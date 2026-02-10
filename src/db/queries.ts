@@ -53,6 +53,7 @@ interface EdgeRow {
   metadata: string | null;
   line: number | null;
   col: number | null;
+  provenance: string | null;
 }
 
 interface FileRow {
@@ -73,9 +74,9 @@ interface UnresolvedRefRow {
   reference_kind: string;
   line: number;
   col: number;
-  file_path: string | null;
-  language: string | null;
   candidates: string | null;
+  file_path: string;
+  language: string;
 }
 
 /**
@@ -117,6 +118,7 @@ function rowToEdge(row: EdgeRow): Edge {
     metadata: row.metadata ? safeJsonParse(row.metadata, undefined) : undefined,
     line: row.line ?? undefined,
     column: row.col ?? undefined,
+    provenance: row.provenance as Edge['provenance'],
   };
 }
 
@@ -171,8 +173,28 @@ export class QueryBuilder {
     getUnresolvedByName?: Database.Statement;
   } = {};
 
+  // Cache for dynamically-built prepared statements keyed by SQL shape.
+  private dynamicStmtCache = new Map<string, Database.Statement>();
+  private readonly maxDynamicStmtCacheSize = 50;
+
   constructor(db: Database.Database) {
     this.db = db;
+  }
+
+  /**
+   * Get or create a cached prepared statement for dynamically-built SQL.
+   */
+  private getDynamicStmt(cacheKey: string, sql: string): Database.Statement {
+    let stmt = this.dynamicStmtCache.get(cacheKey);
+    if (stmt) return stmt;
+
+    if (this.dynamicStmtCache.size >= this.maxDynamicStmtCacheSize) {
+      this.dynamicStmtCache.clear();
+    }
+
+    stmt = this.db.prepare(sql);
+    this.dynamicStmtCache.set(cacheKey, stmt);
+    return stmt;
   }
 
   // ===========================================================================
@@ -394,10 +416,11 @@ export class QueryBuilder {
   }
 
   /**
-   * Clear the node cache
+   * Clear the node cache and dynamic statement cache
    */
   clearCache(): void {
     this.nodeCache.clear();
+    this.dynamicStmtCache.clear();
   }
 
   /**
@@ -430,6 +453,56 @@ export class QueryBuilder {
   getAllNodes(): Node[] {
     const rows = this.db.prepare('SELECT * FROM nodes').all() as NodeRow[];
     return rows.map(rowToNode);
+  }
+
+  /**
+   * Get all nodes matching any of the given kinds in a single query
+   */
+  getNodesByKinds(kinds: NodeKind[]): Node[] {
+    if (kinds.length === 0) return [];
+    const placeholders = kinds.map(() => '?').join(',');
+    const sql = `SELECT * FROM nodes WHERE kind IN (${placeholders})`;
+    const cacheKey = `nodesByKinds:${kinds.length}`;
+    const stmt = this.getDynamicStmt(cacheKey, sql);
+    const rows = stmt.all(...kinds) as NodeRow[];
+    return rows.map(rowToNode);
+  }
+
+  /**
+   * Get multiple nodes by their IDs in a single batch query
+   */
+  getNodesByIds(ids: string[]): Map<string, Node> {
+    const result = new Map<string, Node>();
+    if (ids.length === 0) return result;
+
+    const missing: string[] = [];
+    for (const id of ids) {
+      if (this.nodeCache.has(id)) {
+        const cached = this.nodeCache.get(id)!;
+        // LRU touch
+        this.nodeCache.delete(id);
+        this.nodeCache.set(id, cached);
+        result.set(id, cached);
+      } else {
+        missing.push(id);
+      }
+    }
+
+    // Batch fetch missing nodes, chunking at 999 params (SQLite limit)
+    const CHUNK_SIZE = 999;
+    for (let i = 0; i < missing.length; i += CHUNK_SIZE) {
+      const chunk = missing.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => '?').join(',');
+      const sql = `SELECT * FROM nodes WHERE id IN (${placeholders})`;
+      const rows = this.db.prepare(sql).all(...chunk) as NodeRow[];
+      for (const row of rows) {
+        const node = rowToNode(row);
+        this.cacheNode(node);
+        result.set(node.id, node);
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -627,8 +700,8 @@ export class QueryBuilder {
   insertEdge(edge: Edge): void {
     if (!this.stmts.insertEdge) {
       this.stmts.insertEdge = this.db.prepare(`
-        INSERT OR IGNORE INTO edges (source, target, kind, metadata, line, col)
-        VALUES (@source, @target, @kind, @metadata, @line, @col)
+        INSERT OR IGNORE INTO edges (source, target, kind, metadata, line, col, provenance)
+        VALUES (@source, @target, @kind, @metadata, @line, @col, @provenance)
       `);
     }
 
@@ -639,6 +712,7 @@ export class QueryBuilder {
       metadata: edge.metadata ? JSON.stringify(edge.metadata) : null,
       line: edge.line ?? null,
       col: edge.column ?? null,
+      provenance: edge.provenance ?? null,
     });
   }
 
@@ -666,10 +740,22 @@ export class QueryBuilder {
   /**
    * Get outgoing edges from a node
    */
-  getOutgoingEdges(sourceId: string, kinds?: EdgeKind[]): Edge[] {
-    if (kinds && kinds.length > 0) {
-      const sql = `SELECT * FROM edges WHERE source = ? AND kind IN (${kinds.map(() => '?').join(',')})`;
-      const rows = this.db.prepare(sql).all(sourceId, ...kinds) as EdgeRow[];
+  getOutgoingEdges(sourceId: string, kinds?: EdgeKind[], provenance?: string): Edge[] {
+    if ((kinds && kinds.length > 0) || provenance) {
+      let sql = 'SELECT * FROM edges WHERE source = ?';
+      const params: (string | number)[] = [sourceId];
+
+      if (kinds && kinds.length > 0) {
+        sql += ` AND kind IN (${kinds.map(() => '?').join(',')})`;
+        params.push(...kinds);
+      }
+
+      if (provenance) {
+        sql += ' AND provenance = ?';
+        params.push(provenance);
+      }
+
+      const rows = this.db.prepare(sql).all(...params) as EdgeRow[];
       return rows.map(rowToEdge);
     }
 
@@ -768,14 +854,75 @@ export class QueryBuilder {
   }
 
   /**
-   * Get files that need re-indexing (hash changed)
+   * Get files that need re-indexing (hash changed).
+   *
+   * Uses a temporary table + JOIN so the filtering happens entirely in SQL
+   * instead of loading every FileRecord into JS and comparing in a loop.
    */
   getStaleFiles(currentHashes: Map<string, string>): FileRecord[] {
-    const files = this.getAllFiles();
-    return files.filter((f) => {
-      const currentHash = currentHashes.get(f.path);
-      return currentHash && currentHash !== f.contentHash;
-    });
+    if (currentHashes.size === 0) return [];
+
+    this.db.exec(`
+      CREATE TEMP TABLE IF NOT EXISTS _current_hashes (
+        path TEXT PRIMARY KEY,
+        content_hash TEXT NOT NULL
+      )
+    `);
+    this.db.exec('DELETE FROM _current_hashes');
+
+    const insertHash = this.db.prepare(
+      'INSERT INTO _current_hashes (path, content_hash) VALUES (?, ?)'
+    );
+    this.db.transaction(() => {
+      for (const [filePath, hash] of currentHashes) {
+        insertHash.run(filePath, hash);
+      }
+    })();
+
+    const rows = this.db.prepare(`
+      SELECT f.*
+      FROM files f
+      INNER JOIN _current_hashes ch ON f.path = ch.path
+      WHERE f.content_hash != ch.content_hash
+    `).all() as FileRow[];
+
+    this.db.exec('DELETE FROM _current_hashes');
+
+    return rows.map(rowToFileRecord);
+  }
+
+  /**
+   * Get a lightweight map of tracked file paths to their content hashes.
+   */
+  getFileHashMap(): Map<string, string> {
+    const rows = this.db.prepare(
+      'SELECT path, content_hash FROM files'
+    ).all() as Array<{ path: string; content_hash: string }>;
+
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      map.set(row.path, row.content_hash);
+    }
+    return map;
+  }
+
+  /**
+   * Get a lightweight map of tracked file paths to mtime + size + hash.
+   */
+  getFileSyncMap(): Map<string, { contentHash: string; modifiedAt: number; size: number }> {
+    const rows = this.db.prepare(
+      'SELECT path, content_hash, modified_at, size FROM files'
+    ).all() as Array<{ path: string; content_hash: string; modified_at: number; size: number }>;
+
+    const map = new Map<string, { contentHash: string; modifiedAt: number; size: number }>();
+    for (const row of rows) {
+      map.set(row.path, {
+        contentHash: row.content_hash,
+        modifiedAt: row.modified_at,
+        size: row.size,
+      });
+    }
+    return map;
   }
 
   // ===========================================================================
@@ -788,8 +935,8 @@ export class QueryBuilder {
   insertUnresolvedRef(ref: UnresolvedReference): void {
     if (!this.stmts.insertUnresolved) {
       this.stmts.insertUnresolved = this.db.prepare(`
-        INSERT INTO unresolved_refs (from_node_id, reference_name, reference_kind, line, col, file_path, language, candidates)
-        VALUES (@fromNodeId, @referenceName, @referenceKind, @line, @col, @filePath, @language, @candidates)
+        INSERT INTO unresolved_refs (from_node_id, reference_name, reference_kind, line, col, candidates, file_path, language)
+        VALUES (@fromNodeId, @referenceName, @referenceKind, @line, @col, @candidates, @filePath, @language)
       `);
     }
 
@@ -799,39 +946,23 @@ export class QueryBuilder {
       referenceKind: ref.referenceKind,
       line: ref.line,
       col: ref.column,
-      filePath: ref.filePath ?? null,
-      language: ref.language ?? null,
       candidates: ref.candidates ? JSON.stringify(ref.candidates) : null,
+      filePath: ref.filePath ?? '',
+      language: ref.language ?? 'unknown',
     });
   }
 
   /**
-   * Insert multiple unresolved references in a single transaction
+   * Insert multiple unresolved references in a transaction
    */
   insertUnresolvedRefsBatch(refs: UnresolvedReference[]): void {
     if (refs.length === 0) return;
-
-    if (!this.stmts.insertUnresolved) {
-      this.stmts.insertUnresolved = this.db.prepare(`
-        INSERT INTO unresolved_refs (from_node_id, reference_name, reference_kind, line, col, file_path, language, candidates)
-        VALUES (@fromNodeId, @referenceName, @referenceKind, @line, @col, @filePath, @language, @candidates)
-      `);
-    }
-
-    this.db.transaction(() => {
+    const insert = this.db.transaction(() => {
       for (const ref of refs) {
-        this.stmts.insertUnresolved!.run({
-          fromNodeId: ref.fromNodeId,
-          referenceName: ref.referenceName,
-          referenceKind: ref.referenceKind,
-          line: ref.line,
-          col: ref.column,
-          filePath: ref.filePath ?? null,
-          language: ref.language ?? null,
-          candidates: ref.candidates ? JSON.stringify(ref.candidates) : null,
-        });
+        this.insertUnresolvedRef(ref);
       }
-    })();
+    });
+    insert();
   }
 
   /**
@@ -862,9 +993,9 @@ export class QueryBuilder {
       referenceKind: row.reference_kind as EdgeKind,
       line: row.line,
       column: row.col,
-      filePath: row.file_path ?? undefined,
-      language: (row.language as Language) ?? undefined,
-      candidates: row.candidates ? safeJsonParse<string[]>(row.candidates, []) : undefined,
+      candidates: row.candidates ? safeJsonParse(row.candidates, undefined) : undefined,
+      filePath: row.file_path,
+      language: row.language as Language,
     }));
   }
 
@@ -879,9 +1010,9 @@ export class QueryBuilder {
       referenceKind: row.reference_kind as EdgeKind,
       line: row.line,
       column: row.col,
-      filePath: row.file_path ?? undefined,
-      language: (row.language as Language) ?? undefined,
-      candidates: row.candidates ? safeJsonParse<string[]>(row.candidates, []) : undefined,
+      candidates: row.candidates ? safeJsonParse(row.candidates, undefined) : undefined,
+      filePath: row.file_path,
+      language: row.language as Language,
     }));
   }
 
@@ -909,17 +1040,13 @@ export class QueryBuilder {
    * Get graph statistics
    */
   getStats(): GraphStats {
-    const nodeCount = (
-      this.db.prepare('SELECT COUNT(*) as count FROM nodes').get() as { count: number }
-    ).count;
-
-    const edgeCount = (
-      this.db.prepare('SELECT COUNT(*) as count FROM edges').get() as { count: number }
-    ).count;
-
-    const fileCount = (
-      this.db.prepare('SELECT COUNT(*) as count FROM files').get() as { count: number }
-    ).count;
+    // Single query for all three aggregate counts
+    const counts = this.db.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM nodes) AS node_count,
+        (SELECT COUNT(*) FROM edges) AS edge_count,
+        (SELECT COUNT(*) FROM files) AS file_count
+    `).get() as { node_count: number; edge_count: number; file_count: number };
 
     const nodesByKind = {} as Record<NodeKind, number>;
     const nodeKindRows = this.db
@@ -946,15 +1073,48 @@ export class QueryBuilder {
     }
 
     return {
-      nodeCount,
-      edgeCount,
-      fileCount,
+      nodeCount: counts.node_count,
+      edgeCount: counts.edge_count,
+      fileCount: counts.file_count,
       nodesByKind,
       edgesByKind,
       filesByLanguage,
       dbSizeBytes: 0, // Set by caller using DatabaseConnection.getSize()
       lastUpdated: Date.now(),
     };
+  }
+
+  // ===========================================================================
+  // Project Metadata
+  // ===========================================================================
+
+  /**
+   * Get a metadata value by key
+   */
+  getMetadata(key: string): string | null {
+    const row = this.db.prepare('SELECT value FROM project_metadata WHERE key = ?').get(key) as { value: string } | undefined;
+    return row?.value ?? null;
+  }
+
+  /**
+   * Set a metadata key-value pair (upsert)
+   */
+  setMetadata(key: string, value: string): void {
+    this.db.prepare(
+      'INSERT INTO project_metadata (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at'
+    ).run(key, value, Date.now());
+  }
+
+  /**
+   * Get all metadata as a key-value record
+   */
+  getAllMetadata(): Record<string, string> {
+    const rows = this.db.prepare('SELECT key, value FROM project_metadata').all() as { key: string; value: string }[];
+    const result: Record<string, string> = {};
+    for (const row of rows) {
+      result[row.key] = row.value;
+    }
+    return result;
   }
 
   /**

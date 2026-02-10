@@ -52,6 +52,14 @@ export class DatabaseConnection {
     const schema = fs.readFileSync(schemaPath, 'utf-8');
     db.exec(schema);
 
+    // Record current schema version so migrations aren't re-applied on open
+    const currentVersion = getCurrentVersion(db);
+    if (currentVersion < CURRENT_SCHEMA_VERSION) {
+      db.prepare(
+        'INSERT OR IGNORE INTO schema_versions (version, applied_at, description) VALUES (?, ?, ?)'
+      ).run(CURRENT_SCHEMA_VERSION, Date.now(), 'Initial schema includes all migrations');
+    }
+
     return new DatabaseConnection(db, dbPath);
   }
 

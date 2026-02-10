@@ -166,6 +166,9 @@ export interface Edge {
 
   /** Column number where relationship occurs */
   column?: number;
+
+  /** How this edge was created */
+  provenance?: 'tree-sitter' | 'scip' | 'heuristic';
 }
 
 /**
@@ -333,6 +336,9 @@ export interface SearchOptions {
 
   /** Whether search is case-sensitive */
   caseSensitive?: boolean;
+
+  /** Search intent for biasing results */
+  intent?: 'api' | 'general';
 }
 
 /**

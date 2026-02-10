@@ -4,6 +4,8 @@ node_modules/
 # Build output
 dist/
 
+.cmem
+
 # IDE
 .idea/
 .vscode/
@@ -43,3 +45,5 @@ npm-debug.log*
 
 # Test language repos for manual testing
 test-languages/
+
+nul

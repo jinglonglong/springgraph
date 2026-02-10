@@ -332,6 +332,16 @@ export class ToolHandler {
   }
 
   /**
+   * Validate that a value is a non-empty string
+   */
+  private validateString(value: unknown, name: string): string | ToolResult {
+    if (typeof value !== 'string' || value.length === 0) {
+      return this.errorResult(`${name} must be a non-empty string`);
+    }
+    return value;
+  }
+
+  /**
    * Execute a tool by name
    */
   async execute(toolName: string, args: Record<string, unknown>): Promise<ToolResult> {
@@ -366,10 +376,13 @@ export class ToolHandler {
    * Handle codegraph_search
    */
   private async handleSearch(args: Record<string, unknown>): Promise<ToolResult> {
+    const query = this.validateString(args.query, 'query');
+    if (typeof query !== 'string') return query;
+
     const cg = this.getCodeGraph(args.projectPath as string | undefined);
-    const query = args.query as string;
     const kind = args.kind as string | undefined;
-    const limit = clamp((args.limit as number) || 10, 1, 100);
+    const rawLimit = Number(args.limit) || 10;
+    const limit = clamp(rawLimit, 1, 100);
 
     const results = cg.searchNodes(query, {
       limit,
@@ -388,6 +401,9 @@ export class ToolHandler {
    * Handle codegraph_context
    */
   private async handleContext(args: Record<string, unknown>): Promise<ToolResult> {
+    const task = this.validateString(args.task, 'task');
+    if (typeof task !== 'string') return task;
+
     // Mark session as consulted (enables Grep/Glob/Bash)
     const sessionId = process.env.CLAUDE_SESSION_ID;
     if (sessionId) {
@@ -395,7 +411,6 @@ export class ToolHandler {
     }
 
     const cg = this.getCodeGraph(args.projectPath as string | undefined);
-    const task = args.task as string;
     const maxNodes = (args.maxNodes as number) || 20;
     const includeCode = args.includeCode !== false;
 
@@ -452,8 +467,10 @@ export class ToolHandler {
    * Handle codegraph_callers
    */
   private async handleCallers(args: Record<string, unknown>): Promise<ToolResult> {
+    const symbol = this.validateString(args.symbol, 'symbol');
+    if (typeof symbol !== 'string') return symbol;
+
     const cg = this.getCodeGraph(args.projectPath as string | undefined);
-    const symbol = args.symbol as string;
     const limit = clamp((args.limit as number) || 20, 1, 100);
 
     const match = this.findSymbol(cg, symbol);
@@ -476,8 +493,10 @@ export class ToolHandler {
    * Handle codegraph_callees
    */
   private async handleCallees(args: Record<string, unknown>): Promise<ToolResult> {
+    const symbol = this.validateString(args.symbol, 'symbol');
+    if (typeof symbol !== 'string') return symbol;
+
     const cg = this.getCodeGraph(args.projectPath as string | undefined);
-    const symbol = args.symbol as string;
     const limit = clamp((args.limit as number) || 20, 1, 100);
 
     const match = this.findSymbol(cg, symbol);
@@ -500,8 +519,10 @@ export class ToolHandler {
    * Handle codegraph_impact
    */
   private async handleImpact(args: Record<string, unknown>): Promise<ToolResult> {
+    const symbol = this.validateString(args.symbol, 'symbol');
+    if (typeof symbol !== 'string') return symbol;
+
     const cg = this.getCodeGraph(args.projectPath as string | undefined);
-    const symbol = args.symbol as string;
     const depth = clamp((args.depth as number) || 2, 1, 10);
 
     const match = this.findSymbol(cg, symbol);
@@ -519,8 +540,10 @@ export class ToolHandler {
    * Handle codegraph_node
    */
   private async handleNode(args: Record<string, unknown>): Promise<ToolResult> {
+    const symbol = this.validateString(args.symbol, 'symbol');
+    if (typeof symbol !== 'string') return symbol;
+
     const cg = this.getCodeGraph(args.projectPath as string | undefined);
-    const symbol = args.symbol as string;
     // Default to false to minimize context usage
     const includeCode = args.includeCode === true;
 

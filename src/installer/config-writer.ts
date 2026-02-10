@@ -46,29 +46,55 @@ function getSettingsJsonPath(location: InstallLocation): string {
 }
 
 /**
- * Read a JSON file, returning an empty object if it doesn't exist
+ * Read a JSON file, returning an empty object if it doesn't exist.
+ * Distinguishes between missing files (returns {}) and corrupted
+ * files (logs warning, returns {}).
  */
 function readJsonFile(filePath: string): Record<string, any> {
-  try {
-    if (fs.existsSync(filePath)) {
-      const content = fs.readFileSync(filePath, 'utf-8');
-      return JSON.parse(content);
-    }
-  } catch {
-    // Ignore parse errors, return empty object
+  if (!fs.existsSync(filePath)) {
+    return {};
   }
-  return {};
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    return JSON.parse(content);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`  Warning: Could not parse ${path.basename(filePath)}: ${msg}`);
+    console.warn(`  A backup will be created before overwriting.`);
+    // Create a backup of the corrupted file
+    try {
+      const backupPath = filePath + '.backup';
+      fs.copyFileSync(filePath, backupPath);
+    } catch { /* ignore backup failure */ }
+    return {};
+  }
+}
+
+/**
+ * Write a file atomically by writing to a temp file then renaming.
+ * Prevents corruption if the process crashes mid-write.
+ */
+function atomicWriteFileSync(filePath: string, content: string): void {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const tmpPath = filePath + '.tmp.' + process.pid;
+  try {
+    fs.writeFileSync(tmpPath, content);
+    fs.renameSync(tmpPath, filePath);
+  } catch (err) {
+    // Clean up temp file on failure
+    try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+    throw err;
+  }
 }
 
 /**
  * Write a JSON file, creating parent directories if needed
  */
 function writeJsonFile(filePath: string, data: Record<string, any>): void {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n');
+  atomicWriteFileSync(filePath, JSON.stringify(data, null, 2) + '\n');
 }
 
 /**
@@ -306,7 +332,7 @@ export function writeClaudeMd(location: InstallLocation): { created: boolean; up
   // Check if file exists
   if (!fs.existsSync(claudeMdPath)) {
     // Create new file with just the CodeGraph section
-    fs.writeFileSync(claudeMdPath, CLAUDE_MD_TEMPLATE + '\n');
+    atomicWriteFileSync(claudeMdPath, CLAUDE_MD_TEMPLATE + '\n');
     return { created: true, updated: false };
   }
 
@@ -324,7 +350,7 @@ export function writeClaudeMd(location: InstallLocation): { created: boolean; up
       const before = content.substring(0, startIdx);
       const after = content.substring(endIdx + CODEGRAPH_SECTION_END.length);
       content = before + CLAUDE_MD_TEMPLATE + after;
-      fs.writeFileSync(claudeMdPath, content);
+      atomicWriteFileSync(claudeMdPath, content);
       return { created: false, updated: true };
     }
   }
@@ -334,10 +360,11 @@ export function writeClaudeMd(location: InstallLocation): { created: boolean; up
   const match = content.match(codegraphHeaderRegex);
 
   if (match && match.index !== undefined) {
-    // Find the end of the CodeGraph section (next ## header or end of file)
+    // Find the end of the CodeGraph section (next h2 header or end of file)
+    // Use negative lookahead (?!#) to match "## X" but not "### X"
     const sectionStart = match.index;
     const afterSection = content.substring(sectionStart + 1);
-    const nextHeaderMatch = afterSection.match(/\n## [^#]/);
+    const nextHeaderMatch = afterSection.match(/\n## (?!#)/);
 
     let sectionEnd: number;
     if (nextHeaderMatch && nextHeaderMatch.index !== undefined) {
@@ -350,12 +377,12 @@ export function writeClaudeMd(location: InstallLocation): { created: boolean; up
     const before = content.substring(0, sectionStart);
     const after = content.substring(sectionEnd);
     content = before + '\n' + CLAUDE_MD_TEMPLATE + after;
-    fs.writeFileSync(claudeMdPath, content);
+    atomicWriteFileSync(claudeMdPath, content);
     return { created: false, updated: true };
   }
 
   // No existing section, append to end
   content = content.trimEnd() + '\n\n' + CLAUDE_MD_TEMPLATE + '\n';
-  fs.writeFileSync(claudeMdPath, content);
+  atomicWriteFileSync(claudeMdPath, content);
   return { created: false, updated: false };
 }

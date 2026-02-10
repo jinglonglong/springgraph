@@ -1294,9 +1294,10 @@ export class TreeSitterExtractor {
 
           if (nameNode) {
             const name = getNodeText(nameNode, this.source);
-            // Skip if it looks like a function (arrow function or function expression)
+            // Arrow functions / function expressions: extract as function instead of variable
             if (valueNode && (valueNode.type === 'arrow_function' || valueNode.type === 'function_expression')) {
-              continue; // Already handled by function extraction
+              this.extractFunction(valueNode);
+              continue;
             }
 
             // Capture first 100 chars of initializer for context (stored in signature for searchability)

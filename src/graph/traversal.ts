@@ -85,7 +85,9 @@ export class GraphTraverser {
       const adjacentEdges = this.getAdjacentEdges(node.id, opts.direction, opts.edgeKinds);
 
       for (const adjEdge of adjacentEdges) {
-        const nextNodeId = opts.direction === 'incoming' ? adjEdge.source : adjEdge.target;
+        // Determine next node: for 'both' direction, edges can be either
+        // incoming or outgoing, so pick whichever end is not the current node
+        const nextNodeId = adjEdge.source === node.id ? adjEdge.target : adjEdge.source;
 
         if (visited.has(nextNodeId)) {
           continue;
@@ -169,7 +171,9 @@ export class GraphTraverser {
     const adjacentEdges = this.getAdjacentEdges(node.id, opts.direction, opts.edgeKinds);
 
     for (const edge of adjacentEdges) {
-      const nextNodeId = opts.direction === 'incoming' ? edge.source : edge.target;
+      // Determine next node: for 'both' direction, edges can be either
+      // incoming or outgoing, so pick whichever end is not the current node
+      const nextNodeId = edge.source === node.id ? edge.target : edge.source;
 
       if (visited.has(nextNodeId)) {
         continue;

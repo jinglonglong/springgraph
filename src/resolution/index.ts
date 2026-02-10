@@ -246,27 +246,36 @@ export class ReferenceResolver {
       return null;
     }
 
-    // Strategy 1: Try framework-specific resolution first
+    const candidates: ResolvedRef[] = [];
+
+    // Strategy 1: Try framework-specific resolution
     for (const framework of this.frameworks) {
       const result = framework.resolve(ref, this.context);
       if (result) {
-        return result;
+        if (result.confidence >= 0.9) return result; // High confidence, return immediately
+        candidates.push(result);
       }
     }
 
     // Strategy 2: Try import-based resolution
     const importResult = resolveViaImport(ref, this.context);
     if (importResult) {
-      return importResult;
+      if (importResult.confidence >= 0.9) return importResult;
+      candidates.push(importResult);
     }
 
     // Strategy 3: Try name matching
     const nameResult = matchReference(ref, this.context);
     if (nameResult) {
-      return nameResult;
+      candidates.push(nameResult);
     }
 
-    return null;
+    if (candidates.length === 0) return null;
+
+    // Return highest confidence candidate
+    return candidates.reduce((best, curr) =>
+      curr.confidence > best.confidence ? curr : best
+    );
   }
 
   /**

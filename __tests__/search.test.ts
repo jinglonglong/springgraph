@@ -1,7 +1,7 @@
 /**
  * Search Query Utilities Tests
  *
- * Tests multi-signal scoring, kind bonuses, path relevance, and API intent detection.
+ * Tests multi-signal scoring, kind bonuses, and path relevance.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -9,8 +9,6 @@ import {
   extractSearchTerms,
   scorePathRelevance,
   kindBonus,
-  detectApiIntent,
-  inferRouteDirectories,
   STOP_WORDS,
 } from '../src/search/query-utils';
 
@@ -111,83 +109,6 @@ describe('Search Query Utilities', () => {
 
     it('should return 0 for unknown kinds', () => {
       expect(kindBonus('unknown_kind' as any)).toBe(0);
-    });
-  });
-
-  describe('detectApiIntent', () => {
-    it('should detect API-related queries', () => {
-      expect(detectApiIntent('find the API endpoint for users')).toBe(true);
-      expect(detectApiIntent('where is the login route')).toBe(true);
-      expect(detectApiIntent('show me the request handler')).toBe(true);
-    });
-
-    it('should detect HTTP method patterns', () => {
-      expect(detectApiIntent('GET /api/users')).toBe(true);
-      expect(detectApiIntent('post /users/create')).toBe(true);
-    });
-
-    it('should detect REST and GraphQL', () => {
-      expect(detectApiIntent('REST API for payments')).toBe(true);
-      expect(detectApiIntent('GraphQL resolver for orders')).toBe(true);
-    });
-
-    it('should not detect non-API queries', () => {
-      expect(detectApiIntent('fix the login bug')).toBe(false);
-      expect(detectApiIntent('add dark mode support')).toBe(false);
-    });
-
-    it('should detect controller and middleware mentions', () => {
-      expect(detectApiIntent('find the auth controller')).toBe(true);
-      expect(detectApiIntent('CORS middleware configuration')).toBe(true);
-    });
-  });
-
-  describe('inferRouteDirectories', () => {
-    it('should detect route directories', () => {
-      const files = [
-        'src/routes/auth.ts',
-        'src/routes/users.ts',
-        'src/utils/format.ts',
-      ];
-      const dirs = inferRouteDirectories(files);
-      expect(dirs).toBeDefined();
-      if (dirs) {
-        expect(dirs.some(d => d.includes('route'))).toBe(true);
-      }
-    });
-
-    it('should detect controller directories', () => {
-      const files = [
-        'src/controllers/AuthController.ts',
-        'src/models/User.ts',
-      ];
-      const dirs = inferRouteDirectories(files);
-      expect(dirs).toBeDefined();
-      if (dirs) {
-        expect(dirs.some(d => d.includes('controller'))).toBe(true);
-      }
-    });
-
-    it('should detect api directories', () => {
-      const files = [
-        'src/api/v1/users.ts',
-        'src/api/v1/orders.ts',
-      ];
-      const dirs = inferRouteDirectories(files);
-      expect(dirs).toBeDefined();
-      if (dirs) {
-        expect(dirs.some(d => d.includes('api'))).toBe(true);
-      }
-    });
-
-    it('should return undefined when no route dirs found', () => {
-      const files = [
-        'src/utils/format.ts',
-        'src/models/User.ts',
-        'src/index.ts',
-      ];
-      const dirs = inferRouteDirectories(files);
-      expect(dirs).toBeUndefined();
     });
   });
 

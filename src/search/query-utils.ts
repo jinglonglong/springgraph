@@ -1,7 +1,7 @@
 /**
  * Search Query Utilities
  *
- * Shared module for search term extraction, scoring, and intent detection.
+ * Shared module for search term extraction and scoring.
  */
 
 import * as path from 'path';
@@ -86,44 +86,4 @@ export function kindBonus(kind: Node['kind']): number {
     enum_member: 3,
   };
   return bonuses[kind] ?? 0;
-}
-
-/**
- * Detect if a query has API/endpoint intent
- */
-export function detectApiIntent(query: string): boolean {
-  const apiPatterns = [
-    /\bapi\b/i, /\bendpoint/i, /\broute/i, /\bhandler/i,
-    /\bcontroller/i, /\bmiddleware/i, /\brest\b/i, /\bgraphql/i,
-    /\bget\s+\//, /\bpost\s+\//, /\bput\s+\//, /\bdelete\s+\//,
-    /\brequest/i, /\bresponse/i, /\bhttp/i,
-  ];
-  return apiPatterns.some(p => p.test(query));
-}
-
-/**
- * Infer route/controller directories from project structure
- * Returns undefined if no route directories are detected
- */
-export function inferRouteDirectories(files: string[]): string[] | undefined {
-  const routeDirs = new Set<string>();
-  const routePatterns = [
-    /routes?\//i, /controllers?\//i, /handlers?\//i,
-    /api\//i, /endpoints?\//i,
-  ];
-
-  for (const file of files) {
-    for (const pattern of routePatterns) {
-      if (pattern.test(file)) {
-        const match = file.match(pattern);
-        if (match) {
-          const idx = file.indexOf(match[0]);
-          const dir = file.substring(0, idx + match[0].length - 1);
-          routeDirs.add(dir);
-        }
-      }
-    }
-  }
-
-  return routeDirs.size > 0 ? Array.from(routeDirs) : undefined;
 }

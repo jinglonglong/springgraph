@@ -6,11 +6,12 @@
 
 **30% fewer tokens • 25% fewer tool calls • 100% local**
 
-**Works on Windows, macOS, and Linux**
-
 [![npm version](https://img.shields.io/npm/v/@colbymchenry/codegraph.svg)](https://www.npmjs.com/package/@colbymchenry/codegraph)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![Windows](https://img.shields.io/badge/Windows-supported-blue.svg)](#)
+[![macOS](https://img.shields.io/badge/macOS-supported-blue.svg)](#)
+[![Linux](https://img.shields.io/badge/Linux-supported-blue.svg)](#)
 
 <br />
 

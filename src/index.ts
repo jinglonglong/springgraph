@@ -149,7 +149,9 @@ export class CodeGraph {
     this.queries = queries;
     this.config = config;
     this.projectRoot = projectRoot;
-    this.fileLock = new FileLock(db.getPath());
+    this.fileLock = new FileLock(
+      path.join(projectRoot, '.codegraph', 'codegraph.lock')
+    );
     this.orchestrator = new ExtractionOrchestrator(projectRoot, config, queries);
     this.resolver = createResolver(projectRoot, queries);
     this.graphManager = new GraphQueryManager(queries);
@@ -375,8 +377,9 @@ export class CodeGraph {
    */
   async indexAll(options: IndexOptions = {}): Promise<IndexResult> {
     return this.indexMutex.withLock(async () => {
-      const locked = await this.fileLock.acquire();
-      if (!locked) {
+      try {
+        this.fileLock.acquire();
+      } catch {
         return { success: false, filesIndexed: 0, filesSkipped: 0, nodesCreated: 0, edgesCreated: 0, errors: [{ message: 'Could not acquire file lock - another process may be indexing', severity: 'error' as const }], durationMs: 0 };
       }
       try {
@@ -416,8 +419,9 @@ export class CodeGraph {
    */
   async indexFiles(filePaths: string[]): Promise<IndexResult> {
     return this.indexMutex.withLock(async () => {
-      const locked = await this.fileLock.acquire();
-      if (!locked) {
+      try {
+        this.fileLock.acquire();
+      } catch {
         return { success: false, filesIndexed: 0, filesSkipped: 0, nodesCreated: 0, edgesCreated: 0, errors: [{ message: 'Could not acquire file lock - another process may be indexing', severity: 'error' as const }], durationMs: 0 };
       }
       try {
@@ -435,8 +439,9 @@ export class CodeGraph {
    */
   async sync(options: IndexOptions = {}): Promise<SyncResult> {
     return this.indexMutex.withLock(async () => {
-      const locked = await this.fileLock.acquire();
-      if (!locked) {
+      try {
+        this.fileLock.acquire();
+      } catch {
         return { filesChecked: 0, filesAdded: 0, filesModified: 0, filesRemoved: 0, nodesUpdated: 0, durationMs: 0 };
       }
       try {

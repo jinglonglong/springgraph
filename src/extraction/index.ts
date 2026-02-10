@@ -68,26 +68,8 @@ export function hashContent(content: string): string {
  * Check if a path matches any glob pattern (simplified)
  */
 function matchesGlob(filePath: string, pattern: string): boolean {
-  // Convert glob to regex using placeholders to avoid conflicts
-  let regexStr = pattern;
-
-  // Replace glob patterns with placeholders first
-  regexStr = regexStr.replace(/\*\*\//g, '\x00GLOBSTAR_SLASH\x00');
-  regexStr = regexStr.replace(/\*\*/g, '\x00GLOBSTAR\x00');
-  regexStr = regexStr.replace(/\*/g, '\x00STAR\x00');
-  regexStr = regexStr.replace(/\?/g, '\x00QUESTION\x00');
-
-  // Escape regex special characters
-  regexStr = regexStr.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-
-  // Replace placeholders with regex equivalents
-  regexStr = regexStr.replace(/\x00GLOBSTAR_SLASH\x00/g, '(?:.*/)?');  // **/ = zero or more dirs
-  regexStr = regexStr.replace(/\x00GLOBSTAR\x00/g, '.*');              // ** = anything
-  regexStr = regexStr.replace(/\x00STAR\x00/g, '[^/]*');               // * = anything except /
-  regexStr = regexStr.replace(/\x00QUESTION\x00/g, '.');               // ? = single char
-
-  const regex = new RegExp(`^${regexStr}$`);
-  return regex.test(filePath);
+  const picomatch = require('picomatch');
+  return picomatch.isMatch(filePath, pattern, { dot: true });
 }
 
 /**

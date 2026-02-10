@@ -15,6 +15,8 @@
  *   codegraph query <search>     Search for symbols
  *   codegraph files [options]    Show project file structure
  *   codegraph context <task>     Build context for a task
+ *   codegraph mark-dirty [path]  Mark project as needing sync (hooks)
+ *   codegraph sync-if-dirty [path] Sync if marked dirty (hooks)
  *
  * Note: Git hooks have been removed. CodeGraph sync is triggered automatically
  * through codegraph's Claude Code hooks integration.
@@ -23,7 +25,7 @@
 import { Command } from 'commander';
 import * as path from 'path';
 import * as fs from 'fs';
-import CodeGraph from '../index';
+import CodeGraph, { getCodeGraphDir, findNearestCodeGraphRoot } from '../index';
 import type { IndexProgress } from '../index';
 import { runInstaller } from '../installer';
 import { initSentry, captureException } from '../sentry';
@@ -924,6 +926,75 @@ program
       error(`Failed to start server: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);
     }
+  });
+
+/**
+ * codegraph mark-dirty [path]
+ *
+ * Touches .codegraph/.dirty to signal that files have changed.
+ * Used by Claude Code PostToolUse hooks to batch syncs.
+ * Runs silently and always exits 0.
+ */
+program
+  .command('mark-dirty [path]')
+  .description('Mark project as needing sync (used by Claude Code hooks)')
+  .action(async (pathArg: string | undefined) => {
+    try {
+      const startPath = path.resolve(pathArg || process.cwd());
+      const projectRoot = findNearestCodeGraphRoot(startPath);
+      if (!projectRoot) {
+        // No .codegraph/ found — exit silently
+        process.exit(0);
+      }
+      const dirtyPath = path.join(getCodeGraphDir(projectRoot), '.dirty');
+      fs.writeFileSync(dirtyPath, Date.now().toString(), 'utf-8');
+    } catch {
+      // Never fail — this runs in the background during edits
+    }
+    process.exit(0);
+  });
+
+/**
+ * codegraph sync-if-dirty [path]
+ *
+ * Syncs the index only if .codegraph/.dirty exists.
+ * Removes the marker BEFORE syncing so edits during sync
+ * create a new marker for the next Stop event.
+ * Runs silently and always exits 0.
+ */
+program
+  .command('sync-if-dirty [path]')
+  .description('Sync if project was marked dirty (used by Claude Code hooks)')
+  .action(async (pathArg: string | undefined) => {
+    try {
+      const startPath = path.resolve(pathArg || process.cwd());
+      const projectRoot = findNearestCodeGraphRoot(startPath);
+      if (!projectRoot) {
+        process.exit(0);
+      }
+      const dirtyPath = path.join(getCodeGraphDir(projectRoot), '.dirty');
+
+      // No marker → nothing to do (sub-ms exit)
+      if (!fs.existsSync(dirtyPath)) {
+        process.exit(0);
+      }
+
+      // Remove marker FIRST so edits during sync create a new one
+      try { fs.unlinkSync(dirtyPath); } catch { /* ignore */ }
+
+      // If not fully initialized (no DB), exit
+      if (!CodeGraph.isInitialized(projectRoot)) {
+        process.exit(0);
+      }
+
+      // Run sync
+      const cg = await CodeGraph.open(projectRoot);
+      await cg.sync();
+      cg.destroy();
+    } catch {
+      // Never fail — this runs at the end of Claude responses
+    }
+    process.exit(0);
   });
 
 /**

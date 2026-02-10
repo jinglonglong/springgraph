@@ -96,6 +96,9 @@ cache/
 
 # Logs
 *.log
+
+# Hook markers
+.dirty
 `;
 
     fs.writeFileSync(gitignorePath, gitignoreContent, 'utf-8');

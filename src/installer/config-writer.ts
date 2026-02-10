@@ -175,6 +175,93 @@ export function hasPermissions(location: InstallLocation): boolean {
   return permissions.some((p: string) => p.startsWith('mcp__codegraph__'));
 }
 
+// =============================================================================
+// Hooks Configuration
+// =============================================================================
+
+/**
+ * Get the hooks configuration for Claude Code auto-sync.
+ *
+ * PostToolUse(Edit|Write) → mark-dirty (async, non-blocking)
+ * Stop → sync-if-dirty (sync, ensures fresh index before next user turn)
+ */
+function getHooksConfig(location: InstallLocation): Record<string, any> {
+  const command = location === 'global' ? 'codegraph' : 'npx @colbymchenry/codegraph';
+
+  return {
+    PostToolUse: [
+      {
+        matcher: 'Edit|Write',
+        hooks: [
+          {
+            type: 'command',
+            command: `${command} mark-dirty`,
+            async: true,
+          },
+        ],
+      },
+    ],
+    Stop: [
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: `${command} sync-if-dirty`,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * Check if Claude Code hooks already exist for CodeGraph
+ */
+export function hasHooks(location: InstallLocation): boolean {
+  const settingsPath = getSettingsJsonPath(location);
+  const settings = readJsonFile(settingsPath);
+  const hooks = settings.hooks;
+  if (!hooks) return false;
+
+  // Check if any hook command references codegraph
+  const json = JSON.stringify(hooks);
+  return json.includes('codegraph mark-dirty') || json.includes('codegraph sync-if-dirty');
+}
+
+/**
+ * Write Claude Code hooks to settings.json for auto-sync.
+ * Merges with existing hooks, deduplicating any previous codegraph entries.
+ */
+export function writeHooks(location: InstallLocation): void {
+  const settingsPath = getSettingsJsonPath(location);
+  const settings = readJsonFile(settingsPath);
+
+  if (!settings.hooks) {
+    settings.hooks = {};
+  }
+
+  const newHooks = getHooksConfig(location);
+
+  // For each hook event (PostToolUse, Stop), merge with existing entries
+  for (const [event, newEntries] of Object.entries(newHooks)) {
+    if (!Array.isArray(settings.hooks[event])) {
+      settings.hooks[event] = [];
+    }
+
+    // Remove any existing codegraph entries for this event
+    settings.hooks[event] = (settings.hooks[event] as any[]).filter((entry: any) => {
+      // Keep entries that don't reference codegraph
+      const entryJson = JSON.stringify(entry);
+      return !entryJson.includes('codegraph mark-dirty') && !entryJson.includes('codegraph sync-if-dirty');
+    });
+
+    // Add new codegraph entries
+    settings.hooks[event].push(...(newEntries as any[]));
+  }
+
+  writeJsonFile(settingsPath, settings);
+}
+
 /**
  * Get the path to CLAUDE.md
  * - Global: ~/.claude/CLAUDE.md

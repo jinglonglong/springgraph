@@ -54,6 +54,7 @@ interface EdgeRow {
   metadata: string | null;
   line: number | null;
   col: number | null;
+  provenance: string | null;
 }
 
 interface FileRow {
@@ -74,9 +75,9 @@ interface UnresolvedRefRow {
   reference_kind: string;
   line: number;
   col: number;
-  file_path: string | null;
-  language: string | null;
   candidates: string | null;
+  file_path: string;
+  language: string;
 }
 
 /**
@@ -118,6 +119,7 @@ function rowToEdge(row: EdgeRow): Edge {
     metadata: row.metadata ? safeJsonParse(row.metadata, undefined) : undefined,
     line: row.line ?? undefined,
     column: row.col ?? undefined,
+    provenance: row.provenance as Edge['provenance'],
   };
 }
 
@@ -639,8 +641,8 @@ export class QueryBuilder {
   insertEdge(edge: Edge): void {
     if (!this.stmts.insertEdge) {
       this.stmts.insertEdge = this.db.prepare(`
-        INSERT OR IGNORE INTO edges (source, target, kind, metadata, line, col)
-        VALUES (@source, @target, @kind, @metadata, @line, @col)
+        INSERT OR IGNORE INTO edges (source, target, kind, metadata, line, col, provenance)
+        VALUES (@source, @target, @kind, @metadata, @line, @col, @provenance)
       `);
     }
 
@@ -651,6 +653,7 @@ export class QueryBuilder {
       metadata: edge.metadata ? JSON.stringify(edge.metadata) : null,
       line: edge.line ?? null,
       col: edge.column ?? null,
+      provenance: edge.provenance ?? null,
     });
   }
 
@@ -678,10 +681,22 @@ export class QueryBuilder {
   /**
    * Get outgoing edges from a node
    */
-  getOutgoingEdges(sourceId: string, kinds?: EdgeKind[]): Edge[] {
-    if (kinds && kinds.length > 0) {
-      const sql = `SELECT * FROM edges WHERE source = ? AND kind IN (${kinds.map(() => '?').join(',')})`;
-      const rows = this.db.prepare(sql).all(sourceId, ...kinds) as EdgeRow[];
+  getOutgoingEdges(sourceId: string, kinds?: EdgeKind[], provenance?: string): Edge[] {
+    if ((kinds && kinds.length > 0) || provenance) {
+      let sql = 'SELECT * FROM edges WHERE source = ?';
+      const params: (string | number)[] = [sourceId];
+
+      if (kinds && kinds.length > 0) {
+        sql += ` AND kind IN (${kinds.map(() => '?').join(',')})`;
+        params.push(...kinds);
+      }
+
+      if (provenance) {
+        sql += ' AND provenance = ?';
+        params.push(provenance);
+      }
+
+      const rows = this.db.prepare(sql).all(...params) as EdgeRow[];
       return rows.map(rowToEdge);
     }
 
@@ -800,8 +815,8 @@ export class QueryBuilder {
   insertUnresolvedRef(ref: UnresolvedReference): void {
     if (!this.stmts.insertUnresolved) {
       this.stmts.insertUnresolved = this.db.prepare(`
-        INSERT INTO unresolved_refs (from_node_id, reference_name, reference_kind, line, col, file_path, language, candidates)
-        VALUES (@fromNodeId, @referenceName, @referenceKind, @line, @col, @filePath, @language, @candidates)
+        INSERT INTO unresolved_refs (from_node_id, reference_name, reference_kind, line, col, candidates, file_path, language)
+        VALUES (@fromNodeId, @referenceName, @referenceKind, @line, @col, @candidates, @filePath, @language)
       `);
     }
 
@@ -811,39 +826,23 @@ export class QueryBuilder {
       referenceKind: ref.referenceKind,
       line: ref.line,
       col: ref.column,
-      filePath: ref.filePath ?? null,
-      language: ref.language ?? null,
       candidates: ref.candidates ? JSON.stringify(ref.candidates) : null,
+      filePath: ref.filePath ?? '',
+      language: ref.language ?? 'unknown',
     });
   }
 
   /**
-   * Insert multiple unresolved references in a single transaction
+   * Insert multiple unresolved references in a transaction
    */
   insertUnresolvedRefsBatch(refs: UnresolvedReference[]): void {
     if (refs.length === 0) return;
-
-    if (!this.stmts.insertUnresolved) {
-      this.stmts.insertUnresolved = this.db.prepare(`
-        INSERT INTO unresolved_refs (from_node_id, reference_name, reference_kind, line, col, file_path, language, candidates)
-        VALUES (@fromNodeId, @referenceName, @referenceKind, @line, @col, @filePath, @language, @candidates)
-      `);
-    }
-
-    this.db.transaction(() => {
+    const insert = this.db.transaction(() => {
       for (const ref of refs) {
-        this.stmts.insertUnresolved!.run({
-          fromNodeId: ref.fromNodeId,
-          referenceName: ref.referenceName,
-          referenceKind: ref.referenceKind,
-          line: ref.line,
-          col: ref.column,
-          filePath: ref.filePath ?? null,
-          language: ref.language ?? null,
-          candidates: ref.candidates ? JSON.stringify(ref.candidates) : null,
-        });
+        this.insertUnresolvedRef(ref);
       }
-    })();
+    });
+    insert();
   }
 
   /**
@@ -874,9 +873,9 @@ export class QueryBuilder {
       referenceKind: row.reference_kind as EdgeKind,
       line: row.line,
       column: row.col,
-      filePath: row.file_path ?? undefined,
-      language: (row.language as Language) ?? undefined,
-      candidates: row.candidates ? safeJsonParse<string[]>(row.candidates, []) : undefined,
+      candidates: row.candidates ? safeJsonParse(row.candidates, undefined) : undefined,
+      filePath: row.file_path,
+      language: row.language as Language,
     }));
   }
 
@@ -891,9 +890,9 @@ export class QueryBuilder {
       referenceKind: row.reference_kind as EdgeKind,
       line: row.line,
       column: row.col,
-      filePath: row.file_path ?? undefined,
-      language: (row.language as Language) ?? undefined,
-      candidates: row.candidates ? safeJsonParse<string[]>(row.candidates, []) : undefined,
+      candidates: row.candidates ? safeJsonParse(row.candidates, undefined) : undefined,
+      filePath: row.file_path,
+      language: row.language as Language,
     }));
   }
 
@@ -921,17 +920,13 @@ export class QueryBuilder {
    * Get graph statistics
    */
   getStats(): GraphStats {
-    const nodeCount = (
-      this.db.prepare('SELECT COUNT(*) as count FROM nodes').get() as { count: number }
-    ).count;
-
-    const edgeCount = (
-      this.db.prepare('SELECT COUNT(*) as count FROM edges').get() as { count: number }
-    ).count;
-
-    const fileCount = (
-      this.db.prepare('SELECT COUNT(*) as count FROM files').get() as { count: number }
-    ).count;
+    // Single query for all three aggregate counts
+    const counts = this.db.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM nodes) AS node_count,
+        (SELECT COUNT(*) FROM edges) AS edge_count,
+        (SELECT COUNT(*) FROM files) AS file_count
+    `).get() as { node_count: number; edge_count: number; file_count: number };
 
     const nodesByKind = {} as Record<NodeKind, number>;
     const nodeKindRows = this.db
@@ -958,15 +953,48 @@ export class QueryBuilder {
     }
 
     return {
-      nodeCount,
-      edgeCount,
-      fileCount,
+      nodeCount: counts.node_count,
+      edgeCount: counts.edge_count,
+      fileCount: counts.file_count,
       nodesByKind,
       edgesByKind,
       filesByLanguage,
       dbSizeBytes: 0, // Set by caller using DatabaseConnection.getSize()
       lastUpdated: Date.now(),
     };
+  }
+
+  // ===========================================================================
+  // Project Metadata
+  // ===========================================================================
+
+  /**
+   * Get a metadata value by key
+   */
+  getMetadata(key: string): string | null {
+    const row = this.db.prepare('SELECT value FROM project_metadata WHERE key = ?').get(key) as { value: string } | undefined;
+    return row?.value ?? null;
+  }
+
+  /**
+   * Set a metadata key-value pair (upsert)
+   */
+  setMetadata(key: string, value: string): void {
+    this.db.prepare(
+      'INSERT INTO project_metadata (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at'
+    ).run(key, value, Date.now());
+  }
+
+  /**
+   * Get all metadata as a key-value record
+   */
+  getAllMetadata(): Record<string, string> {
+    const rows = this.db.prepare('SELECT key, value FROM project_metadata').all() as { key: string; value: string }[];
+    const result: Record<string, string> = {};
+    for (const row of rows) {
+      result[row.key] = row.value;
+    }
+    return result;
   }
 
   /**

@@ -166,6 +166,9 @@ export interface Edge {
 
   /** Column number where relationship occurs */
   column?: number;
+
+  /** How this edge was created */
+  provenance?: 'tree-sitter' | 'scip' | 'heuristic';
 }
 
 /**

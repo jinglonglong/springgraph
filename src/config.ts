@@ -7,6 +7,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { CodeGraphConfig, DEFAULT_CONFIG, Language, NodeKind } from './types';
+import { normalizePath } from './utils';
 
 /**
  * Configuration filename
@@ -240,6 +241,9 @@ export function addCustomPattern(
  * Check if a file path matches the include/exclude patterns
  */
 export function shouldIncludeFile(filePath: string, config: CodeGraphConfig): boolean {
+  // Normalize to forward slashes so Windows backslash paths match glob patterns
+  filePath = normalizePath(filePath);
+
   // Simple glob matching (for now, just check if any pattern matches)
   // A full implementation would use a proper glob library
 

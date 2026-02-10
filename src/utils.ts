@@ -75,6 +75,14 @@ export function clamp(value: number, min: number, max: number): number {
 }
 
 /**
+ * Normalize a file path to use forward slashes.
+ * Fixes Windows backslash paths so glob matching works consistently.
+ */
+export function normalizePath(filePath: string): string {
+  return filePath.replace(/\\/g, '/');
+}
+
+/**
  * Cross-process file lock using lock files.
  * Prevents concurrent database writes from CLI, MCP server, and git hooks.
  */

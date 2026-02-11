@@ -536,6 +536,8 @@ export const DEFAULT_CONFIG: CodeGraphConfig = {
     '**/node_modules/**',
     '**/vendor/**',
     '**/Pods/**',
+    '**/_libs/**',
+    '**/libs/**',
 
     // Generic build outputs
     '**/dist/**',
@@ -629,6 +631,11 @@ export const DEFAULT_CONFIG: CodeGraphConfig = {
     '**/xcuserdata/**',
     '**/Carthage/Build/**',
     '**/SourcePackages/**',
+
+    // Delphi/Pascal
+    '**/__history/**',
+    '**/__recovery/**',
+    '**/*.dcu',
 
     // PHP
     '**/.composer/**',

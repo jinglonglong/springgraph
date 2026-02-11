@@ -2,7 +2,7 @@
 
 Dieses Verzeichnis enthält einen **umsetzbaren Bauplan** für Pascal/Delphi-Support in CodeGraph. Es basiert auf der tatsächlichen CodeGraph-Architektur und den verifizierten AST-Knotentypen von [`tree-sitter-pascal`](https://github.com/Isopod/tree-sitter-pascal).
 
-**Ziel:** CodeGraph soll **Pascal/Delphi**-Dateien indexieren und daraus **Nodes** (Units, Klassen, Methoden, Properties, Enums, …) sowie **Edges** (uses/imports, calls, extends, implements, …) extrahieren.
+**Ziel:** CodeGraph soll **Pascal/Delphi**-Dateien indexieren und daraus **Nodes** (Units, Klassen, Methoden, Properties, Enums, …) sowie **Edges** (uses/imports, calls, extends, implements, …) extrahieren. Zusätzlich werden **DFM/FMX-Formulardateien** unterstützt, um UI-Komponenten und Event-Handler-Verknüpfungen zu erfassen.
 
 ## Inhalt
 
@@ -13,8 +13,9 @@ Dieses Verzeichnis enthält einen **umsetzbaren Bauplan** für Pascal/Delphi-Sup
 | `Docs/03-AST-Referenz.md` | Verifizierte AST-Knotentypen aus tree-sitter-pascal |
 | `Docs/04-Checklist.md` | Umsetzungs-Checkliste mit bekannten Einschränkungen |
 | `Docs/05-NodeKind-Mapping.md` | Explizite Zuordnung Delphi → CodeGraph NodeKind/EdgeKind |
-| `Docs/06-Integration-Guide.md` | Konkrete Code-Diffs für `grammars.ts`, `types.ts`, `tree-sitter.ts` |
-| `fixtures/` | Delphi-Beispieldateien zum Testen der Extraktion |
+| `Docs/06-Integration-Guide.md` | Konkrete Code-Diffs für `grammars.ts`, `types.ts`, `tree-sitter.ts` + DfmExtractor |
+| `Docs/07-DFM-FMX-Support.md` | DFM/FMX Form-Dateien: Format-Referenz & Extraktions-Konzept |
+| `fixtures/` | Delphi-Beispieldateien zum Testen (`.pas`, `.dpr`, `.dfm`) |
 | `resolution/` | Resolver-Heuristiken (Unit-Mapping, Call-Resolution) |
 
 ## Architektur-Übersicht
@@ -33,8 +34,8 @@ CodeGraph verwendet **keine** per-Sprache Plugin-Verzeichnisse. Die Integration 
 4. **Resolver erweitern** (mindestens `uses` → Unit-File, einfache Call-Auflösung)
 5. **Fixtures in die Tests aufnehmen** und Assertions hinzufügen
 
-## Grammar
+## Grammar & Parsing
 
-Verwendet wird: [`tree-sitter-pascal`](https://github.com/Isopod/tree-sitter-pascal) (npm: `tree-sitter-pascal`)
-- Unterstützt: Delphi, FreePascal, Standard-Pascal
-- Dateierweiterungen: `.pas`, `.dpr`, `.dpk`, `.lpr`
+**Pascal-Dateien** (`.pas`, `.dpr`, `.dpk`, `.lpr`) werden mit [`tree-sitter-pascal`](https://github.com/Isopod/tree-sitter-pascal) geparst (AST-basierte Extraktion via `LanguageExtractor`).
+
+**DFM/FMX-Dateien** (`.dfm`, `.fmx`) werden mit einem **Custom Extractor** (`DfmExtractor`) verarbeitet — analog zu `LiquidExtractor` und `SvelteExtractor`. Das DFM-Textformat ist zeilenbasiert und wird per Regex geparst. Besonders wertvoll: Event-Handler wie `OnClick = Button1Click` erzeugen `references`-Edges zu den zugehörigen Methoden in der `.pas`-Datei.

@@ -43,13 +43,32 @@ Dieses Dokument zeigt die explizite Zuordnung von Delphi/Pascal-Konzepten zu den
 | Unit enthält Klasse | AST Parent-Child | `contains` |
 | Klasse enthält Methode | AST Parent-Child | `contains` |
 
+## DFM/FMX Node-Mapping
+
+DFM/FMX-Dateien werden durch einen eigenen `DfmExtractor` (Regex-basiert, analog `LiquidExtractor`) verarbeitet.
+
+| DFM-Konzept | Erkennung | CodeGraph `NodeKind` | Anmerkungen |
+|---|---|---|---|
+| Formular | `object Form1: TForm1` (Top-Level) | `component` | Root-Komponente der DFM-Datei |
+| UI-Komponente | `object Button1: TButton` (verschachtelt) | `component` | Jede Komponente wird ein Node |
+| Geerbte Komponente | `inherited Form1: TForm1` | `component` | Formular-Vererbung |
+
+## DFM/FMX Edge-Mapping
+
+| DFM-Beziehung | Erkennung | CodeGraph `EdgeKind` | Beschreibung |
+|---|---|---|---|
+| Verschachtelung | `object` innerhalb `object` | `contains` | Panel1 enthält Button1 |
+| Event-Handler | `OnClick = Button1Click` | `references` | Komponente → Methode in `.pas` |
+| Datei enthält Formular | Top-Level `object` | `contains` | DFM-Datei → Root-Komponente |
+
+> **Hinweis:** Event-Handler-Verknüpfungen werden als `UnresolvedReference` gespeichert und in der Resolution-Phase zur entsprechenden Methode in der zugehörigen `.pas`-Datei aufgelöst.
+
 ## Nicht abgebildete Konzepte (Phase 2+)
 
 | Konzept | Grund |
 |---|---|
 | `with`-Statement | Kein eigener EdgeKind nötig; erschwert nur die Call-Qualifizierung |
 | Class Helper | Kein eigener NodeKind; als `class` mit speziellem Bezug zum erweiterten Typ |
-| `.dfm`/`.fmx` Komponenten | Kein Code im Pascal-Sinne; erfordert eigenen Parser |
 | `exports`-Klauseln | `declExports` → könnte als `export` NodeKind abgebildet werden |
 | Generics | `typerefTpl` → beeinflusst Typ-Referenzen, nicht den NodeKind |
 

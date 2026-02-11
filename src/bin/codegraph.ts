@@ -25,6 +25,7 @@
 import { Command } from 'commander';
 import * as path from 'path';
 import * as fs from 'fs';
+import { spawn } from 'child_process';
 import CodeGraph, { getCodeGraphDir, findNearestCodeGraphRoot } from '../index';
 import type { IndexProgress } from '../index';
 import { runInstaller } from '../installer';
@@ -957,8 +958,11 @@ program
 /**
  * codegraph sync-if-dirty [path]
  *
- * Syncs the index only if .codegraph/.dirty exists.
- * Removes the marker BEFORE syncing so edits during sync
+ * Checks if .codegraph/.dirty exists and, if so, spawns a detached
+ * background process to run `codegraph sync`. The hook process exits
+ * immediately so Claude Code's Stop hook never blocks.
+ *
+ * Removes the marker BEFORE spawning so edits during sync
  * create a new marker for the next Stop event.
  * Runs silently and always exits 0.
  */
@@ -972,7 +976,7 @@ program
       if (!projectRoot) {
         process.exit(0);
       }
-      const dirtyPath = path.join(getCodeGraphDir(projectRoot), '.dirty');
+      const dirtyPath = path.join(getCodeGraphDir(projectRoot!), '.dirty');
 
       // No marker → nothing to do (sub-ms exit)
       if (!fs.existsSync(dirtyPath)) {
@@ -983,14 +987,24 @@ program
       try { fs.unlinkSync(dirtyPath); } catch { /* ignore */ }
 
       // If not fully initialized (no DB), exit
-      if (!CodeGraph.isInitialized(projectRoot)) {
+      if (!CodeGraph.isInitialized(projectRoot!)) {
         process.exit(0);
       }
 
-      // Run sync
-      const cg = await CodeGraph.open(projectRoot);
-      await cg.sync();
-      cg.destroy();
+      // Spawn `codegraph sync` as a detached background process
+      // so this hook exits immediately and doesn't block Claude Code
+      const isWindows = process.platform === 'win32';
+      const child = spawn(
+        isWindows ? 'codegraph' : process.argv[0]!,
+        isWindows ? ['sync', '--quiet', projectRoot!] : [process.argv[1]!, 'sync', '--quiet', projectRoot!],
+        {
+          detached: true,
+          stdio: 'ignore',
+          windowsHide: true,
+          shell: isWindows,
+        }
+      );
+      child.unref();
     } catch {
       // Never fail — this runs at the end of Claude responses
     }

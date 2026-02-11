@@ -80,6 +80,10 @@ const grammarLoaders: Record<GrammarLanguage, GrammarLoader> = {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require('@sengac/tree-sitter-dart');
   },
+  pascal: () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('tree-sitter-pascal');
+  },
   // Note: tree-sitter-liquid has ABI compatibility issues with tree-sitter 0.22+
   // Liquid extraction is handled separately via regex in tree-sitter.ts
 };
@@ -116,6 +120,12 @@ export const EXTENSION_MAP: Record<string, Language> = {
   '.dart': 'dart',
   '.liquid': 'liquid',
   '.svelte': 'svelte',
+  '.pas': 'pascal',
+  '.dpr': 'pascal',
+  '.dpk': 'pascal',
+  '.lpr': 'pascal',
+  '.dfm': 'pascal',
+  '.fmx': 'pascal',
 };
 
 /**
@@ -245,6 +255,7 @@ export function getLanguageDisplayName(language: Language): string {
     dart: 'Dart',
     svelte: 'Svelte',
     liquid: 'Liquid',
+    pascal: 'Pascal / Delphi',
     unknown: 'Unknown',
   };
   return names[language] || language;

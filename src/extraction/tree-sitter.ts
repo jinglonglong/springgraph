@@ -755,6 +755,64 @@ const EXTRACTORS: Partial<Record<Language, LanguageExtractor>> = {
       return false;
     },
   },
+  pascal: {
+    functionTypes: ['declProc'],
+    classTypes: ['declClass'],
+    methodTypes: ['declProc'],
+    interfaceTypes: ['declIntf'],
+    structTypes: [],
+    enumTypes: ['declEnum'],
+    typeAliasTypes: ['declType'],
+    importTypes: ['declUses'],
+    callTypes: ['exprCall'],
+    variableTypes: ['declField', 'declConst'],
+    nameField: 'name',
+    bodyField: 'body',
+    paramsField: 'args',
+    returnField: 'type',
+    getSignature: (node, source) => {
+      const args = getChildByField(node, 'args');
+      const returnType = node.namedChildren.find(
+        (c: SyntaxNode) => c.type === 'typeref'
+      );
+      if (!args && !returnType) return undefined;
+      let sig = '';
+      if (args) sig = getNodeText(args, source);
+      if (returnType) {
+        sig += ': ' + getNodeText(returnType, source);
+      }
+      return sig || undefined;
+    },
+    getVisibility: (node) => {
+      let current = node.parent;
+      while (current) {
+        if (current.type === 'declSection') {
+          for (let i = 0; i < current.childCount; i++) {
+            const child = current.child(i);
+            if (child?.type === 'kPublic' || child?.type === 'kPublished')
+              return 'public';
+            if (child?.type === 'kPrivate') return 'private';
+            if (child?.type === 'kProtected') return 'protected';
+          }
+        }
+        current = current.parent;
+      }
+      return undefined;
+    },
+    isExported: (_node, _source) => {
+      // In Pascal, symbols declared in the interface section are exported
+      return false;
+    },
+    isStatic: (node) => {
+      for (let i = 0; i < node.childCount; i++) {
+        if (node.child(i)?.type === 'kClass') return true;
+      }
+      return false;
+    },
+    isConst: (node) => {
+      return node.type === 'declConst';
+    },
+  },
 };
 
 // TSX and JSX use the same extractors as their base languages
@@ -923,6 +981,12 @@ export class TreeSitterExtractor {
 
     const nodeType = node.type;
     let skipChildren = false;
+
+    // Pascal-specific AST handling
+    if (this.language === 'pascal') {
+      skipChildren = this.visitPascalNode(node);
+      if (skipChildren) return;
+    }
 
     // Check for function declarations
     // For Python/Ruby, function_definition inside a class should be treated as method
@@ -1979,6 +2043,379 @@ export class TreeSitterExtractor {
       }
     }
   }
+
+  /**
+   * Handle Pascal-specific AST structures.
+   * Returns true if the node was fully handled and children should be skipped.
+   */
+  private visitPascalNode(node: SyntaxNode): boolean {
+    const nodeType = node.type;
+
+    // Unit/Program/Library → module node
+    if (nodeType === 'unit' || nodeType === 'program' || nodeType === 'library') {
+      const moduleNameNode = node.namedChildren.find(
+        (c: SyntaxNode) => c.type === 'moduleName'
+      );
+      if (moduleNameNode) {
+        const name = getNodeText(moduleNameNode, this.source);
+        this.createNode('module', name, node);
+      }
+      // Continue visiting children (interface/implementation sections)
+      for (let i = 0; i < node.namedChildCount; i++) {
+        const child = node.namedChild(i);
+        if (child) this.visitNode(child);
+      }
+      return true;
+    }
+
+    // declType wraps declClass/declIntf/declEnum/type-alias
+    // The name lives on declType, the inner node determines the kind
+    if (nodeType === 'declType') {
+      this.extractPascalDeclType(node);
+      return true;
+    }
+
+    // declUses → import nodes for each unit name
+    if (nodeType === 'declUses') {
+      this.extractPascalUses(node);
+      return true;
+    }
+
+    // declConsts → container; visit children for individual declConst
+    if (nodeType === 'declConsts') {
+      for (let i = 0; i < node.namedChildCount; i++) {
+        const child = node.namedChild(i);
+        if (child?.type === 'declConst') {
+          this.extractPascalConst(child);
+        }
+      }
+      return true;
+    }
+
+    // declConst at top level (outside declConsts)
+    if (nodeType === 'declConst') {
+      this.extractPascalConst(node);
+      return true;
+    }
+
+    // declTypes → container for type declarations
+    if (nodeType === 'declTypes') {
+      for (let i = 0; i < node.namedChildCount; i++) {
+        const child = node.namedChild(i);
+        if (child) this.visitNode(child);
+      }
+      return true;
+    }
+
+    // declVars → container for variable declarations
+    if (nodeType === 'declVars') {
+      for (let i = 0; i < node.namedChildCount; i++) {
+        const child = node.namedChild(i);
+        if (child?.type === 'declVar') {
+          const nameNode = getChildByField(child, 'name');
+          if (nameNode) {
+            const name = getNodeText(nameNode, this.source);
+            this.createNode('variable', name, child);
+          }
+        }
+      }
+      return true;
+    }
+
+    // defProc in implementation section → extract calls but don't create duplicate nodes
+    if (nodeType === 'defProc') {
+      this.extractPascalDefProc(node);
+      return true;
+    }
+
+    // declProp → property node
+    if (nodeType === 'declProp') {
+      const nameNode = getChildByField(node, 'name');
+      if (nameNode) {
+        const name = getNodeText(nameNode, this.source);
+        const visibility = this.extractor!.getVisibility?.(node);
+        this.createNode('property', name, node, { visibility });
+      }
+      return true;
+    }
+
+    // declField → field node
+    if (nodeType === 'declField') {
+      const nameNode = getChildByField(node, 'name');
+      if (nameNode) {
+        const name = getNodeText(nameNode, this.source);
+        const visibility = this.extractor!.getVisibility?.(node);
+        this.createNode('field', name, node, { visibility });
+      }
+      return true;
+    }
+
+    // declSection → visit children (propagates visibility via getVisibility)
+    if (nodeType === 'declSection') {
+      for (let i = 0; i < node.namedChildCount; i++) {
+        const child = node.namedChild(i);
+        if (child) this.visitNode(child);
+      }
+      return true;
+    }
+
+    // exprCall → extract function call reference
+    if (nodeType === 'exprCall') {
+      this.extractPascalCall(node);
+      return true;
+    }
+
+    // interface/implementation sections → visit children
+    if (nodeType === 'interface' || nodeType === 'implementation') {
+      for (let i = 0; i < node.namedChildCount; i++) {
+        const child = node.namedChild(i);
+        if (child) this.visitNode(child);
+      }
+      return true;
+    }
+
+    // block (begin..end) → visit for calls
+    if (nodeType === 'block') {
+      this.visitPascalBlock(node);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Extract a Pascal declType node (class, interface, enum, or type alias)
+   */
+  private extractPascalDeclType(node: SyntaxNode): void {
+    const nameNode = getChildByField(node, 'name');
+    if (!nameNode) return;
+    const name = getNodeText(nameNode, this.source);
+
+    // Find the inner type declaration
+    const declClass = node.namedChildren.find(
+      (c: SyntaxNode) => c.type === 'declClass'
+    );
+    const declIntf = node.namedChildren.find(
+      (c: SyntaxNode) => c.type === 'declIntf'
+    );
+    const typeChild = node.namedChildren.find(
+      (c: SyntaxNode) => c.type === 'type'
+    );
+
+    if (declClass) {
+      const classNode = this.createNode('class', name, node);
+      // Extract inheritance from typeref children of declClass
+      this.extractPascalInheritance(declClass, classNode.id);
+      // Visit class body
+      this.nodeStack.push(classNode.id);
+      for (let i = 0; i < declClass.namedChildCount; i++) {
+        const child = declClass.namedChild(i);
+        if (child) this.visitNode(child);
+      }
+      this.nodeStack.pop();
+    } else if (declIntf) {
+      const ifaceNode = this.createNode('interface', name, node);
+      // Visit interface members
+      this.nodeStack.push(ifaceNode.id);
+      for (let i = 0; i < declIntf.namedChildCount; i++) {
+        const child = declIntf.namedChild(i);
+        if (child) this.visitNode(child);
+      }
+      this.nodeStack.pop();
+    } else if (typeChild) {
+      // Check if it contains a declEnum
+      const declEnum = typeChild.namedChildren.find(
+        (c: SyntaxNode) => c.type === 'declEnum'
+      );
+      if (declEnum) {
+        const enumNode = this.createNode('enum', name, node);
+        // Extract enum members
+        this.nodeStack.push(enumNode.id);
+        for (let i = 0; i < declEnum.namedChildCount; i++) {
+          const child = declEnum.namedChild(i);
+          if (child?.type === 'declEnumValue') {
+            const memberName = getChildByField(child, 'name');
+            if (memberName) {
+              this.createNode('enum_member', getNodeText(memberName, this.source), child);
+            }
+          }
+        }
+        this.nodeStack.pop();
+      } else {
+        // Simple type alias: type TFoo = string / type TFoo = Integer
+        this.createNode('type_alias', name, node);
+      }
+    } else {
+      // Fallback: could be a forward declaration or simple alias
+      this.createNode('type_alias', name, node);
+    }
+  }
+
+  /**
+   * Extract Pascal uses clause into individual import nodes
+   */
+  private extractPascalUses(node: SyntaxNode): void {
+    const importText = getNodeText(node, this.source).trim();
+    for (let i = 0; i < node.namedChildCount; i++) {
+      const child = node.namedChild(i);
+      if (child?.type === 'moduleName') {
+        const unitName = getNodeText(child, this.source);
+        this.createNode('import', unitName, child, {
+          signature: importText,
+        });
+        // Create unresolved reference for resolution
+        if (this.nodeStack.length > 0) {
+          const parentId = this.nodeStack[this.nodeStack.length - 1];
+          if (parentId) {
+            this.unresolvedReferences.push({
+              fromNodeId: parentId,
+              referenceName: unitName,
+              referenceKind: 'imports',
+              line: child.startPosition.row + 1,
+              column: child.startPosition.column,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Extract a Pascal constant declaration
+   */
+  private extractPascalConst(node: SyntaxNode): void {
+    const nameNode = getChildByField(node, 'name');
+    if (!nameNode) return;
+    const name = getNodeText(nameNode, this.source);
+    const defaultValue = node.namedChildren.find(
+      (c: SyntaxNode) => c.type === 'defaultValue'
+    );
+    const sig = defaultValue ? getNodeText(defaultValue, this.source) : undefined;
+    this.createNode('constant', name, node, { signature: sig });
+  }
+
+  /**
+   * Extract Pascal inheritance (extends/implements) from declClass typeref children
+   */
+  private extractPascalInheritance(declClass: SyntaxNode, classId: string): void {
+    const typerefs = declClass.namedChildren.filter(
+      (c: SyntaxNode) => c.type === 'typeref'
+    );
+    for (let i = 0; i < typerefs.length; i++) {
+      const ref = typerefs[i]!;
+      const name = getNodeText(ref, this.source);
+      this.unresolvedReferences.push({
+        fromNodeId: classId,
+        referenceName: name,
+        referenceKind: i === 0 ? 'extends' : 'implements',
+        line: ref.startPosition.row + 1,
+        column: ref.startPosition.column,
+      });
+    }
+  }
+
+  /**
+   * Extract calls and resolve method context from a Pascal defProc (implementation body).
+   * Does not create a new node — the declaration was already captured from the interface section.
+   */
+  private extractPascalDefProc(node: SyntaxNode): void {
+    // Find the matching declaration node by name to use as call parent
+    const declProc = node.namedChildren.find(
+      (c: SyntaxNode) => c.type === 'declProc'
+    );
+    if (!declProc) return;
+
+    const nameNode = getChildByField(declProc, 'name');
+    if (!nameNode) return;
+    const fullName = getNodeText(nameNode, this.source);
+    // fullName is like "TAuthService.Create" — we want just the method name part
+    const shortName = fullName.includes('.') ? fullName.split('.').pop()! : fullName;
+
+    // Find matching node from earlier extraction
+    const existingNode = this.nodes.find(
+      (n) => n.name === shortName && (n.kind === 'method' || n.kind === 'function')
+    );
+
+    const parentId = existingNode?.id || this.nodeStack[this.nodeStack.length - 1];
+    if (!parentId) return;
+
+    // Visit the block for calls
+    const block = node.namedChildren.find(
+      (c: SyntaxNode) => c.type === 'block'
+    );
+    if (block) {
+      this.nodeStack.push(parentId);
+      this.visitPascalBlock(block);
+      this.nodeStack.pop();
+    }
+  }
+
+  /**
+   * Extract function calls from a Pascal expression
+   */
+  private extractPascalCall(node: SyntaxNode): void {
+    if (this.nodeStack.length === 0) return;
+    const callerId = this.nodeStack[this.nodeStack.length - 1];
+    if (!callerId) return;
+
+    // Get the callee name — first child is typically the identifier or exprDot
+    const firstChild = node.namedChild(0);
+    if (!firstChild) return;
+
+    let calleeName = '';
+    if (firstChild.type === 'exprDot') {
+      // Qualified call: Obj.Method(...)
+      const identifiers = firstChild.namedChildren.filter(
+        (c: SyntaxNode) => c.type === 'identifier'
+      );
+      if (identifiers.length > 0) {
+        calleeName = identifiers.map((id: SyntaxNode) => getNodeText(id, this.source)).join('.');
+      }
+    } else if (firstChild.type === 'identifier') {
+      calleeName = getNodeText(firstChild, this.source);
+    }
+
+    if (calleeName) {
+      this.unresolvedReferences.push({
+        fromNodeId: callerId,
+        referenceName: calleeName,
+        referenceKind: 'calls',
+        line: node.startPosition.row + 1,
+        column: node.startPosition.column,
+      });
+    }
+
+    // Also visit arguments for nested calls
+    const args = node.namedChildren.find(
+      (c: SyntaxNode) => c.type === 'exprArgs'
+    );
+    if (args) {
+      this.visitPascalBlock(args);
+    }
+  }
+
+  /**
+   * Recursively visit a Pascal block/statement tree for call expressions
+   */
+  private visitPascalBlock(node: SyntaxNode): void {
+    for (let i = 0; i < node.namedChildCount; i++) {
+      const child = node.namedChild(i);
+      if (!child) continue;
+      if (child.type === 'exprCall') {
+        this.extractPascalCall(child);
+      } else if (child.type === 'exprDot') {
+        // Check if exprDot contains an exprCall
+        for (let j = 0; j < child.namedChildCount; j++) {
+          const grandchild = child.namedChild(j);
+          if (grandchild?.type === 'exprCall') {
+            this.extractPascalCall(grandchild);
+          }
+        }
+      } else {
+        this.visitPascalBlock(child);
+      }
+    }
+  }
 }
 
 /**
@@ -2524,6 +2961,163 @@ export class SvelteExtractor {
 }
 
 /**
+ * Custom extractor for Delphi DFM/FMX form files.
+ *
+ * DFM/FMX files describe the visual component hierarchy and event handler
+ * bindings. They use a simple text format (object/end blocks) that we parse
+ * with regex — no tree-sitter grammar exists for this format.
+ *
+ * Extracted information:
+ * - Components as NodeKind `component`
+ * - Nesting as EdgeKind `contains`
+ * - Event handlers (OnClick = MethodName) as UnresolvedReference → EdgeKind `references`
+ */
+export class DfmExtractor {
+  private filePath: string;
+  private source: string;
+  private nodes: Node[] = [];
+  private edges: Edge[] = [];
+  private unresolvedReferences: UnresolvedReference[] = [];
+  private errors: ExtractionError[] = [];
+
+  constructor(filePath: string, source: string) {
+    this.filePath = filePath;
+    this.source = source;
+  }
+
+  /**
+   * Extract components and event handler references from DFM/FMX source
+   */
+  extract(): ExtractionResult {
+    const startTime = Date.now();
+
+    try {
+      const fileNode = this.createFileNode();
+      this.parseComponents(fileNode.id);
+    } catch (error) {
+      captureException(error, { operation: 'dfm-extraction', filePath: this.filePath });
+      this.errors.push({
+        message: `DFM extraction error: ${error instanceof Error ? error.message : String(error)}`,
+        severity: 'error',
+      });
+    }
+
+    return {
+      nodes: this.nodes,
+      edges: this.edges,
+      unresolvedReferences: this.unresolvedReferences,
+      errors: this.errors,
+      durationMs: Date.now() - startTime,
+    };
+  }
+
+  /** Create a file node for the DFM form file */
+  private createFileNode(): Node {
+    const lines = this.source.split('\n');
+    const id = generateNodeId(this.filePath, 'file', this.filePath, 1);
+
+    const fileNode: Node = {
+      id,
+      kind: 'file',
+      name: this.filePath.split('/').pop() || this.filePath,
+      qualifiedName: this.filePath,
+      filePath: this.filePath,
+      language: 'pascal',
+      startLine: 1,
+      endLine: lines.length,
+      startColumn: 0,
+      endColumn: lines[lines.length - 1]?.length || 0,
+      updatedAt: Date.now(),
+    };
+
+    this.nodes.push(fileNode);
+    return fileNode;
+  }
+
+  /** Parse object/end blocks and extract components + event handlers */
+  private parseComponents(fileNodeId: string): void {
+    const lines = this.source.split('\n');
+    const stack: string[] = [fileNodeId];
+
+    const objectPattern = /^\s*(object|inherited|inline)\s+(\w+)\s*:\s*(\w+)/;
+    const eventPattern = /^\s*(On\w+)\s*=\s*(\w+)\s*$/;
+    const endPattern = /^\s*end\s*$/;
+    const multiLineStart = /=\s*\(\s*$/;
+    const multiLineItemStart = /=\s*<\s*$/;
+    let inMultiLine = false;
+    let multiLineEndChar = ')';
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]!;
+      const lineNum = i + 1;
+
+      // Skip multi-line properties
+      if (inMultiLine) {
+        if (line.trimEnd().endsWith(multiLineEndChar)) inMultiLine = false;
+        continue;
+      }
+      if (multiLineStart.test(line)) {
+        inMultiLine = true;
+        multiLineEndChar = ')';
+        continue;
+      }
+      if (multiLineItemStart.test(line)) {
+        inMultiLine = true;
+        multiLineEndChar = '>';
+        continue;
+      }
+
+      // Component declaration
+      const objMatch = line.match(objectPattern);
+      if (objMatch) {
+        const [, , name, typeName] = objMatch;
+        const nodeId = generateNodeId(this.filePath, 'component', name!, lineNum);
+        this.nodes.push({
+          id: nodeId,
+          kind: 'component',
+          name: name!,
+          qualifiedName: `${this.filePath}#${name}`,
+          filePath: this.filePath,
+          language: 'pascal',
+          startLine: lineNum,
+          endLine: lineNum,
+          startColumn: 0,
+          endColumn: line.length,
+          signature: typeName,
+          updatedAt: Date.now(),
+        });
+        this.edges.push({
+          source: stack[stack.length - 1]!,
+          target: nodeId,
+          kind: 'contains',
+        });
+        stack.push(nodeId);
+        continue;
+      }
+
+      // Event handler
+      const eventMatch = line.match(eventPattern);
+      if (eventMatch) {
+        const [, , methodName] = eventMatch;
+        this.unresolvedReferences.push({
+          fromNodeId: stack[stack.length - 1]!,
+          referenceName: methodName!,
+          referenceKind: 'references',
+          line: lineNum,
+          column: 0,
+        });
+        continue;
+      }
+
+      // Block end
+      if (endPattern.test(line)) {
+        if (stack.length > 1) stack.pop();
+      }
+    }
+  }
+}
+
+/**
  * Extract nodes and edges from source code
  */
 export function extractFromSource(
@@ -2542,6 +3136,15 @@ export function extractFromSource(
   // Use custom extractor for Liquid
   if (detectedLanguage === 'liquid') {
     const extractor = new LiquidExtractor(filePath, source);
+    return extractor.extract();
+  }
+
+  // Use custom extractor for DFM/FMX form files
+  if (
+    detectedLanguage === 'pascal' &&
+    (filePath.endsWith('.dfm') || filePath.endsWith('.fmx'))
+  ) {
+    const extractor = new DfmExtractor(filePath, source);
     return extractor.extract();
   }
 

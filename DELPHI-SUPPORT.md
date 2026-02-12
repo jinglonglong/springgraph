@@ -58,15 +58,33 @@ The implementation follows CodeGraph's established patterns:
 - **Routing** in `extractFromSource()` dispatches `.dfm`/`.fmx` files to `DfmExtractor` before reaching the tree-sitter path
 - **`tree-sitter-pascal`** is declared as an `optionalDependency` (consistent with all other grammars), pinned to a specific commit for reproducible builds
 
+## Performance Improvements
+
+Testing with a large Delphi codebase (~3,400 files, ~244k nodes) uncovered performance bottlenecks in the reference resolution pipeline. The following fixes **benefit all languages**, not just Pascal:
+
+| Fix | Scope | Impact |
+|-----|-------|--------|
+| **Fuzzy match index** — replaced O(n) linear scan with lazily-built case-insensitive `Map` index | `name-matcher.ts` (all languages) | O(1) lookup per ref instead of iterating all nodes |
+| **Import mapping cache** — cached per-file import mappings instead of re-reading/re-parsing for every ref | `import-resolver.ts` (all languages) | Eliminated redundant file I/O during resolution |
+| **Kind cache** — pre-populated `getNodesByKind` results during warm-up | `resolution/index.ts` (all languages) | Avoided repeated DB queries for the same node kinds |
+| **Pascal built-in filtering** — skip known RTL/VCL/FMX identifiers before resolution | `resolution/index.ts` (Pascal-specific) | ~60 built-in identifiers filtered out early |
+| **Method index for `defProc`** — replaced O(n) `find()` with `Map` lookup when linking implementation bodies to declarations | `tree-sitter.ts` (Pascal-specific) | O(1) per implementation body |
+| **Delphi-specific excludes** — `__history/**`, `__recovery/**`, `*.dcu` added to default excludes | `types.ts` (Pascal-specific) | Skips Delphi IDE temp files during indexing |
+
+**Result:** Reference resolution on a large Delphi project dropped from **~30 minutes to ~15 seconds** (120x speedup). The general improvements (fuzzy index, import cache, kind cache) will benefit all CodeGraph users.
+
 ## Files Changed
 
 | File | Change |
 |------|--------|
 | `src/types.ts` | Added `'pascal'` to `Language` type, file patterns to `DEFAULT_CONFIG.include` |
 | `src/extraction/grammars.ts` | Grammar loader, extension mappings (`.pas`, `.dpr`, `.dpk`, `.lpr`, `.dfm`, `.fmx`), display name |
-| `src/extraction/tree-sitter.ts` | Pascal `LanguageExtractor`, `visitPascalNode()` with 7 helper methods, `DfmExtractor` class, routing in `extractFromSource()` |
+| `src/extraction/tree-sitter.ts` | Pascal `LanguageExtractor`, `visitPascalNode()` with 7 helper methods, `DfmExtractor` class, routing in `extractFromSource()`, method index |
+| `src/resolution/index.ts` | Pascal built-in filtering, kind cache, cache clearing |
+| `src/resolution/import-resolver.ts` | Import mapping cache |
+| `src/resolution/name-matcher.ts` | Fuzzy match index (case-insensitive `Map`) |
 | `package.json` | `tree-sitter-pascal` in `optionalDependencies` (pinned commit) |
-| `__tests__/extraction.test.ts` | 36 new tests covering all Pascal and DFM extraction features |
+| `__tests__/extraction.test.ts` | 37 new tests covering all Pascal and DFM extraction features |
 
 ## Test Results
 
@@ -77,3 +95,63 @@ The implementation follows CodeGraph's established patterns:
 ## Dependency Note
 
 The npm package `tree-sitter-pascal@0.0.1` is outdated (uses NAN bindings, incompatible with Node.js v24+). The implementation uses the actively maintained GitHub repository ([Isopod/tree-sitter-pascal](https://github.com/Isopod/tree-sitter-pascal), v0.10.2) with a pinned commit hash for deterministic builds. This is consistent with how `@sengac/tree-sitter-dart` handles a similar situation.
+
+## Testing Instructions
+
+### Prerequisites
+
+- Node.js >= 18
+- npm
+- Git
+
+### 1. Clone and build
+
+```bash
+git clone -b delphi-support https://github.com/omonien/codegraph.git
+cd codegraph
+npm install
+npm run build
+```
+
+### 2. Link globally
+
+```bash
+npm link
+```
+
+Verify with:
+
+```bash
+codegraph --version
+```
+
+### 3. Index a Delphi project
+
+```bash
+cd /path/to/your/delphi-project
+codegraph init -i
+codegraph index
+```
+
+### 4. Query the code graph
+
+```bash
+codegraph status                          # Show index statistics
+codegraph query "TFormMain"               # Search for a symbol
+codegraph context "What does TCustomer do?"  # Build AI context
+```
+
+### 5. Set up the MCP server (for Claude Code)
+
+```bash
+codegraph install
+```
+
+This configures the MCP server, tool permissions, auto-sync hooks, and CLAUDE.md in one step. After that, start Claude Code in the project — CodeGraph tools will be available immediately.
+
+### 6. Clean up
+
+```bash
+npm unlink -g @colbymchenry/codegraph       # Remove global link
+rm -rf /path/to/delphi-project/.codegraph   # Remove project index
+```

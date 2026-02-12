@@ -16,8 +16,8 @@ import {
   ResolutionContext,
   FrameworkResolver,
 } from './types';
-import { matchReference } from './name-matcher';
-import { resolveViaImport } from './import-resolver';
+import { matchReference, clearFuzzyIndex } from './name-matcher';
+import { resolveViaImport, clearImportMappingCache } from './import-resolver';
 import { detectFrameworks } from './frameworks';
 import { logDebug } from '../errors';
 
@@ -106,6 +106,8 @@ export class ReferenceResolver {
     this.qualifiedNameCache.clear();
     this.kindCache.clear();
     this.nodeByIdCache.clear();
+    clearImportMappingCache();
+    clearFuzzyIndex();
     this.cachesWarmed = false;
   }
 

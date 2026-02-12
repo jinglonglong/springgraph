@@ -190,6 +190,16 @@ function findBestMatch(
   return bestNode;
 }
 
+// Lazily-built case-insensitive index for fuzzy matching
+let fuzzyIndex: Map<string, Node[]> | null = null;
+
+/**
+ * Clear the fuzzy match index (call between indexing runs)
+ */
+export function clearFuzzyIndex(): void {
+  fuzzyIndex = null;
+}
+
 /**
  * Fuzzy match - last resort with lower confidence
  */
@@ -197,21 +207,29 @@ export function matchFuzzy(
   ref: UnresolvedRef,
   context: ResolutionContext
 ): ResolvedRef | null {
-  // Try case-insensitive match
-  const allNodes = [
-    ...context.getNodesByKind('function'),
-    ...context.getNodesByKind('method'),
-    ...context.getNodesByKind('class'),
-  ];
+  // Build case-insensitive index on first use
+  if (!fuzzyIndex) {
+    fuzzyIndex = new Map();
+    const kinds: Array<Node['kind']> = ['function', 'method', 'class'];
+    for (const kind of kinds) {
+      for (const node of context.getNodesByKind(kind)) {
+        const lower = node.name.toLowerCase();
+        const existing = fuzzyIndex.get(lower);
+        if (existing) {
+          existing.push(node);
+        } else {
+          fuzzyIndex.set(lower, [node]);
+        }
+      }
+    }
+  }
 
   const lowerName = ref.referenceName.toLowerCase();
 
-  // Exact case-insensitive match
-  const caseInsensitive = allNodes.filter(
-    (n) => n.name.toLowerCase() === lowerName
-  );
+  // Exact case-insensitive match via index (O(1) lookup)
+  const caseInsensitive = fuzzyIndex.get(lowerName);
 
-  if (caseInsensitive.length === 1) {
+  if (caseInsensitive && caseInsensitive.length === 1) {
     return {
       original: ref,
       targetNodeId: caseInsensitive[0]!.id,
@@ -220,20 +238,7 @@ export function matchFuzzy(
     };
   }
 
-  // Try prefix match (e.g., "get" matches "getUser")
-  const prefixMatches = allNodes.filter((n) =>
-    n.name.toLowerCase().startsWith(lowerName)
-  );
-
-  if (prefixMatches.length === 1) {
-    return {
-      original: ref,
-      targetNodeId: prefixMatches[0]!.id,
-      confidence: 0.3,
-      resolvedBy: 'fuzzy',
-    };
-  }
-
+  // Skip prefix matching — too expensive and low value (confidence 0.3)
   return null;
 }
 

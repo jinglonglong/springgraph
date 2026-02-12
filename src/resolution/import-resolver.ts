@@ -425,6 +425,16 @@ function extractPHPImports(content: string): ImportMapping[] {
   return mappings;
 }
 
+// Cache import mappings per file to avoid re-reading and re-parsing
+const importMappingCache = new Map<string, ImportMapping[]>();
+
+/**
+ * Clear the import mapping cache (call between indexing runs)
+ */
+export function clearImportMappingCache(): void {
+  importMappingCache.clear();
+}
+
 /**
  * Resolve a reference using import mappings
  */
@@ -432,13 +442,16 @@ export function resolveViaImport(
   ref: UnresolvedRef,
   context: ResolutionContext
 ): ResolvedRef | null {
-  // Read the source file to extract imports
-  const content = context.readFile(ref.filePath);
-  if (!content) {
-    return null;
+  // Use cached import mappings or extract and cache them
+  let imports = importMappingCache.get(ref.filePath);
+  if (!imports) {
+    const content = context.readFile(ref.filePath);
+    if (!content) {
+      return null;
+    }
+    imports = extractImportMappings(ref.filePath, content, ref.language);
+    importMappingCache.set(ref.filePath, imports);
   }
-
-  const imports = extractImportMappings(ref.filePath, content, ref.language);
 
   // Check if the reference name matches any import
   for (const imp of imports) {

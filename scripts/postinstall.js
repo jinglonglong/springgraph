@@ -62,9 +62,6 @@ async function downloadModel() {
   }
 }
 
-// @sengac/tree-sitter-dart ships with NAPI prebuilds for all platforms
-// No patching needed (replaced old tree-sitter-dart v1.0.0 which used NAN bindings)
-
 downloadModel().catch(() => {
   // Silent exit - don't break npm install
   process.exit(0);

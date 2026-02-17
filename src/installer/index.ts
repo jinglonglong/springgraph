@@ -8,8 +8,7 @@
 import { execSync } from 'child_process';
 import { showBanner, showNextSteps, success, error, info, chalk } from './banner';
 import { promptInstallLocation, promptAutoAllow, InstallLocation } from './prompts';
-import { writeMcpConfig, writePermissions, writeClaudeMd, writeHooks, hasMcpConfig, hasPermissions, hasHooks } from './config-writer';
-import CodeGraph from '../index';
+import { writeMcpConfig, writePermissions, writeClaudeMd, writeHooks, hasMcpConfig, hasPermissions, hasHooks, setUseNpxFallback } from './config-writer';
 
 /**
  * Format a number with commas
@@ -29,7 +28,8 @@ export async function runInstaller(): Promise<void> {
     // Step 1: Check if codegraph is available (skip install if already there)
     let codegraphAvailable = false;
     try {
-      execSync('which codegraph', { stdio: 'pipe' });
+      const checkCmd = process.platform === 'win32' ? 'where codegraph' : 'command -v codegraph';
+      execSync(checkCmd, { stdio: 'pipe' });
       codegraphAvailable = true;
     } catch {
       // Not installed globally yet
@@ -40,11 +40,18 @@ export async function runInstaller(): Promise<void> {
       try {
         execSync('npm install -g @colbymchenry/codegraph', { stdio: 'pipe' });
         success('Installed codegraph command globally');
+        codegraphAvailable = true;
       } catch {
         // May fail if no permissions, but that's ok - npx still works
-        info('Could not install globally (try with sudo if needed)');
+        info('Could not install globally — will use npx instead');
+        info('(MCP server and hooks will use npx @colbymchenry/codegraph)');
       }
       console.log();
+    }
+
+    // If codegraph binary isn't in PATH, tell config-writer to use npx for everything
+    if (!codegraphAvailable) {
+      setUseNpxFallback(true);
     }
 
     // Step 2: Ask for installation location
@@ -104,7 +111,7 @@ export async function runInstaller(): Promise<void> {
     }
 
     // Show next steps
-    showNextSteps(location);
+    showNextSteps(location, !codegraphAvailable);
   } catch (err) {
     console.log();
     if (err instanceof Error && err.message.includes('readline was closed')) {
@@ -122,6 +129,18 @@ export async function runInstaller(): Promise<void> {
  */
 async function initializeLocalProject(): Promise<void> {
   const projectPath = process.cwd();
+
+  // Lazy-load CodeGraph (requires native modules)
+  let CodeGraph: typeof import('../index').default;
+  try {
+    CodeGraph = (await import('../index')).default;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    error(`Could not load native modules: ${msg}`);
+    info('Skipping project initialization. You can run "codegraph init -i" later.');
+    info('If this persists, try a Node.js LTS version (20 or 22).');
+    return;
+  }
 
   // Check if already initialized
   if (CodeGraph.isInitialized(projectPath)) {

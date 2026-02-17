@@ -98,18 +98,28 @@ function writeJsonFile(filePath: string, data: Record<string, any>): void {
 }
 
 /**
+ * When true, all configs use `npx @colbymchenry/codegraph` instead of the
+ * bare `codegraph` command.  Set by the installer when global install fails.
+ */
+let useNpxFallback = false;
+
+export function setUseNpxFallback(value: boolean): void {
+  useNpxFallback = value;
+}
+
+/**
  * Get the MCP server configuration for the given location
  */
 function getMcpServerConfig(location: InstallLocation): Record<string, any> {
-  if (location === 'global') {
-    // Global: use 'codegraph' command directly (assumes globally installed)
+  if (location === 'global' && !useNpxFallback) {
+    // Global: use 'codegraph' command directly (globally installed and in PATH)
     return {
       type: 'stdio',
       command: 'codegraph',
       args: ['serve', '--mcp'],
     };
   }
-  // Local: use npx to run the package
+  // Local or npx fallback: use npx to run the package
   return {
     type: 'stdio',
     command: 'npx',
@@ -212,7 +222,7 @@ export function hasPermissions(location: InstallLocation): boolean {
  * Stop → sync-if-dirty (sync, ensures fresh index before next user turn)
  */
 function getHooksConfig(location: InstallLocation): Record<string, any> {
-  const command = location === 'global' ? 'codegraph' : 'npx @colbymchenry/codegraph';
+  const command = (location === 'global' && !useNpxFallback) ? 'codegraph' : 'npx @colbymchenry/codegraph';
 
   return {
     PostToolUse: [
@@ -229,6 +239,7 @@ function getHooksConfig(location: InstallLocation): Record<string, any> {
     ],
     Stop: [
       {
+        matcher: '.*',
         hooks: [
           {
             type: 'command',

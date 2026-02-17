@@ -4,7 +4,7 @@
  * Handles parsing source code and extracting structural information.
  */
 
-import { SyntaxNode, Tree } from 'tree-sitter';
+import { Node as SyntaxNode, Tree } from 'web-tree-sitter';
 import * as crypto from 'crypto';
 import * as path from 'path';
 import {
@@ -934,7 +934,10 @@ export class TreeSitterExtractor {
     }
 
     try {
-      this.tree = parser.parse(this.source);
+      this.tree = parser.parse(this.source) ?? null;
+      if (!this.tree) {
+        throw new Error('Parser returned null tree');
+      }
 
       // Create file node representing the source file
       const fileNode: Node = {
@@ -1775,9 +1778,15 @@ export class TreeSitterExtractor {
       if (namespacePrefix && useGroup) {
         // Grouped import - create one import per item
         const prefix = getNodeText(namespacePrefix, this.source);
-        const useClauses = useGroup.namedChildren.filter((c: SyntaxNode) => c.type === 'namespace_use_clause');
+        const useClauses = useGroup.namedChildren.filter((c: SyntaxNode) =>
+          c.type === 'namespace_use_group_clause' || c.type === 'namespace_use_clause'
+        );
         for (const clause of useClauses) {
-          const name = clause.namedChildren.find((c: SyntaxNode) => c.type === 'name');
+          // WASM grammar wraps names in namespace_name; native uses name directly
+          const nsName = clause.namedChildren.find((c: SyntaxNode) => c.type === 'namespace_name');
+          const name = nsName
+            ? nsName.namedChildren.find((c: SyntaxNode) => c.type === 'name')
+            : clause.namedChildren.find((c: SyntaxNode) => c.type === 'name');
           if (name) {
             const fullPath = `${prefix}\\${getNodeText(name, this.source)}`;
             this.createNode('import', fullPath, node, {

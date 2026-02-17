@@ -577,6 +577,8 @@ export const DEFAULT_CONFIG: CodeGraphConfig = {
     '**/__pycache__/**',
     '**/.venv/**',
     '**/venv/**',
+    '**/site-packages/**',
+    '**/dist-packages/**',
     '**/.pytest_cache/**',
     '**/.mypy_cache/**',
     '**/.ruff_cache/**',

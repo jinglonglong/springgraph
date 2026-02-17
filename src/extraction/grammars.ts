@@ -1,91 +1,39 @@
 /**
  * Grammar Loading and Caching
  *
- * Uses lazy per-language loading so one missing native grammar does not
- * break extraction for all other languages.
+ * Uses web-tree-sitter (WASM) for universal cross-platform support.
+ * All grammars are pre-loaded asynchronously via initGrammars(), then
+ * getParser() returns synchronously from cache.
  */
 
-import Parser from 'tree-sitter';
+import * as path from 'path';
+import { Parser, Language as WasmLanguage } from 'web-tree-sitter';
 import { Language } from '../types';
 
-type GrammarLoader = () => unknown;
 type GrammarLanguage = Exclude<Language, 'svelte' | 'liquid' | 'unknown'>;
 
 /**
- * Lazy grammar loaders — each language's native binding is only loaded
- * on first use, so a failure in one grammar doesn't affect others.
+ * WASM filename map — maps each language to its .wasm grammar file
+ * in the tree-sitter-wasms package.
  */
-const grammarLoaders: Record<GrammarLanguage, GrammarLoader> = {
-  typescript: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-typescript').typescript;
-  },
-  tsx: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-typescript').tsx;
-  },
-  javascript: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-javascript');
-  },
-  jsx: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-javascript');
-  },
-  python: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-python');
-  },
-  go: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-go');
-  },
-  rust: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-rust');
-  },
-  java: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-java');
-  },
-  c: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-c');
-  },
-  cpp: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-cpp');
-  },
-  csharp: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-c-sharp');
-  },
-  php: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-php').php;
-  },
-  ruby: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-ruby');
-  },
-  swift: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-swift');
-  },
-  kotlin: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-kotlin');
-  },
-  dart: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('@sengac/tree-sitter-dart');
-  },
-  pascal: () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('tree-sitter-pascal');
-  },
-  // Note: tree-sitter-liquid has ABI compatibility issues with tree-sitter 0.22+
-  // Liquid extraction is handled separately via regex in tree-sitter.ts
+const WASM_GRAMMAR_FILES: Record<GrammarLanguage, string> = {
+  typescript: 'tree-sitter-typescript.wasm',
+  tsx: 'tree-sitter-tsx.wasm',
+  javascript: 'tree-sitter-javascript.wasm',
+  jsx: 'tree-sitter-javascript.wasm',
+  python: 'tree-sitter-python.wasm',
+  go: 'tree-sitter-go.wasm',
+  rust: 'tree-sitter-rust.wasm',
+  java: 'tree-sitter-java.wasm',
+  c: 'tree-sitter-c.wasm',
+  cpp: 'tree-sitter-cpp.wasm',
+  csharp: 'tree-sitter-c_sharp.wasm',
+  php: 'tree-sitter-php.wasm',
+  ruby: 'tree-sitter-ruby.wasm',
+  swift: 'tree-sitter-swift.wasm',
+  kotlin: 'tree-sitter-kotlin.wasm',
+  dart: 'tree-sitter-dart.wasm',
+  pascal: 'tree-sitter-pascal.wasm',
 };
 
 /**
@@ -132,55 +80,65 @@ export const EXTENSION_MAP: Record<string, Language> = {
  * Caches for loaded grammars and parsers
  */
 const parserCache = new Map<Language, Parser>();
-const grammarCache = new Map<Language, unknown | null>();
+const languageCache = new Map<Language, WasmLanguage>();
 const unavailableGrammarErrors = new Map<Language, string>();
 
+let grammarsInitialized = false;
+
 /**
- * Load a grammar on demand, caching the result.
- * Returns null if the grammar is not available on this platform.
+ * Initialize all WASM grammars. Must be called before any parsing.
+ * Idempotent — safe to call multiple times.
  */
-function loadGrammar(language: Language): unknown | null {
-  if (grammarCache.has(language)) {
-    return grammarCache.get(language) ?? null;
-  }
+export async function initGrammars(): Promise<void> {
+  if (grammarsInitialized) return;
 
-  const loader = grammarLoaders[language as GrammarLanguage];
-  if (!loader) {
-    grammarCache.set(language, null);
-    return null;
-  }
+  await Parser.init();
 
-  try {
-    const grammar = loader();
-    if (!grammar) {
-      throw new Error(`Grammar loader returned empty value for ${language}`);
-    }
-    grammarCache.set(language, grammar);
-    return grammar;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn(`[CodeGraph] Failed to load ${language} grammar — parsing will be unavailable: ${message}`);
-    unavailableGrammarErrors.set(language, message);
-    grammarCache.set(language, null);
-    return null;
-  }
+  // Load all grammars in parallel
+  const entries = Object.entries(WASM_GRAMMAR_FILES) as [GrammarLanguage, string][];
+  await Promise.allSettled(
+    entries.map(async ([lang, wasmFile]) => {
+      try {
+        // Pascal ships its own WASM (not in tree-sitter-wasms)
+        const wasmPath = lang === 'pascal'
+          ? path.join(__dirname, 'wasm', wasmFile)
+          : require.resolve(`tree-sitter-wasms/out/${wasmFile}`);
+        const language = await WasmLanguage.load(wasmPath);
+        languageCache.set(lang, language);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[CodeGraph] Failed to load ${lang} grammar — parsing will be unavailable: ${message}`);
+        unavailableGrammarErrors.set(lang, message);
+      }
+    })
+  );
+
+  grammarsInitialized = true;
 }
 
 /**
- * Get a parser for the specified language
+ * Check if grammars have been initialized
+ */
+export function isGrammarsInitialized(): boolean {
+  return grammarsInitialized;
+}
+
+/**
+ * Get a parser for the specified language.
+ * Returns synchronously from pre-loaded cache.
  */
 export function getParser(language: Language): Parser | null {
   if (parserCache.has(language)) {
     return parserCache.get(language)!;
   }
 
-  const grammar = loadGrammar(language);
-  if (!grammar) {
+  const lang = languageCache.get(language);
+  if (!lang) {
     return null;
   }
 
   const parser = new Parser();
-  parser.setLanguage(grammar as Parameters<typeof parser.setLanguage>[0]);
+  parser.setLanguage(lang);
   parserCache.set(language, parser);
   return parser;
 }
@@ -200,15 +158,15 @@ export function isLanguageSupported(language: Language): boolean {
   if (language === 'svelte') return true; // custom extractor (script block delegation)
   if (language === 'liquid') return true; // custom regex extractor
   if (language === 'unknown') return false;
-  return loadGrammar(language) !== null;
+  return languageCache.has(language);
 }
 
 /**
  * Get all currently supported languages.
  */
 export function getSupportedLanguages(): Language[] {
-  const available = (Object.keys(grammarLoaders) as GrammarLanguage[])
-    .filter((language) => loadGrammar(language) !== null);
+  const available = (Object.keys(WASM_GRAMMAR_FILES) as GrammarLanguage[])
+    .filter((language) => languageCache.has(language));
   return [...available, 'svelte', 'liquid'];
 }
 
@@ -217,7 +175,8 @@ export function getSupportedLanguages(): Language[] {
  */
 export function clearParserCache(): void {
   parserCache.clear();
-  grammarCache.clear();
+  // Note: languageCache is NOT cleared — WASM languages persist.
+  // To fully re-init, set grammarsInitialized = false and call initGrammars() again.
   unavailableGrammarErrors.clear();
 }
 

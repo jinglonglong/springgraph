@@ -4,7 +4,7 @@
  * High-level manager that coordinates embedding generation and vector search.
  */
 
-import Database from 'better-sqlite3';
+import { SqliteDatabase } from '../db/sqlite-adapter';
 import { Node, SearchResult, SearchOptions } from '../types';
 import { TextEmbedder, createEmbedder, EmbedderOptions, EMBEDDING_DIMENSION } from './embedder';
 import { VectorSearchManager, createVectorSearch } from './search';
@@ -68,7 +68,7 @@ export class VectorManager {
   private initialized = false;
 
   constructor(
-    db: Database.Database,
+    db: SqliteDatabase,
     queries: QueryBuilder,
     options: VectorManagerOptions = {}
   ) {
@@ -355,7 +355,7 @@ export class VectorManager {
  * Create a vector manager
  */
 export function createVectorManager(
-  db: Database.Database,
+  db: SqliteDatabase,
   queries: QueryBuilder,
   options?: VectorManagerOptions
 ): VectorManager {

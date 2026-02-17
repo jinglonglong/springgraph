@@ -4,15 +4,19 @@
  * Tests for the tree-sitter extraction system.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { CodeGraph } from '../src';
 import { extractFromSource, scanDirectory, shouldIncludeFile } from '../src/extraction';
-import { detectLanguage, isLanguageSupported, getSupportedLanguages } from '../src/extraction/grammars';
+import { detectLanguage, isLanguageSupported, getSupportedLanguages, initGrammars } from '../src/extraction/grammars';
 import { normalizePath } from '../src/utils';
 import { DEFAULT_CONFIG } from '../src/types';
+
+beforeAll(async () => {
+  await initGrammars();
+});
 
 // Create a temporary directory for each test
 function createTempDir(): string {

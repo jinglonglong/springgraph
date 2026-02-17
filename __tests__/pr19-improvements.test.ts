@@ -13,7 +13,7 @@
  * - CLI uninit command
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -24,7 +24,12 @@ import {
   getSupportedLanguages,
   clearParserCache,
   getUnavailableGrammarErrors,
+  initGrammars,
 } from '../src/extraction/grammars';
+
+beforeAll(async () => {
+  await initGrammars();
+});
 
 // Create a temporary directory for each test
 function createTempDir(): string {
@@ -320,8 +325,9 @@ describe('Database Layer Improvements', () => {
     const { DatabaseConnection } = await import('../src/db');
     const { QueryBuilder } = await import('../src/db/queries');
 
-    const db = DatabaseConnection.initialize(testDir);
-    const queries = new QueryBuilder(db.getDatabase());
+    const dbPath = path.join(testDir, 'codegraph.db');
+    const db = DatabaseConnection.initialize(dbPath);
+    const queries = new QueryBuilder(db.getDb());
 
     // Insert a node first (needed as foreign key)
     queries.insertNode({
@@ -375,8 +381,9 @@ describe('Database Layer Improvements', () => {
     const { DatabaseConnection } = await import('../src/db');
     const { QueryBuilder } = await import('../src/db/queries');
 
-    const db = DatabaseConnection.initialize(testDir);
-    const queries = new QueryBuilder(db.getDatabase());
+    const dbPath = path.join(testDir, 'codegraph.db');
+    const db = DatabaseConnection.initialize(dbPath);
+    const queries = new QueryBuilder(db.getDb());
 
     // Insert some nodes
     for (let i = 0; i < 3; i++) {
@@ -405,8 +412,9 @@ describe('Database Layer Improvements', () => {
   it.skipIf(!HAS_SQLITE)('should set performance pragmas on initialization', async () => {
     const { DatabaseConnection } = await import('../src/db');
 
-    const db = DatabaseConnection.initialize(testDir);
-    const rawDb = db.getDatabase();
+    const dbPath = path.join(testDir, 'codegraph.db');
+    const db = DatabaseConnection.initialize(dbPath);
+    const rawDb = db.getDb();
 
     // Check pragmas were set
     const synchronous = rawDb.pragma('synchronous', { simple: true });
@@ -428,8 +436,9 @@ describe('Database Layer Improvements', () => {
     const { DatabaseConnection } = await import('../src/db');
     const { QueryBuilder } = await import('../src/db/queries');
 
-    const db = DatabaseConnection.initialize(testDir);
-    const queries = new QueryBuilder(db.getDatabase());
+    const dbPath = path.join(testDir, 'codegraph.db');
+    const db = DatabaseConnection.initialize(dbPath);
+    const queries = new QueryBuilder(db.getDb());
 
     // Should not throw on empty array
     expect(() => queries.insertUnresolvedRefsBatch([])).not.toThrow();
@@ -665,28 +674,21 @@ describe('CLI uninit', () => {
 // Tree-sitter Version Pinning
 // =============================================================================
 
-describe('Tree-sitter Version Pinning', () => {
-  it('should have exact versions (no caret) in package.json', () => {
+describe('Tree-sitter WASM Setup', () => {
+  it('should use web-tree-sitter and tree-sitter-wasms in dependencies', () => {
     const pkgPath = path.join(__dirname, '..', 'package.json');
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
 
-    const treeSitterDeps = Object.entries(pkg.dependencies as Record<string, string>)
-      .filter(([name]) => name.startsWith('tree-sitter') || name.includes('tree-sitter'));
-
-    for (const [name, version] of treeSitterDeps) {
-      // Skip github: references
-      if (version.startsWith('github:')) continue;
-      expect(version, `${name} should not use caret range`).not.toMatch(/^\^/);
-    }
+    expect(pkg.dependencies['web-tree-sitter']).toBeDefined();
+    expect(pkg.dependencies['tree-sitter-wasms']).toBeDefined();
   });
 
-  it('should have tree-sitter override pinned', () => {
+  it('should not have native tree-sitter in dependencies', () => {
     const pkgPath = path.join(__dirname, '..', 'package.json');
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
 
-    expect(pkg.overrides).toBeDefined();
-    expect(pkg.overrides['tree-sitter']).toBeDefined();
-    expect(pkg.overrides['tree-sitter']).not.toMatch(/^\^/);
+    expect(pkg.dependencies['tree-sitter']).toBeUndefined();
+    expect(pkg.overrides).toBeUndefined();
   });
 });
 

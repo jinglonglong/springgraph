@@ -4,20 +4,22 @@
  * Handles SQLite database initialization and connection management.
  */
 
-import Database from 'better-sqlite3';
+import { SqliteDatabase, createDatabase } from './sqlite-adapter';
 import * as fs from 'fs';
 import * as path from 'path';
 import { SchemaVersion } from '../types';
 import { runMigrations, getCurrentVersion, CURRENT_SCHEMA_VERSION } from './migrations';
 
+export { SqliteDatabase, getActiveBackend } from './sqlite-adapter';
+
 /**
  * Database connection wrapper with lifecycle management
  */
 export class DatabaseConnection {
-  private db: Database.Database;
+  private db: SqliteDatabase;
   private dbPath: string;
 
-  private constructor(db: Database.Database, dbPath: string) {
+  private constructor(db: SqliteDatabase, dbPath: string) {
     this.db = db;
     this.dbPath = dbPath;
   }
@@ -33,7 +35,7 @@ export class DatabaseConnection {
     }
 
     // Create and configure database
-    const db = new Database(dbPath);
+    const db = createDatabase(dbPath);
 
     // Enable foreign keys and WAL mode for better performance
     db.pragma('foreign_keys = ON');
@@ -71,7 +73,7 @@ export class DatabaseConnection {
       throw new Error(`Database not found: ${dbPath}`);
     }
 
-    const db = new Database(dbPath);
+    const db = createDatabase(dbPath);
 
     // Enable foreign keys and WAL mode
     db.pragma('foreign_keys = ON');
@@ -99,7 +101,7 @@ export class DatabaseConnection {
   /**
    * Get the underlying database instance
    */
-  getDb(): Database.Database {
+  getDb(): SqliteDatabase {
     return this.db;
   }
 

@@ -4,7 +4,7 @@
  * Prepared statements for CRUD operations on the knowledge graph.
  */
 
-import Database from 'better-sqlite3';
+import { SqliteDatabase, SqliteStatement } from './sqlite-adapter';
 import {
   Node,
   Edge,
@@ -143,7 +143,7 @@ function rowToFileRecord(row: FileRow): FileRecord {
  * Query builder for the knowledge graph database
  */
 export class QueryBuilder {
-  private db: Database.Database;
+  private db: SqliteDatabase;
 
   // Node cache for frequently accessed nodes (LRU-style, max 1000 entries)
   private nodeCache: Map<string, Node> = new Map();
@@ -151,30 +151,30 @@ export class QueryBuilder {
 
   // Prepared statements (lazily initialized)
   private stmts: {
-    insertNode?: Database.Statement;
-    updateNode?: Database.Statement;
-    deleteNode?: Database.Statement;
-    deleteNodesByFile?: Database.Statement;
-    getNodeById?: Database.Statement;
-    getNodesByFile?: Database.Statement;
-    getNodesByKind?: Database.Statement;
-    insertEdge?: Database.Statement;
-    upsertFile?: Database.Statement;
-    deleteEdgesBySource?: Database.Statement;
-    deleteEdgesByTarget?: Database.Statement;
-    getEdgesBySource?: Database.Statement;
-    getEdgesByTarget?: Database.Statement;
-    insertFile?: Database.Statement;
-    updateFile?: Database.Statement;
-    deleteFile?: Database.Statement;
-    getFileByPath?: Database.Statement;
-    getAllFiles?: Database.Statement;
-    insertUnresolved?: Database.Statement;
-    deleteUnresolvedByNode?: Database.Statement;
-    getUnresolvedByName?: Database.Statement;
+    insertNode?: SqliteStatement;
+    updateNode?: SqliteStatement;
+    deleteNode?: SqliteStatement;
+    deleteNodesByFile?: SqliteStatement;
+    getNodeById?: SqliteStatement;
+    getNodesByFile?: SqliteStatement;
+    getNodesByKind?: SqliteStatement;
+    insertEdge?: SqliteStatement;
+    upsertFile?: SqliteStatement;
+    deleteEdgesBySource?: SqliteStatement;
+    deleteEdgesByTarget?: SqliteStatement;
+    getEdgesBySource?: SqliteStatement;
+    getEdgesByTarget?: SqliteStatement;
+    insertFile?: SqliteStatement;
+    updateFile?: SqliteStatement;
+    deleteFile?: SqliteStatement;
+    getFileByPath?: SqliteStatement;
+    getAllFiles?: SqliteStatement;
+    insertUnresolved?: SqliteStatement;
+    deleteUnresolvedByNode?: SqliteStatement;
+    getUnresolvedByName?: SqliteStatement;
   } = {};
 
-  constructor(db: Database.Database) {
+  constructor(db: SqliteDatabase) {
     this.db = db;
   }
 
@@ -884,6 +884,30 @@ export class QueryBuilder {
    */
   getUnresolvedReferences(): UnresolvedReference[] {
     const rows = this.db.prepare('SELECT * FROM unresolved_refs').all() as UnresolvedRefRow[];
+    return rows.map((row) => ({
+      fromNodeId: row.from_node_id,
+      referenceName: row.reference_name,
+      referenceKind: row.reference_kind as EdgeKind,
+      line: row.line,
+      column: row.col,
+      candidates: row.candidates ? safeJsonParse(row.candidates, undefined) : undefined,
+      filePath: row.file_path,
+      language: row.language as Language,
+    }));
+  }
+
+  /**
+   * Get unresolved references scoped to specific file paths.
+   * Uses the idx_unresolved_file_path index for efficient lookup.
+   */
+  getUnresolvedReferencesByFiles(filePaths: string[]): UnresolvedReference[] {
+    if (filePaths.length === 0) return [];
+
+    const placeholders = filePaths.map(() => '?').join(',');
+    const rows = this.db
+      .prepare(`SELECT * FROM unresolved_refs WHERE file_path IN (${placeholders})`)
+      .all(...filePaths) as UnresolvedRefRow[];
+
     return rows.map((row) => ({
       fromNodeId: row.from_node_id,
       referenceName: row.reference_name,

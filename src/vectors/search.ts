@@ -5,7 +5,7 @@
  * Falls back to brute-force cosine similarity if sqlite-vss is not available.
  */
 
-import Database from 'better-sqlite3';
+import { SqliteDatabase } from '../db/sqlite-adapter';
 import { Node } from '../types';
 import { TextEmbedder, EMBEDDING_DIMENSION } from './embedder';
 
@@ -29,11 +29,11 @@ export interface VectorSearchOptions {
  * Handles vector storage and similarity search for semantic code search.
  */
 export class VectorSearchManager {
-  private db: Database.Database;
+  private db: SqliteDatabase;
   private vssEnabled = false;
   private embeddingDimension: number;
 
-  constructor(db: Database.Database, dimension: number = EMBEDDING_DIMENSION) {
+  constructor(db: SqliteDatabase, dimension: number = EMBEDDING_DIMENSION) {
     this.db = db;
     this.embeddingDimension = dimension;
   }
@@ -75,10 +75,11 @@ export class VectorSearchManager {
       const vss = await import('sqlite-vss');
 
       // Use the load function which loads both vector0 and vss0
+      // VSS extension expects the raw better-sqlite3 Database instance
       if (typeof vss.load === 'function') {
-        vss.load(this.db);
+        vss.load(this.db as any);
       } else if (typeof vss.default?.load === 'function') {
-        vss.default.load(this.db);
+        vss.default.load(this.db as any);
       } else {
         throw new Error('sqlite-vss load function not found');
       }
@@ -464,7 +465,7 @@ export class VectorSearchManager {
  * Create a vector search manager
  */
 export function createVectorSearch(
-  db: Database.Database,
+  db: SqliteDatabase,
   dimension?: number
 ): VectorSearchManager {
   return new VectorSearchManager(db, dimension);

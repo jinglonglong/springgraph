@@ -38,6 +38,7 @@ import {
   IndexResult,
   SyncResult,
   extractFromSource,
+  initGrammars,
 } from './extraction';
 import {
   ReferenceResolver,
@@ -60,7 +61,7 @@ export {
   CODEGRAPH_DIR,
 } from './directory';
 export { IndexProgress, IndexResult, SyncResult } from './extraction';
-export { detectLanguage, isLanguageSupported, getSupportedLanguages } from './extraction';
+export { detectLanguage, isLanguageSupported, getSupportedLanguages, initGrammars } from './extraction';
 export { ResolutionResult } from './resolution';
 export { EmbeddingProgress } from './vectors';
 export {
@@ -184,6 +185,7 @@ export class CodeGraph {
    * @returns A new CodeGraph instance
    */
   static async init(projectRoot: string, options: InitOptions = {}): Promise<CodeGraph> {
+    await initGrammars();
     const resolvedRoot = path.resolve(projectRoot);
 
     // Check if already initialized
@@ -253,6 +255,7 @@ export class CodeGraph {
    * @returns A CodeGraph instance
    */
   static async open(projectRoot: string, options: OpenOptions = {}): Promise<CodeGraph> {
+    await initGrammars();
     const resolvedRoot = path.resolve(projectRoot);
 
     // Check if initialized
@@ -449,15 +452,18 @@ export class CodeGraph {
 
         // Resolve references if files were updated
         if (result.filesAdded > 0 || result.filesModified > 0) {
-          const unresolvedCount = this.queries.getUnresolvedReferences().length;
+          // Scope resolution to changed files when available (git fast path)
+          const unresolvedRefs = result.changedFilePaths
+            ? this.queries.getUnresolvedReferencesByFiles(result.changedFilePaths)
+            : this.queries.getUnresolvedReferences();
 
           options.onProgress?.({
             phase: 'resolving',
             current: 0,
-            total: unresolvedCount,
+            total: unresolvedRefs.length,
           });
 
-          this.resolveReferences((current, total) => {
+          this.resolver.resolveAndPersist(unresolvedRefs, (current, total) => {
             options.onProgress?.({
               phase: 'resolving',
               current,

@@ -4,7 +4,7 @@
  * Schema versioning and migration support.
  */
 
-import Database from 'better-sqlite3';
+import { SqliteDatabase } from './sqlite-adapter';
 
 /**
  * Current schema version
@@ -17,7 +17,7 @@ export const CURRENT_SCHEMA_VERSION = 2;
 interface Migration {
   version: number;
   description: string;
-  up: (db: Database.Database) => void;
+  up: (db: SqliteDatabase) => void;
 }
 
 /**
@@ -50,7 +50,7 @@ const migrations: Migration[] = [
 /**
  * Get the current schema version from the database
  */
-export function getCurrentVersion(db: Database.Database): number {
+export function getCurrentVersion(db: SqliteDatabase): number {
   try {
     const row = db
       .prepare('SELECT MAX(version) as version FROM schema_versions')
@@ -65,7 +65,7 @@ export function getCurrentVersion(db: Database.Database): number {
 /**
  * Record a migration as applied
  */
-function recordMigration(db: Database.Database, version: number, description: string): void {
+function recordMigration(db: SqliteDatabase, version: number, description: string): void {
   db.prepare(
     'INSERT INTO schema_versions (version, applied_at, description) VALUES (?, ?, ?)'
   ).run(version, Date.now(), description);
@@ -74,7 +74,7 @@ function recordMigration(db: Database.Database, version: number, description: st
 /**
  * Run all pending migrations
  */
-export function runMigrations(db: Database.Database, fromVersion: number): void {
+export function runMigrations(db: SqliteDatabase, fromVersion: number): void {
   const pending = migrations.filter((m) => m.version > fromVersion);
 
   if (pending.length === 0) {
@@ -96,7 +96,7 @@ export function runMigrations(db: Database.Database, fromVersion: number): void 
 /**
  * Check if the database needs migration
  */
-export function needsMigration(db: Database.Database): boolean {
+export function needsMigration(db: SqliteDatabase): boolean {
   const current = getCurrentVersion(db);
   return current < CURRENT_SCHEMA_VERSION;
 }
@@ -104,7 +104,7 @@ export function needsMigration(db: Database.Database): boolean {
 /**
  * Get list of pending migrations
  */
-export function getPendingMigrations(db: Database.Database): Migration[] {
+export function getPendingMigrations(db: SqliteDatabase): Migration[] {
   const current = getCurrentVersion(db);
   return migrations
     .filter((m) => m.version > current)
@@ -115,7 +115,7 @@ export function getPendingMigrations(db: Database.Database): Migration[] {
  * Get migration history from database
  */
 export function getMigrationHistory(
-  db: Database.Database
+  db: SqliteDatabase
 ): Array<{ version: number; appliedAt: number; description: string | null }> {
   const rows = db
     .prepare('SELECT version, applied_at, description FROM schema_versions ORDER BY version')

@@ -12,6 +12,9 @@ import { clamp } from '../utils';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
+/** Maximum output length to prevent context bloat (characters) */
+const MAX_OUTPUT_LENGTH = 15000;
+
 /**
  * Mark a Claude session as having consulted MCP tools.
  * This enables Grep/Glob/Bash commands that would otherwise be blocked.
@@ -821,18 +824,13 @@ export class ToolHandler {
   }
 
   /**
-   * Maximum output length to prevent context bloat (characters)
-   */
-  private readonly MAX_OUTPUT_LENGTH = 15000;
-
-  /**
    * Truncate output if it exceeds the maximum length
    */
   private truncateOutput(text: string): string {
-    if (text.length <= this.MAX_OUTPUT_LENGTH) return text;
-    const truncated = text.slice(0, this.MAX_OUTPUT_LENGTH);
+    if (text.length <= MAX_OUTPUT_LENGTH) return text;
+    const truncated = text.slice(0, MAX_OUTPUT_LENGTH);
     const lastNewline = truncated.lastIndexOf('\n');
-    const cutPoint = lastNewline > this.MAX_OUTPUT_LENGTH * 0.8 ? lastNewline : this.MAX_OUTPUT_LENGTH;
+    const cutPoint = lastNewline > MAX_OUTPUT_LENGTH * 0.8 ? lastNewline : MAX_OUTPUT_LENGTH;
     return truncated.slice(0, cutPoint) + '\n\n... (output truncated)';
   }
 

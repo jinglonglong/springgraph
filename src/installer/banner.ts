@@ -113,15 +113,16 @@ export function warn(message: string): void {
 /**
  * Show the "next steps" section after installation
  */
-export function showNextSteps(location: 'global' | 'local'): void {
+export function showNextSteps(location: 'global' | 'local', useNpx?: boolean): void {
   console.log();
   console.log(chalk.bold('  Done!') + ' Restart Claude Code to use CodeGraph.');
   console.log();
 
   if (location === 'global') {
+    const cmd = useNpx ? 'npx @colbymchenry/codegraph' : 'codegraph';
     console.log(chalk.dim('  Quick start:'));
     console.log(chalk.dim('    cd your-project'));
-    console.log(chalk.cyan('    codegraph init -i'));
+    console.log(chalk.cyan(`    ${cmd} init -i`));
   } else {
     console.log(chalk.dim('  CodeGraph is ready to use in this project!'));
   }

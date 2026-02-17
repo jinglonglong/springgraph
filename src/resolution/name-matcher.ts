@@ -190,16 +190,6 @@ function findBestMatch(
   return bestNode;
 }
 
-// Lazily-built case-insensitive index for fuzzy matching
-let fuzzyIndex: Map<string, Node[]> | null = null;
-
-/**
- * Clear the fuzzy match index (call between indexing runs)
- */
-export function clearFuzzyIndex(): void {
-  fuzzyIndex = null;
-}
-
 /**
  * Fuzzy match - last resort with lower confidence
  */
@@ -207,38 +197,24 @@ export function matchFuzzy(
   ref: UnresolvedRef,
   context: ResolutionContext
 ): ResolvedRef | null {
-  // Build case-insensitive index on first use
-  if (!fuzzyIndex) {
-    fuzzyIndex = new Map();
-    const kinds: Array<Node['kind']> = ['function', 'method', 'class'];
-    for (const kind of kinds) {
-      for (const node of context.getNodesByKind(kind)) {
-        const lower = node.name.toLowerCase();
-        const existing = fuzzyIndex.get(lower);
-        if (existing) {
-          existing.push(node);
-        } else {
-          fuzzyIndex.set(lower, [node]);
-        }
-      }
-    }
-  }
-
   const lowerName = ref.referenceName.toLowerCase();
 
-  // Exact case-insensitive match via index (O(1) lookup)
-  const caseInsensitive = fuzzyIndex.get(lowerName);
+  // Use pre-built lowercase index for O(1) lookup instead of scanning all nodes
+  const candidates = context.getNodesByLowerName(lowerName);
 
-  if (caseInsensitive && caseInsensitive.length === 1) {
+  // Filter to callable kinds only (function, method, class)
+  const callableKinds = new Set(['function', 'method', 'class']);
+  const callableCandidates = candidates.filter((n) => callableKinds.has(n.kind));
+
+  if (callableCandidates.length === 1) {
     return {
       original: ref,
-      targetNodeId: caseInsensitive[0]!.id,
+      targetNodeId: callableCandidates[0]!.id,
       confidence: 0.5,
       resolvedBy: 'fuzzy',
     };
   }
 
-  // Skip prefix matching — too expensive and low value (confidence 0.3)
   return null;
 }
 

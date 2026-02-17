@@ -241,10 +241,16 @@ export function validateDirectory(projectRoot: string): {
     return { valid: false, errors };
   }
 
-  // Check for required files
+  // Auto-repair missing .gitignore (non-critical file)
   const gitignorePath = path.join(codegraphDir, '.gitignore');
   if (!fs.existsSync(gitignorePath)) {
-    errors.push('.gitignore missing in .codegraph directory');
+    try {
+      const gitignoreContent = `# CodeGraph data files\n# These are local to each machine and should not be committed\n\n# Database\n*.db\n*.db-wal\n*.db-shm\n\n# Cache\ncache/\n\n# Logs\n*.log\n\n# Hook markers\n.dirty\n`;
+      fs.writeFileSync(gitignorePath, gitignoreContent, 'utf-8');
+    } catch {
+      // Non-fatal: warn but don't block
+      errors.push('.gitignore missing in .codegraph directory and could not be created');
+    }
   }
 
   return {

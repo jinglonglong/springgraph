@@ -105,7 +105,7 @@ function resolveRelativeImport(
 
   // Try the path as-is first
   const basePath = path.resolve(fromDir, importPath);
-  const relativePath = path.relative(projectRoot, basePath);
+  const relativePath = path.relative(projectRoot, basePath).replace(/\\/g, '/');
 
   // Try each extension
   for (const ext of extensions) {
@@ -442,15 +442,10 @@ export function resolveViaImport(
   ref: UnresolvedRef,
   context: ResolutionContext
 ): ResolvedRef | null {
-  // Use cached import mappings or extract and cache them
-  let imports = importMappingCache.get(ref.filePath);
-  if (!imports) {
-    const content = context.readFile(ref.filePath);
-    if (!content) {
-      return null;
-    }
-    imports = extractImportMappings(ref.filePath, content, ref.language);
-    importMappingCache.set(ref.filePath, imports);
+  // Use cached import mappings (avoids re-reading and re-parsing per ref)
+  const imports = context.getImportMappings(ref.filePath, ref.language);
+  if (imports.length === 0 && !context.readFile(ref.filePath)) {
+    return null;
   }
 
   // Check if the reference name matches any import

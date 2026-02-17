@@ -132,8 +132,8 @@ Know exactly what breaks before you change it. Trace callers, callees, and the f
 <tr>
 <td width="33%" valign="top">
 
-### 🌍 18+ Languages
-TypeScript, JavaScript, Python, Go, Rust, Java, C#, PHP, Ruby, C, C++, Swift, Kotlin, Dart, Svelte, Pascal/Delphi—all with the same API.
+### 🌍 19+ Languages
+TypeScript, JavaScript, Python, Go, Rust, Java, C#, PHP, Ruby, C, C++, Swift, Kotlin, Dart, Svelte, Liquid, Pascal/Delphi—all with the same API.
 
 </td>
 <td width="33%" valign="top">
@@ -145,7 +145,7 @@ No data leaves your machine. No API keys. No external services. Everything runs 
 <td width="33%" valign="top">
 
 ### ⚡ Always Fresh
-Git hooks automatically sync the index on every commit. Your code intelligence is always up to date.
+Claude Code hooks automatically sync the index as you work. Your code intelligence is always up to date.
 
 </td>
 </tr>
@@ -165,6 +165,7 @@ The interactive installer will:
 - Configure the MCP server in `~/.claude.json`
 - Set up auto-allow permissions for CodeGraph tools
 - Add global instructions to `~/.claude/CLAUDE.md` (teaches Claude how to use CodeGraph)
+- Install Claude Code hooks for automatic index syncing
 - Optionally initialize your current project
 
 ### 2. Restart Claude Code
@@ -216,7 +217,8 @@ npm install -g @colbymchenry/codegraph
       "mcp__codegraph__codegraph_callees",
       "mcp__codegraph__codegraph_impact",
       "mcp__codegraph__codegraph_node",
-      "mcp__codegraph__codegraph_status"
+      "mcp__codegraph__codegraph_status",
+      "mcp__codegraph__codegraph_files"
     ]
   }
 }
@@ -246,6 +248,7 @@ CodeGraph builds a semantic knowledge graph of codebases for faster, smarter cod
 | `codegraph_callees` | Find what a function calls |
 | `codegraph_impact` | See what's affected by changing a symbol |
 | `codegraph_node` | Get details + source code for a symbol |
+| `codegraph_files` | Get project file structure from the index |
 
 **When spawning Explore agents in a codegraph-enabled project:**
 
@@ -279,12 +282,13 @@ At the start of a session, ask the user if they'd like to initialize CodeGraph:
 codegraph                   # Run interactive installer
 codegraph install           # Run interactive installer (explicit)
 codegraph init [path]       # Initialize in a project
+codegraph uninit [path]     # Remove CodeGraph from a project
 codegraph index [path]      # Full index
 codegraph sync [path]       # Incremental update
 codegraph status [path]     # Show statistics
 codegraph query <search>    # Search symbols
+codegraph files [path]      # Show project file structure
 codegraph context <task>    # Build context for AI
-codegraph hooks install     # Install git auto-sync hook
 codegraph serve --mcp       # Start MCP server
 ```
 
@@ -305,7 +309,8 @@ The installer will:
 2. Configure the MCP server in `claude.json`
 3. Optionally set up auto-allow permissions
 4. Add global instructions to `~/.claude/CLAUDE.md` (teaches Claude how to use CodeGraph)
-5. For local installs: initialize and index the current project
+5. Install Claude Code hooks for automatic index syncing
+6. For local installs: initialize and index the current project
 
 ### `codegraph init [path]`
 
@@ -315,7 +320,15 @@ Initialize CodeGraph in a project directory. Creates a `.codegraph/` directory w
 codegraph init                    # Initialize in current directory
 codegraph init /path/to/project   # Initialize in specific directory
 codegraph init --index            # Initialize and immediately index
-codegraph init --no-hooks         # Skip git hook installation
+```
+
+### `codegraph uninit [path]`
+
+Remove CodeGraph from a project. Deletes the `.codegraph/` directory and all indexed data.
+
+```bash
+codegraph uninit                  # Remove from current directory
+codegraph uninit --force          # Skip confirmation prompt
 ```
 
 ### `codegraph index [path]`
@@ -350,7 +363,6 @@ Output includes:
 - Nodes by kind (functions, classes, methods, etc.)
 - Files by language
 - Pending changes (if any)
-- Git hook status
 
 ### `codegraph query <search>`
 
@@ -363,6 +375,21 @@ codegraph query "process" --limit 20     # Limit results
 codegraph query "validate" --json        # Output as JSON
 ```
 
+### `codegraph files [path]`
+
+Show the project file structure from the index. Faster than filesystem scanning since it reads from the indexed data.
+
+```bash
+codegraph files                           # Show file tree
+codegraph files --format flat             # Simple list
+codegraph files --format grouped          # Group by language
+codegraph files --filter src/components   # Filter by directory
+codegraph files --pattern "*.test.ts"     # Filter by glob pattern
+codegraph files --max-depth 2             # Limit tree depth
+codegraph files --no-metadata             # Hide language/symbol counts
+codegraph files --json                    # Output as JSON
+```
+
 ### `codegraph context <task>`
 
 Build relevant code context for a task. Uses semantic search to find entry points, then expands through the graph to find related code.
@@ -371,16 +398,6 @@ Build relevant code context for a task. Uses semantic search to find entry point
 codegraph context "fix checkout bug"
 codegraph context "add user authentication" --format json
 codegraph context "refactor payment service" --max-nodes 30
-```
-
-### `codegraph hooks`
-
-Manage git hooks for automatic syncing.
-
-```bash
-codegraph hooks install    # Install post-commit hook
-codegraph hooks remove     # Remove hook
-codegraph hooks status     # Check if hook is installed
 ```
 
 ### `codegraph serve`
@@ -438,6 +455,14 @@ Get details about a specific symbol. Use `includeCode: true` only when needed.
 codegraph_node(symbol: "authenticate", includeCode: true)
 ```
 
+### `codegraph_files`
+
+Get the project file structure from the index. Faster than filesystem scanning.
+
+```
+codegraph_files(path: "src/components", format: "tree", includeMetadata: true)
+```
+
 ### `codegraph_status`
 
 Check index health and statistics.
@@ -452,6 +477,7 @@ Claude's **Explore agents** use these tools instead of grep/glob/Read for faster
 | Multiple `Read` calls | `codegraph_context(task)` | Related code in one call |
 | Manual file tracing | `codegraph_callers/callees` | Call graph traversal |
 | Guessing impact | `codegraph_impact(symbol)` | Know what breaks |
+| `Glob`/`find` scanning | `codegraph_files(path)` | Indexed file structure |
 
 This hybrid approach gives you **~30% fewer tokens** and **~25% fewer tool calls** while letting Claude's native agents handle synthesis.
 
@@ -517,7 +543,11 @@ All data is stored in a local SQLite database (`.codegraph/codegraph.db`):
 - **nodes** table: All code entities with metadata
 - **edges** table: Relationships between nodes
 - **files** table: File tracking for incremental updates
-- **node_vectors** / **vector_map**: Embeddings for semantic search (using sqlite-vss)
+- **unresolved_refs** table: References pending resolution
+- **vectors** table: Embeddings stored as BLOBs for semantic search
+- **nodes_fts**: FTS5 virtual table for full-text search
+- **schema_versions** table: Schema version tracking
+- **project_metadata** table: Project-level key-value metadata
 
 ### 3. Reference Resolution
 
@@ -561,7 +591,6 @@ The `.codegraph/config.json` file controls indexing behavior:
 ```json
 {
   "version": 1,
-  "projectName": "my-project",
   "languages": ["typescript", "javascript"],
   "exclude": [
     "node_modules/**",
@@ -569,9 +598,11 @@ The `.codegraph/config.json` file controls indexing behavior:
     "build/**",
     "*.min.js"
   ],
-  "frameworks": ["express", "react"],
+  "frameworks": [],
   "maxFileSize": 1048576,
-  "gitHooksEnabled": true
+  "extractDocstrings": true,
+  "trackCallSites": true,
+  "enableEmbeddings": false
 }
 ```
 
@@ -583,7 +614,9 @@ The `.codegraph/config.json` file controls indexing behavior:
 | `exclude` | Glob patterns to ignore | `["node_modules/**", ...]` |
 | `frameworks` | Framework hints for better resolution | `[]` |
 | `maxFileSize` | Skip files larger than this (bytes) | `1048576` (1MB) |
-| `gitHooksEnabled` | Enable git hook installation | `true` |
+| `extractDocstrings` | Whether to extract docstrings from code | `true` |
+| `trackCallSites` | Whether to track call site locations | `true` |
+| `enableEmbeddings` | Enable semantic search embeddings | `false` |
 
 ## 🌐 Supported Languages
 
@@ -601,9 +634,10 @@ The `.codegraph/config.json` file controls indexing behavior:
 | C | `.c`, `.h` | Full support |
 | C++ | `.cpp`, `.hpp`, `.cc` | Full support |
 | Swift | `.swift` | Basic support |
-| Kotlin | `.kt` | Basic support |
+| Kotlin | `.kt`, `.kts` | Basic support |
 | Dart | `.dart` | Full support |
 | Svelte | `.svelte` | Full support (script extraction, Svelte 5 runes, SvelteKit routes) |
+| Liquid | `.liquid` | Full support |
 | Pascal / Delphi | `.pas`, `.dpr`, `.dpk`, `.lpr` | Full support (classes, records, interfaces, enums, DFM/FMX form files) |
 
 ## 🔧 Troubleshooting

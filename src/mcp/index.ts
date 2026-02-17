@@ -88,6 +88,11 @@ export class MCPServer {
     // Keep the process running
     process.on('SIGINT', () => this.stop());
     process.on('SIGTERM', () => this.stop());
+
+    // When the parent process (Claude Code) exits, stdin closes.
+    // Detect this and shut down gracefully to prevent orphaned processes.
+    process.stdin.on('end', () => this.stop());
+    process.stdin.on('close', () => this.stop());
   }
 
   /**

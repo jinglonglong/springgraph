@@ -79,6 +79,10 @@ export interface ResolutionContext {
   getProjectRoot(): string;
   /** Get all files */
   getAllFiles(): string[];
+  /** Get nodes by lowercase name (O(1) lookup for fuzzy matching) */
+  getNodesByLowerName(lowerName: string): Node[];
+  /** Get cached import mappings for a file */
+  getImportMappings(filePath: string, language: Language): ImportMapping[];
 }
 
 /**

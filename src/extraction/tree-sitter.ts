@@ -887,7 +887,7 @@ export class TreeSitterExtractor {
   private errors: ExtractionError[] = [];
   private extractor: LanguageExtractor | null = null;
   private nodeStack: string[] = []; // Stack of parent node IDs
-  private methodIndex: Map<string, string> | null = null; // name → node ID for defProc lookup
+  private methodIndex: Map<string, string> | null = null; // lookup key → node ID for Pascal defProc lookup
 
   constructor(filePath: string, source: string, language?: Language) {
     this.filePath = filePath;
@@ -2337,21 +2337,42 @@ export class TreeSitterExtractor {
 
     const nameNode = getChildByField(declProc, 'name');
     if (!nameNode) return;
-    const fullName = getNodeText(nameNode, this.source);
-    // fullName is like "TAuthService.Create" — we want just the method name part
+    const fullName = getNodeText(nameNode, this.source).trim();
+    // fullName is like "TAuthService.Create"
     const shortName = fullName.includes('.') ? fullName.split('.').pop()! : fullName;
+    const fullNameKey = fullName.toLowerCase();
+    const shortNameKey = shortName.toLowerCase();
 
     // Build method index on first use (O(n) once, then O(1) per lookup)
     if (!this.methodIndex) {
       this.methodIndex = new Map();
       for (const n of this.nodes) {
         if (n.kind === 'method' || n.kind === 'function') {
-          this.methodIndex.set(n.name, n.id);
+          const nameKey = n.name.toLowerCase();
+          // Keep first seen short-name mapping to avoid silently overwriting earlier entries.
+          if (!this.methodIndex.has(nameKey)) {
+            this.methodIndex.set(nameKey, n.id);
+          }
+
+          // For Pascal methods, also index qualified forms (e.g. TAuthService.Create).
+          if (n.kind === 'method') {
+            const qualifiedParts = n.qualifiedName.split('::').slice(1); // drop file path
+            if (qualifiedParts.length >= 2) {
+              // Create suffix keys so both "Module.Class.Method" and "Class.Method" can resolve.
+              for (let i = 0; i < qualifiedParts.length - 1; i++) {
+                const scopedName = qualifiedParts.slice(i).join('.').toLowerCase();
+                this.methodIndex.set(scopedName, n.id);
+              }
+            }
+          }
         }
       }
     }
 
-    const parentId = this.methodIndex.get(shortName) || this.nodeStack[this.nodeStack.length - 1];
+    const parentId =
+      this.methodIndex.get(fullNameKey) ||
+      this.methodIndex.get(shortNameKey) ||
+      this.nodeStack[this.nodeStack.length - 1];
     if (!parentId) return;
 
     // Visit the block for calls
@@ -3141,6 +3162,7 @@ export function extractFromSource(
   language?: Language
 ): ExtractionResult {
   const detectedLanguage = language || detectLanguage(filePath);
+  const fileExtension = path.extname(filePath).toLowerCase();
 
   // Use custom extractor for Svelte
   if (detectedLanguage === 'svelte') {
@@ -3157,7 +3179,7 @@ export function extractFromSource(
   // Use custom extractor for DFM/FMX form files
   if (
     detectedLanguage === 'pascal' &&
-    (filePath.endsWith('.dfm') || filePath.endsWith('.fmx'))
+    (fileExtension === '.dfm' || fileExtension === '.fmx')
   ) {
     const extractor = new DfmExtractor(filePath, source);
     return extractor.extract();

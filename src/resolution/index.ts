@@ -435,7 +435,7 @@ export class ReferenceResolver {
       const pascalUnitPrefixes = [
         'System.', 'Winapi.', 'Vcl.', 'Fmx.', 'Data.', 'Datasnap.',
         'Soap.', 'Xml.', 'Web.', 'REST.', 'FireDAC.', 'IBX.',
-        'IdHTTP', 'IdTCP', 'IdSSL', 'Id',
+        'IdHTTP', 'IdTCP', 'IdSSL',
       ];
       if (pascalUnitPrefixes.some((p) => name.startsWith(p))) {
         return true;

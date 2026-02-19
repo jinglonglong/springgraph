@@ -25,31 +25,18 @@ export async function runInstaller(): Promise<void> {
   showBanner();
 
   try {
-    // Step 1: Ensure codegraph is installed globally
+    // Step 1: Install codegraph globally.
+    // Always run npm install -g — we can't use `command -v codegraph` to check
+    // because npx puts a temporary binary in PATH that vanishes when npx exits.
+    console.log(chalk.dim('  Installing codegraph globally...'));
     try {
-      const checkCmd = process.platform === 'win32' ? 'where codegraph' : 'command -v codegraph';
-      execSync(checkCmd, { stdio: 'pipe' });
+      execSync('npm install -g @colbymchenry/codegraph', { stdio: 'pipe' });
+      success('Installed codegraph command globally');
     } catch {
-      // Not installed globally yet — try to install
-      console.log(chalk.dim('  Installing codegraph globally...'));
-      try {
-        execSync('npm install -g @colbymchenry/codegraph', { stdio: 'pipe' });
-        // Verify it actually worked (PATH may not include npm global bin)
-        try {
-          execSync(process.platform === 'win32' ? 'where codegraph' : 'command -v codegraph', { stdio: 'pipe' });
-          success('Installed codegraph command globally');
-        } catch {
-          // Install "succeeded" but command not in PATH — common with nvm/fnm
-          info('Global install succeeded but codegraph is not in your PATH');
-          info('You may need to add npm\'s global bin directory to your PATH');
-          info('Then restart your terminal and run: codegraph init -i');
-        }
-      } catch {
-        info('Could not install globally (permission denied)');
-        info('Try: sudo npm install -g @colbymchenry/codegraph');
-      }
-      console.log();
+      info('Could not install globally (permission denied)');
+      info('Try: sudo npm install -g @colbymchenry/codegraph');
     }
+    console.log();
 
     // Step 2: Ask for installation location
     const location = await promptInstallLocation();

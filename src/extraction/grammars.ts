@@ -86,21 +86,20 @@ export async function initGrammars(): Promise<void> {
 
   await Parser.init();
 
-  // Load all grammars in parallel
+  // Load grammars sequentially to avoid web-tree-sitter WASM race condition on Node 20+
+  // See: https://github.com/tree-sitter/tree-sitter/issues/2338
   const entries = Object.entries(WASM_GRAMMAR_FILES) as [GrammarLanguage, string][];
-  await Promise.allSettled(
-    entries.map(async ([lang, wasmFile]) => {
-      try {
-        const wasmPath = require.resolve(`tree-sitter-wasms/out/${wasmFile}`);
-        const language = await WasmLanguage.load(wasmPath);
-        languageCache.set(lang, language);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.warn(`[CodeGraph] Failed to load ${lang} grammar — parsing will be unavailable: ${message}`);
-        unavailableGrammarErrors.set(lang, message);
-      }
-    })
-  );
+  for (const [lang, wasmFile] of entries) {
+    try {
+      const wasmPath = require.resolve(`tree-sitter-wasms/out/${wasmFile}`);
+      const language = await WasmLanguage.load(wasmPath);
+      languageCache.set(lang, language);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[CodeGraph] Failed to load ${lang} grammar — parsing will be unavailable: ${message}`);
+      unavailableGrammarErrors.set(lang, message);
+    }
+  }
 
   grammarsInitialized = true;
 }

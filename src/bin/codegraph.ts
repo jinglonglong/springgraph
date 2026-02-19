@@ -922,11 +922,12 @@ program
         await server.start();
         // Server will run until terminated
       } else {
-        // Default: show info about MCP mode
-        console.log(chalk.bold('\nCodeGraph MCP Server\n'));
-        info('Use --mcp flag to start the MCP server');
-        console.log('\nTo use with Claude Code, add to your MCP configuration:');
-        console.log(chalk.dim(`
+        // Default: show info about MCP mode.
+        // Use stderr so stdout stays clean for any piped/stdio usage.
+        console.error(chalk.bold('\nCodeGraph MCP Server\n'));
+        console.error(chalk.blue('ℹ') + ' Use --mcp flag to start the MCP server');
+        console.error('\nTo use with Claude Code, add to your MCP configuration:');
+        console.error(chalk.dim(`
 {
   "mcpServers": {
     "codegraph": {
@@ -936,15 +937,15 @@ program
   }
 }
 `));
-        console.log('Available tools:');
-        console.log(chalk.cyan('  codegraph_search') + '    - Search for code symbols');
-        console.log(chalk.cyan('  codegraph_context') + '   - Build context for a task');
-        console.log(chalk.cyan('  codegraph_callers') + '   - Find callers of a symbol');
-        console.log(chalk.cyan('  codegraph_callees') + '   - Find what a symbol calls');
-        console.log(chalk.cyan('  codegraph_impact') + '    - Analyze impact of changes');
-        console.log(chalk.cyan('  codegraph_node') + '      - Get symbol details');
-        console.log(chalk.cyan('  codegraph_files') + '     - Get project file structure');
-        console.log(chalk.cyan('  codegraph_status') + '    - Get index status');
+        console.error('Available tools:');
+        console.error(chalk.cyan('  codegraph_search') + '    - Search for code symbols');
+        console.error(chalk.cyan('  codegraph_context') + '   - Build context for a task');
+        console.error(chalk.cyan('  codegraph_callers') + '   - Find callers of a symbol');
+        console.error(chalk.cyan('  codegraph_callees') + '   - Find what a symbol calls');
+        console.error(chalk.cyan('  codegraph_impact') + '    - Analyze impact of changes');
+        console.error(chalk.cyan('  codegraph_node') + '      - Get symbol details');
+        console.error(chalk.cyan('  codegraph_files') + '     - Get project file structure');
+        console.error(chalk.cyan('  codegraph_status') + '    - Get index status');
       }
     } catch (err) {
       captureException(err);

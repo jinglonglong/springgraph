@@ -15,6 +15,7 @@
  *   codegraph query <search>     Search for symbols
  *   codegraph files [options]    Show project file structure
  *   codegraph context <task>     Build context for a task
+ *   codegraph affected [files]   Find test files affected by changes
  *   codegraph mark-dirty [path]  Mark project as needing sync (hooks)
  *   codegraph sync-if-dirty [path] Sync if marked dirty (hooks)
  *
@@ -1063,6 +1064,145 @@ program
     } catch (err) {
       captureException(err);
       error(`Failed to remove lock: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+  });
+
+/**
+ * codegraph affected [files...]
+ *
+ * Find test files affected by the given source files.
+ * Traces dependency edges transitively to find test files that depend on changed code.
+ *
+ * Usage:
+ *   git diff --name-only | codegraph affected --stdin
+ *   codegraph affected src/lib/components/Editor.svelte src/routes/+page.svelte
+ */
+program
+  .command('affected [files...]')
+  .description('Find test files affected by changed source files')
+  .option('-p, --path <path>', 'Project path')
+  .option('--stdin', 'Read file list from stdin (one per line)')
+  .option('-d, --depth <number>', 'Max dependency traversal depth', '5')
+  .option('-f, --filter <glob>', 'Custom glob filter for test files (e.g. "e2e/*.spec.ts")')
+  .option('-j, --json', 'Output as JSON')
+  .option('-q, --quiet', 'Only output file paths, no decoration')
+  .action(async (fileArgs: string[], options: { path?: string; stdin?: boolean; depth?: string; filter?: string; json?: boolean; quiet?: boolean }) => {
+    const projectPath = resolveProjectPath(options.path);
+
+    try {
+      if (!isInitialized(projectPath)) {
+        error(`CodeGraph not initialized in ${projectPath}`);
+        process.exit(1);
+      }
+
+      // Collect changed files from args or stdin
+      let changedFiles: string[] = [...(fileArgs || [])];
+
+      if (options.stdin) {
+        const stdinData = fs.readFileSync(0, 'utf-8');
+        const stdinFiles = stdinData.split('\n').map(f => f.trim()).filter(Boolean);
+        changedFiles.push(...stdinFiles);
+      }
+
+      if (changedFiles.length === 0) {
+        if (!options.quiet) info('No files provided. Use file arguments or --stdin.');
+        process.exit(0);
+      }
+
+      const { default: CodeGraph } = await loadCodeGraph();
+      const cg = await CodeGraph.open(projectPath);
+      const maxDepth = parseInt(options.depth || '5', 10);
+
+      // Common test file patterns
+      const defaultTestPatterns = [
+        /\.spec\./,
+        /\.test\./,
+        /\/__tests__\//,
+        /\/tests?\//,
+        /\/e2e\//,
+        /\/spec\//,
+      ];
+
+      // Custom filter pattern
+      let customFilter: RegExp | null = null;
+      if (options.filter) {
+        // Convert glob to regex: ** → .+, * → [^/]*, . → \.
+        const regex = options.filter
+          .replace(/[+[\]{}()^$|\\]/g, '\\$&')
+          .replace(/\./g, '\\.')
+          .replace(/\*\*/g, '.+')
+          .replace(/\*/g, '[^/]*');
+        customFilter = new RegExp(regex);
+      }
+
+      function isTestFile(filePath: string): boolean {
+        if (customFilter) return customFilter.test(filePath);
+        return defaultTestPatterns.some(p => p.test(filePath));
+      }
+
+      // BFS to find all transitive dependents of changed files, filtered to test files
+      const affectedTests = new Set<string>();
+      const allDependents = new Set<string>();
+
+      for (const file of changedFiles) {
+        // If the changed file is itself a test file, include it
+        if (isTestFile(file)) {
+          affectedTests.add(file);
+          continue;
+        }
+
+        // BFS through dependents
+        const queue: Array<{ file: string; depth: number }> = [{ file, depth: 0 }];
+        const visited = new Set<string>();
+        visited.add(file);
+
+        while (queue.length > 0) {
+          const current = queue.shift()!;
+          if (current.depth >= maxDepth) continue;
+
+          const dependents = cg.getFileDependents(current.file);
+          for (const dep of dependents) {
+            if (visited.has(dep)) continue;
+            visited.add(dep);
+            allDependents.add(dep);
+
+            if (isTestFile(dep)) {
+              affectedTests.add(dep);
+            } else {
+              queue.push({ file: dep, depth: current.depth + 1 });
+            }
+          }
+        }
+      }
+
+      const sortedTests = Array.from(affectedTests).sort();
+
+      // Output
+      if (options.json) {
+        console.log(JSON.stringify({
+          changedFiles,
+          affectedTests: sortedTests,
+          totalDependentsTraversed: allDependents.size,
+        }, null, 2));
+      } else if (options.quiet) {
+        for (const t of sortedTests) console.log(t);
+      } else {
+        if (sortedTests.length === 0) {
+          info('No test files affected by the changed files.');
+        } else {
+          console.log(chalk.bold(`\nAffected test files (${sortedTests.length}):\n`));
+          for (const t of sortedTests) {
+            console.log('  ' + chalk.cyan(t));
+          }
+          console.log();
+        }
+      }
+
+      cg.destroy();
+    } catch (err) {
+      captureException(err);
+      error(`Affected analysis failed: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);
     }
   });

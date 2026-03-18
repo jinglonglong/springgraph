@@ -289,6 +289,7 @@ codegraph status [path]     # Show statistics
 codegraph query <search>    # Search symbols
 codegraph files [path]      # Show project file structure
 codegraph context <task>    # Build context for AI
+codegraph affected [files]  # Find test files affected by changes
 codegraph serve --mcp       # Start MCP server
 ```
 
@@ -398,6 +399,47 @@ Build relevant code context for a task. Uses semantic search to find entry point
 codegraph context "fix checkout bug"
 codegraph context "add user authentication" --format json
 codegraph context "refactor payment service" --max-nodes 30
+```
+
+### `codegraph affected [files...]`
+
+Find test files affected by changed source files. Traces import dependencies transitively through the graph to discover which test files depend on the code you changed. Works with any test framework and any language CodeGraph supports.
+
+```bash
+codegraph affected src/utils.ts src/api.ts         # Pass files as arguments
+git diff --name-only | codegraph affected --stdin   # Pipe from git diff
+codegraph affected --stdin --json < changed.txt     # JSON output
+codegraph affected src/auth.ts --filter "e2e/*"     # Custom test file pattern
+codegraph affected src/lib.ts --depth 3 --quiet     # Shallow search, paths only
+```
+
+**Options:**
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--stdin` | Read file list from stdin (one per line) | `false` |
+| `-d, --depth <n>` | Max dependency traversal depth | `5` |
+| `-f, --filter <glob>` | Custom glob to identify test files | auto-detect |
+| `-j, --json` | Output as JSON | `false` |
+| `-q, --quiet` | Output file paths only, no decoration | `false` |
+| `-p, --path <path>` | Project path | auto-detect |
+
+**How it works:**
+
+1. For each changed file, BFS-traverses its transitive dependents (files that import from it, directly or indirectly)
+2. Filters results to test files using common conventions (`*.spec.*`, `*.test.*`, `e2e/`, `tests/`, `__tests__/`) or a custom `--filter` glob
+3. Changed files that are themselves test files are always included
+
+**Example: CI/hook integration**
+
+```bash
+#!/usr/bin/env bash
+# In a pre-commit hook or CI step:
+AFFECTED=$(git diff --name-only HEAD | codegraph affected --stdin --quiet)
+if [ -n "$AFFECTED" ]; then
+  echo "Running affected tests..."
+  npx vitest run $AFFECTED
+fi
 ```
 
 ### `codegraph serve`

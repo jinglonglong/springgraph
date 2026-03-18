@@ -148,7 +148,19 @@ export class GraphQueryManager {
     const nodes = this.queries.getNodesByFile(filePath);
     const dependents = new Set<string>();
 
-    // For each exported symbol in this file, find imports
+    // Check file-level incoming import edges (file:X imports file:Y)
+    const fileNode = nodes.find((n) => n.kind === 'file');
+    if (fileNode) {
+      const incomingFileEdges = this.queries.getIncomingEdges(fileNode.id, ['imports']);
+      for (const edge of incomingFileEdges) {
+        const sourceNode = this.queries.getNodeById(edge.source);
+        if (sourceNode && sourceNode.filePath !== filePath) {
+          dependents.add(sourceNode.filePath);
+        }
+      }
+    }
+
+    // Also check node-level imports of exported symbols
     for (const node of nodes) {
       if (node.isExported) {
         const incomingEdges = this.queries.getIncomingEdges(node.id, ['imports']);

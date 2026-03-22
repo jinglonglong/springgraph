@@ -1414,7 +1414,7 @@
         }
         addSubgraph(data.nodes, data.edges);
 
-        // Highlight root/entry-point nodes
+        // Highlight root nodes, with entry point getting special treatment
         if (data.roots && data.roots.length > 0) {
           for (const rootId of data.roots) {
             const ele = cy.getElementById(rootId);
@@ -1423,6 +1423,19 @@
         }
 
         runLayout();
+
+        // Center on entry point if available
+        if (data.entryPoint) {
+          const entryEle = cy.getElementById(data.entryPoint);
+          if (entryEle.length > 0) {
+            entryEle.select();
+            setTimeout(() => {
+              cy.animate({ center: { eles: entryEle } }, { duration: 400 });
+              showNodeDetails(data.entryPoint);
+            }, 350);
+          }
+        }
+
         const source = data.usedClaude ? ' (via Claude)' : '';
         showToast(`Found ${data.nodes.length} related symbols${source}`);
       } catch (err) {

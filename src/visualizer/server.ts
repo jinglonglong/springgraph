@@ -80,10 +80,16 @@ export class VisualizerServer {
 
     const symbolIndex = this.buildSymbolIndex();
 
-    const prompt = `You are analyzing a codebase to help a developer understand it visually. Given the question and symbol index below, identify the 8-12 most relevant symbols that would help answer the question.
+    const prompt = `You are analyzing a codebase to help a developer visually trace a code flow. Given the question and symbol index below, identify the entry point and the key symbols in the flow.
 
-IMPORTANT: Return ONLY a JSON array of symbol names. No explanation, no markdown, no code fences. Just the array.
-Example: ["requireAuth", "LoginPage", "getSession", "UserService"]
+IMPORTANT: Return ONLY a JSON object with this exact format. No explanation, no markdown, no code fences.
+{"entry": "symbolName", "flow": ["symbol1", "symbol2", "symbol3", ...]}
+
+- "entry" is THE single starting point the user would trigger (e.g., a page component, route handler, button click handler)
+- "flow" is the symbols in rough execution order, starting from the entry point (max 8-10 symbols)
+- Include the entry point in the flow array too
+
+Example: {"entry": "LoginPage", "flow": ["LoginPage", "handleSubmit", "authenticateUser", "createSession", "redirect"]}
 
 Question: "${question}"
 
@@ -109,13 +115,27 @@ ${symbolIndex}`;
 
         this.claudeAvailable = true;
 
-        // Parse the JSON array from Claude's response
+        // Parse Claude's response — try object format first, then array fallback
         try {
           const text = stdout.trim();
-          // Try to extract JSON array from response (Claude might wrap it)
-          const jsonMatch = text.match(/\[[\s\S]*\]/);
-          if (jsonMatch) {
-            const names = JSON.parse(jsonMatch[0]) as string[];
+          // Try to extract JSON object {"entry": ..., "flow": [...]}
+          const objMatch = text.match(/\{[\s\S]*\}/);
+          if (objMatch) {
+            const parsed = JSON.parse(objMatch[0]) as { entry?: string; flow?: string[] };
+            if (parsed.flow && Array.isArray(parsed.flow) && parsed.flow.length > 0) {
+              // Return flow with entry first
+              const names = parsed.flow.map(String);
+              if (parsed.entry && !names.includes(parsed.entry)) {
+                names.unshift(String(parsed.entry));
+              }
+              resolve(names);
+              return;
+            }
+          }
+          // Fallback: try JSON array
+          const arrMatch = text.match(/\[[\s\S]*\]/);
+          if (arrMatch) {
+            const names = JSON.parse(arrMatch[0]) as string[];
             if (Array.isArray(names) && names.length > 0) {
               resolve(names.map(String));
               return;
@@ -322,6 +342,7 @@ ${symbolIndex}`;
         let usedClaude = false;
 
         // Try Claude CLI first for intelligent query interpretation
+        let entryNodeId: string | null = null;
         const claudeNames = await this.askClaude(q);
         if (claudeNames && claudeNames.length > 0) {
           usedClaude = true;
@@ -332,6 +353,10 @@ ${symbolIndex}`;
               if (r.node.name.toLowerCase().includes(name.toLowerCase()) ||
                   name.toLowerCase().includes(r.node.name.toLowerCase())) {
                 seedMap.set(r.node.id, r.node);
+                // First match of first name = entry point
+                if (!entryNodeId && name === claudeNames[0]) {
+                  entryNodeId = r.node.id;
+                }
               }
             }
           }
@@ -448,7 +473,7 @@ ${symbolIndex}`;
 
         const finalNodes = Array.from(nodeMap.values()).filter(n => connectedIds.has(n.id));
 
-        json({ nodes: finalNodes, edges: finalEdges, roots: rootIds, usedClaude });
+        json({ nodes: finalNodes, edges: finalEdges, roots: rootIds, entryPoint: entryNodeId, usedClaude });
         return;
       }
 

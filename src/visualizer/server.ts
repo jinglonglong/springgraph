@@ -80,20 +80,21 @@ export class VisualizerServer {
 
     const symbolIndex = this.buildSymbolIndex();
 
-    const prompt = `You are analyzing a codebase to help a developer visually trace a code flow. Given the question and symbol index below, identify the entry point and the key symbols in the flow.
+    const prompt = `You are tracing a code flow through a codebase. Given the question and symbol index below, identify the EXACT execution path.
 
-IMPORTANT: Return ONLY a JSON object with this exact format. No explanation, no markdown, no code fences.
-{"entry": "symbolName", "flow": ["symbol1", "symbol2", "symbol3", ...]}
+Rules:
+- Return ONLY 5-8 symbols that are DIRECTLY in the execution path
+- Start from the user-facing entry point (page, button handler, route)
+- Follow the call chain: what calls what, in order
+- Do NOT include tangentially related symbols, utilities, or unrelated features
+- Every symbol should call or be called by the next one in the flow
 
-- "entry" is THE single starting point the user would trigger (e.g., a page component, route handler, button click handler)
-- "flow" is the symbols in rough execution order, starting from the entry point (max 8-10 symbols)
-- Include the entry point in the flow array too
-
-Example: {"entry": "LoginPage", "flow": ["LoginPage", "handleSubmit", "authenticateUser", "createSession", "redirect"]}
+Return ONLY this JSON format, nothing else:
+{"entry": "entrySymbol", "flow": ["step1", "step2", "step3", "step4", "step5"]}
 
 Question: "${question}"
 
-Symbol index (format: file: kind:name, ...):
+Symbol index:
 ${symbolIndex}`;
 
     return new Promise((resolve) => {

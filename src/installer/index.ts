@@ -7,7 +7,7 @@
 
 import { execSync } from 'child_process';
 import { showBanner, showNextSteps, success, error, info, chalk } from './banner';
-import { promptInstallLocation, promptAutoAllow, InstallLocation } from './prompts';
+import { promptInstallLocation, promptAutoAllow, promptConfirm, InstallLocation } from './prompts';
 import { writeMcpConfig, writePermissions, writeClaudeMd, writeHooks, hasMcpConfig, hasPermissions, hasHooks } from './config-writer';
 
 /**
@@ -25,16 +25,25 @@ export async function runInstaller(): Promise<void> {
   showBanner();
 
   try {
-    // Step 1: Install codegraph globally.
-    // Always run npm install -g — we can't use `command -v codegraph` to check
-    // because npx puts a temporary binary in PATH that vanishes when npx exits.
-    console.log(chalk.dim('  Installing codegraph globally...'));
-    try {
-      execSync('npm install -g @colbymchenry/codegraph', { stdio: 'pipe' });
-      success('Installed codegraph command globally');
-    } catch {
-      info('Could not install globally (permission denied)');
-      info('Try: sudo npm install -g @colbymchenry/codegraph');
+    // Step 1: Install codegraph globally (with user consent).
+    // The global install is needed because Claude Code hooks and the MCP server
+    // invoke `codegraph` by name — the temporary npx binary vanishes when npx exits.
+    console.log(chalk.bold('  Install codegraph globally?') + chalk.dim(' (Required for hooks & MCP server)'));
+    console.log();
+    const shouldInstallGlobally = await promptConfirm('Install globally via npm', true);
+
+    if (shouldInstallGlobally) {
+      console.log(chalk.dim('  Installing codegraph globally...'));
+      try {
+        execSync('npm install -g @colbymchenry/codegraph', { stdio: 'pipe' });
+        success('Installed codegraph command globally');
+      } catch {
+        info('Could not install globally (permission denied)');
+        info('Try: sudo npm install -g @colbymchenry/codegraph');
+      }
+    } else {
+      info('Skipped global install — hooks and MCP server may not work without it');
+      info('You can install later: npm install -g @colbymchenry/codegraph');
     }
     console.log();
 

@@ -162,6 +162,7 @@ npx @colbymchenry/codegraph
 ```
 
 The interactive installer will:
+- Prompt to install `codegraph` globally (needed for hooks & MCP server to work)
 - Configure the MCP server in `~/.claude.json`
 - Set up auto-allow permissions for CodeGraph tools
 - Add global instructions to `~/.claude/CLAUDE.md` (teaches Claude how to use CodeGraph)
@@ -306,12 +307,13 @@ npx @colbymchenry/codegraph       # Run via npx (no global install needed)
 ```
 
 The installer will:
-1. Ask for installation location (global `~/.claude` or local `./.claude`)
-2. Configure the MCP server in `claude.json`
-3. Optionally set up auto-allow permissions
-4. Add global instructions to `~/.claude/CLAUDE.md` (teaches Claude how to use CodeGraph)
-5. Install Claude Code hooks for automatic index syncing
-6. For local installs: initialize and index the current project
+1. Prompt to install `codegraph` globally (needed for hooks & MCP server)
+2. Ask for installation location (global `~/.claude` or local `./.claude`)
+3. Configure the MCP server in `claude.json`
+4. Optionally set up auto-allow permissions
+5. Add global instructions to `~/.claude/CLAUDE.md` (teaches Claude how to use CodeGraph)
+6. Install Claude Code hooks for automatic index syncing
+7. For local installs: initialize and index the current project
 
 ### `codegraph init [path]`
 

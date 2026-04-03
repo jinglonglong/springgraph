@@ -849,6 +849,11 @@ export class ToolHandler {
       }
     }
 
+    // Add completeness signal so agents know they don't need to re-read these files
+    lines.push('');
+    lines.push('---');
+    lines.push(`> **Complete source code is included above for ${filesIncluded} files.** You do NOT need to re-read these files — the relevant sections are already shown in full. Only use Read/Grep for files listed under "Additional relevant files" if you need more detail.`);
+
     return this.textResult(lines.join('\n'));
   }
 

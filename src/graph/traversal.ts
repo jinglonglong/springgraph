@@ -248,7 +248,7 @@ export class GraphTraverser {
     }
     visited.add(nodeId);
 
-    const incomingEdges = this.queries.getIncomingEdges(nodeId, ['calls']);
+    const incomingEdges = this.queries.getIncomingEdges(nodeId, ['calls', 'references', 'imports']);
 
     for (const edge of incomingEdges) {
       const callerNode = this.queries.getNodeById(edge.source);
@@ -287,7 +287,7 @@ export class GraphTraverser {
     }
     visited.add(nodeId);
 
-    const outgoingEdges = this.queries.getOutgoingEdges(nodeId, ['calls']);
+    const outgoingEdges = this.queries.getOutgoingEdges(nodeId, ['calls', 'references', 'imports']);
 
     for (const edge of outgoingEdges) {
       const calleeNode = this.queries.getNodeById(edge.target);

@@ -23,9 +23,9 @@ import { QueryBuilder } from '../db/queries';
 import { GraphTraverser } from '../graph';
 import { VectorManager } from '../vectors';
 import { formatContextAsMarkdown, formatContextAsJson } from './formatter';
-import { logDebug, logWarn } from '../errors';
+import { logDebug } from '../errors';
 import { validatePathWithinRoot } from '../utils';
-import { isTestFile } from '../search/query-utils';
+import { isTestFile, extractSearchTerms } from '../search/query-utils';
 
 /**
  * Extract likely symbol names from a natural language query
@@ -298,21 +298,47 @@ export class ContextBuilder {
       }
     }
 
-    // Step 4: Fall back to text search if no semantic results
-    if (semanticResults.length === 0 && exactMatches.length === 0) {
-      try {
-        const textResults = this.queries.searchNodes(query, {
-          limit: opts.searchLimit,
-          kinds: opts.nodeKinds && opts.nodeKinds.length > 0 ? opts.nodeKinds : undefined,
-        });
-        semanticResults = textResults;
-      } catch (error) {
-        logWarn('Text search failed', { query, error: String(error) });
-        // Return empty results
+    // Step 4: Always run text search for natural language term matching
+    // This catches file-name and node-name matches that semantic search may miss,
+    // which is critical for template-heavy codebases (e.g., Liquid/Shopify themes)
+    // where file names are the primary identifiers.
+    let textResults: SearchResult[] = [];
+    try {
+      const searchTerms = extractSearchTerms(query);
+      if (searchTerms.length > 0) {
+        // Search each term individually to get broader coverage,
+        // then boost results that match multiple terms
+        const termResultsMap = new Map<string, { result: SearchResult; termHits: number }>();
+        for (const term of searchTerms) {
+          const termResults = this.queries.searchNodes(term, {
+            limit: opts.searchLimit * 2,
+            kinds: opts.nodeKinds && opts.nodeKinds.length > 0 ? opts.nodeKinds : undefined,
+          });
+          for (const r of termResults) {
+            const existing = termResultsMap.get(r.node.id);
+            if (existing) {
+              existing.termHits++;
+              existing.result.score = Math.max(existing.result.score, r.score);
+            } else {
+              termResultsMap.set(r.node.id, { result: r, termHits: 1 });
+            }
+          }
+        }
+        // Boost results matching multiple terms and sort
+        textResults = Array.from(termResultsMap.values())
+          .map(({ result, termHits }) => ({
+            ...result,
+            score: result.score + (termHits - 1) * 5,
+          }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, opts.searchLimit * 2);
       }
+      logDebug('Text search results', { count: textResults.length });
+    } catch (error) {
+      logDebug('Text search failed', { query, error: String(error) });
     }
 
-    // Step 5: Merge results, prioritizing exact matches
+    // Step 5: Merge results, prioritizing exact matches, then text (path-boosted), then semantic
     const seenIds = new Set<string>();
     let searchResults: SearchResult[] = [];
 
@@ -324,7 +350,15 @@ export class ContextBuilder {
       }
     }
 
-    // Add semantic/text results
+    // Add text search results (includes path relevance scoring from searchNodes)
+    for (const result of textResults) {
+      if (!seenIds.has(result.node.id)) {
+        seenIds.add(result.node.id);
+        searchResults.push(result);
+      }
+    }
+
+    // Add semantic results
     for (const result of semanticResults) {
       if (!seenIds.has(result.node.id)) {
         seenIds.add(result.node.id);

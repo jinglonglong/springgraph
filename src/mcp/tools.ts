@@ -874,7 +874,12 @@ export class ToolHandler {
       return { nodes: [], note: '' };
     }
 
-    const exactMatches = results.filter(r => r.node.name === symbol);
+    // Match by exact name, OR by file basename without extension
+    // (e.g., "product-card" matches file node named "product-card.liquid")
+    const exactMatches = results.filter(r =>
+      r.node.name === symbol ||
+      (r.node.kind === 'file' && r.node.name.replace(/\.[^.]+$/, '') === symbol)
+    );
 
     if (exactMatches.length <= 1) {
       const node = exactMatches[0]?.node ?? results[0]!.node;

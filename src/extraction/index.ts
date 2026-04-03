@@ -111,6 +111,30 @@ export function shouldIncludeFile(
  */
 function getGitVisibleFiles(rootDir: string): Set<string> | null {
   try {
+    // Check if the project directory is gitignored by a parent repo.
+    // When rootDir lives inside a parent git repo that ignores it,
+    // `git ls-files` returns nothing — fall back to filesystem walk.
+    const gitRoot = execFileSync(
+      'git',
+      ['rev-parse', '--show-toplevel'],
+      { cwd: rootDir, encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }
+    ).trim();
+
+    if (path.resolve(gitRoot) !== path.resolve(rootDir)) {
+      try {
+        // git check-ignore exits 0 if the path IS ignored, 1 if not
+        execFileSync(
+          'git',
+          ['check-ignore', '-q', path.resolve(rootDir)],
+          { cwd: rootDir, encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }
+        );
+        // Directory is gitignored by parent repo — fall back to filesystem walk
+        return null;
+      } catch {
+        // Not ignored — safe to use git ls-files
+      }
+    }
+
     // -c = cached (tracked), -o = others (untracked), --exclude-standard = respect .gitignore
     const output = execFileSync(
       'git',

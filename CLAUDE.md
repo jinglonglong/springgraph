@@ -132,8 +132,9 @@ Use these tools **directly in the main session** for fast code exploration (repl
 
 | Tool | Use For |
 |------|---------|
+| `codegraph_explore` | **Deep exploration** — comprehensive context for a topic in ONE call |
+| `codegraph_context` | Quick context for a task (lighter than explore) |
 | `codegraph_search` | Find symbols by name (functions, classes, types) |
-| `codegraph_context` | Get relevant code context for a task |
 | `codegraph_callers` | Find what calls a function |
 | `codegraph_callees` | Find what a function calls |
 | `codegraph_impact` | See what's affected by changing a symbol |

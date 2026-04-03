@@ -20,12 +20,15 @@ CodeGraph builds a semantic knowledge graph of codebases for faster, smarter cod
 
 | Tool | Use For |
 |------|---------|
-| \`codegraph_context\` | Get relevant code context for a task (great starting point) |
+| \`codegraph_explore\` | **Deep exploration** — comprehensive context for a topic in ONE call (replaces Explore agents) |
+| \`codegraph_context\` | Quick context for a task (lighter than explore) |
 | \`codegraph_search\` | Find symbols by name (functions, classes, types) |
 | \`codegraph_callers\` | Find what calls a function |
 | \`codegraph_callees\` | Find what a function calls |
 | \`codegraph_impact\` | See what's affected by changing a symbol |
 | \`codegraph_node\` | Get details + source code for a symbol |
+
+**For deep exploration questions** (e.g., "how does the undo/redo system work?"), use \`codegraph_explore\` directly. It returns full source code sections from all relevant files in a single call — no need to spawn an Explore agent.
 
 **Do NOT tell Explore agents to use codegraph tools.** Testing shows Explore agents use codegraph for discovery then still read all the same files — making them slower, not faster. Codegraph's value is in the main session where it replaces the need for exhaustive file reading.
 

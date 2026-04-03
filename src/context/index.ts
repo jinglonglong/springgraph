@@ -25,6 +25,7 @@ import { VectorManager } from '../vectors';
 import { formatContextAsMarkdown, formatContextAsJson } from './formatter';
 import { logDebug, logWarn } from '../errors';
 import { validatePathWithinRoot } from '../utils';
+import { isTestFile } from '../search/query-utils';
 
 /**
  * Extract likely symbol names from a natural language query
@@ -333,6 +334,17 @@ export class ContextBuilder {
 
     // Limit total results
     searchResults = searchResults.slice(0, opts.searchLimit * 2);
+
+    // Deprioritize test files unless the query is about tests
+    const queryLower = query.toLowerCase();
+    const isTestQuery = queryLower.includes('test') || queryLower.includes('spec');
+    if (!isTestQuery) {
+      searchResults = searchResults.map(r => ({
+        ...r,
+        score: isTestFile(r.node.filePath) ? r.score * 0.3 : r.score,
+      }));
+      searchResults.sort((a, b) => b.score - a.score);
+    }
 
     // Filter by minimum score
     let filteredResults = searchResults.filter((r) => r.score >= opts.minScore);

@@ -79,7 +79,43 @@ export function scorePathRelevance(filePath: string, query: string): number {
     else if (pathLower.includes(term)) score += 3;
   }
 
+  // Deprioritize test files unless the query is explicitly about tests
+  const queryLower = query.toLowerCase();
+  const isTestQuery = queryLower.includes('test') || queryLower.includes('spec');
+  if (!isTestQuery && isTestFile(filePath)) {
+    score -= 15;
+  }
+
   return score;
+}
+
+/**
+ * Check if a file path looks like a test file
+ */
+export function isTestFile(filePath: string): boolean {
+  const lower = filePath.toLowerCase();
+  const fileName = path.basename(lower);
+
+  // Common test file patterns
+  return (
+    fileName.startsWith('test_') ||
+    fileName.startsWith('test.') ||
+    fileName.endsWith('.test.ts') ||
+    fileName.endsWith('.test.js') ||
+    fileName.endsWith('.test.tsx') ||
+    fileName.endsWith('.test.jsx') ||
+    fileName.endsWith('.spec.ts') ||
+    fileName.endsWith('.spec.js') ||
+    fileName.endsWith('_test.go') ||
+    fileName.endsWith('_test.py') ||
+    fileName.endsWith('_test.rs') ||
+    fileName.endsWith('Tests.java') ||
+    fileName.endsWith('Test.java') ||
+    lower.includes('/tests/') ||
+    lower.includes('/test/') ||
+    lower.includes('/__tests__/') ||
+    lower.includes('/spec/')
+  );
 }
 
 /**
@@ -91,10 +127,10 @@ export function kindBonus(kind: Node['kind']): number {
     function: 10,
     method: 10,
     class: 8,
-    interface: 7,
+    interface: 9,
     type_alias: 6,
     struct: 6,
-    trait: 6,
+    trait: 9,
     enum: 5,
     component: 8,
     route: 9,
@@ -108,7 +144,7 @@ export function kindBonus(kind: Node['kind']): number {
     parameter: 0,
     namespace: 4,
     file: 0,
-    protocol: 6,
+    protocol: 9,
     enum_member: 3,
   };
   return bonuses[kind] ?? 0;

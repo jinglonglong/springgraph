@@ -20,12 +20,13 @@ export function matchByExactName(
     return null;
   }
 
-  // If only one match, use it
+  // If only one match, use it — but penalize cross-language matches
   if (candidates.length === 1) {
+    const isCrossLanguage = candidates[0]!.language !== ref.language;
     return {
       original: ref,
       targetNodeId: candidates[0]!.id,
-      confidence: 0.9,
+      confidence: isCrossLanguage ? 0.5 : 0.9,
       resolvedBy: 'exact-match',
     };
   }
@@ -108,12 +109,14 @@ export function matchMethodCall(
 
   const [, objectOrClass, methodName] = match;
 
-  // Find the class/object first
+  // Strategy 1: Direct class name match (existing logic)
   const classCandidates = context.getNodesByName(objectOrClass!);
 
   for (const classNode of classCandidates) {
     if (classNode.kind === 'class' || classNode.kind === 'struct' || classNode.kind === 'interface') {
-      // Look for method in the same file
+      // Skip cross-language class matches
+      if (classNode.language !== ref.language) continue;
+
       const nodesInFile = context.getNodesInFile(classNode.filePath);
       const methodNode = nodesInFile.find(
         (n) =>
@@ -133,7 +136,100 @@ export function matchMethodCall(
     }
   }
 
+  // Strategy 2: Instance variable receiver - try capitalized form to find class
+  // e.g., "permissionEngine" → look for classes containing "PermissionEngine"
+  const capitalizedReceiver = objectOrClass!.charAt(0).toUpperCase() + objectOrClass!.slice(1);
+  if (capitalizedReceiver !== objectOrClass) {
+    const fuzzyClassCandidates = context.getNodesByName(capitalizedReceiver);
+    for (const classNode of fuzzyClassCandidates) {
+      if (classNode.kind === 'class' || classNode.kind === 'struct' || classNode.kind === 'interface') {
+        // Skip cross-language class matches
+        if (classNode.language !== ref.language) continue;
+
+        const nodesInFile = context.getNodesInFile(classNode.filePath);
+        const methodNode = nodesInFile.find(
+          (n) =>
+            n.kind === 'method' &&
+            n.name === methodName &&
+            n.qualifiedName.includes(classNode.name)
+        );
+
+        if (methodNode) {
+          return {
+            original: ref,
+            targetNodeId: methodNode.id,
+            confidence: 0.8,
+            resolvedBy: 'instance-method',
+          };
+        }
+      }
+    }
+  }
+
+  // Strategy 3: Find methods by name across the codebase, match by receiver
+  // name similarity with the containing class. Handles abbreviated variable
+  // names like permissionEngine → PermissionRuleEngine.
+  if (methodName) {
+    const methodCandidates = context.getNodesByName(methodName!);
+    const methods = methodCandidates.filter(
+      (n) => n.kind === 'method' && n.name === methodName
+    );
+
+    // Filter to same-language candidates first
+    const sameLanguageMethods = methods.filter(m => m.language === ref.language);
+    const targetMethods = sameLanguageMethods.length > 0 ? sameLanguageMethods : methods;
+
+    // If only one same-language method with this name exists, use it
+    if (targetMethods.length === 1 && targetMethods[0]!.language === ref.language) {
+      return {
+        original: ref,
+        targetNodeId: targetMethods[0]!.id,
+        confidence: 0.7,
+        resolvedBy: 'instance-method',
+      };
+    }
+
+    // Multiple methods: score by receiver name word overlap with class name
+    if (targetMethods.length > 1) {
+      const receiverWords = splitCamelCase(objectOrClass!);
+      let bestMatch: typeof targetMethods[0] | undefined;
+      let bestScore = 0;
+
+      for (const method of targetMethods) {
+        const classWords = splitCamelCase(method.qualifiedName);
+        let score = receiverWords.filter(w =>
+          classWords.some(cw => cw.toLowerCase() === w.toLowerCase())
+        ).length;
+        // Bonus for same language
+        if (method.language === ref.language) score += 1;
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = method;
+        }
+      }
+
+      if (bestMatch && bestScore >= 2) {
+        return {
+          original: ref,
+          targetNodeId: bestMatch.id,
+          confidence: 0.65,
+          resolvedBy: 'instance-method',
+        };
+      }
+    }
+  }
+
   return null;
+}
+
+/**
+ * Split a camelCase or PascalCase string into words.
+ */
+function splitCamelCase(str: string): string[] {
+  return str.replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .split(/[\s._:\/\\]+/)
+    .filter(w => w.length > 1);
 }
 
 /**
@@ -187,9 +283,11 @@ function findBestMatch(
     // Directory proximity bonus — strongly prefer same module/package
     score += computePathProximity(ref.filePath, candidate.filePath);
 
-    // Same language bonus
+    // Language matching: strongly prefer same language, penalize cross-language
     if (candidate.language === ref.language) {
       score += 50;
+    } else {
+      score -= 80;
     }
 
     // For call references, prefer functions/methods
@@ -235,11 +333,16 @@ export function matchFuzzy(
   const callableKinds = new Set(['function', 'method', 'class']);
   const callableCandidates = candidates.filter((n) => callableKinds.has(n.kind));
 
-  if (callableCandidates.length === 1) {
+  // Prefer same-language matches
+  const sameLanguageCandidates = callableCandidates.filter(n => n.language === ref.language);
+  const finalCandidates = sameLanguageCandidates.length > 0 ? sameLanguageCandidates : callableCandidates;
+
+  if (finalCandidates.length === 1) {
+    const isCrossLanguage = finalCandidates[0]!.language !== ref.language;
     return {
       original: ref,
-      targetNodeId: callableCandidates[0]!.id,
-      confidence: 0.5,
+      targetNodeId: finalCandidates[0]!.id,
+      confidence: isCrossLanguage ? 0.3 : 0.5,
       resolvedBy: 'fuzzy',
     };
   }

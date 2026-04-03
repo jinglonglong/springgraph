@@ -375,6 +375,17 @@ export class ReferenceResolver {
       this.queries.insertEdges(edges);
     }
 
+    // Clean up resolved refs from unresolved_refs table so metrics are accurate
+    if (result.resolved.length > 0) {
+      this.queries.deleteSpecificResolvedReferences(
+        result.resolved.map((r) => ({
+          fromNodeId: r.original.fromNodeId,
+          referenceName: r.original.referenceName,
+          referenceKind: r.original.referenceKind,
+        }))
+      );
+    }
+
     return result;
   }
 
@@ -424,6 +435,37 @@ export class ReferenceResolver {
 
     if (ref.language === 'python' && pythonBuiltIns.includes(name)) {
       return true;
+    }
+
+    // Python built-in method calls (e.g., list.extend, dict.update, self.xxx)
+    if (ref.language === 'python') {
+      const dotIdx = name.indexOf('.');
+      if (dotIdx > 0) {
+        const receiver = name.substring(0, dotIdx);
+        // self.method and cls.method are internal calls, not built-in — let them resolve
+        // But receiver types that are built-in types should be filtered
+        const pythonBuiltInTypes = new Set([
+          'list', 'dict', 'set', 'tuple', 'str', 'int', 'float', 'bool',
+          'bytes', 'bytearray', 'frozenset', 'object', 'super',
+        ]);
+        if (pythonBuiltInTypes.has(receiver)) {
+          return true;
+        }
+      }
+      // Also filter bare method names that are common Python built-in methods
+      // These get extracted as unresolved refs when called on arbitrary objects
+      const pythonBuiltInMethods = new Set([
+        'append', 'extend', 'insert', 'remove', 'pop', 'clear', 'sort', 'reverse', 'copy',
+        'update', 'keys', 'values', 'items', 'get',
+        'add', 'discard', 'union', 'intersection', 'difference',
+        'split', 'join', 'strip', 'lstrip', 'rstrip', 'replace', 'lower', 'upper',
+        'startswith', 'endswith', 'find', 'index', 'count', 'encode', 'decode',
+        'format', 'isdigit', 'isalpha', 'isalnum',
+        'read', 'write', 'readline', 'readlines', 'close', 'flush', 'seek',
+      ]);
+      if (pythonBuiltInMethods.has(name)) {
+        return true;
+      }
     }
 
     // Pascal/Delphi built-ins and standard library units

@@ -192,11 +192,16 @@ function printProgress(progress: IndexProgress): void {
   };
 
   const phaseName = phaseNames[progress.phase] || progress.phase;
-  const bar = progressBar(progress.current, progress.total);
   const file = progress.currentFile ? chalk.dim(` ${progress.currentFile}`) : '';
 
-  // Clear line and print progress
-  process.stdout.write(`\r${chalk.cyan(phaseName)}: ${bar}${file}`.padEnd(100));
+  if (progress.total > 0) {
+    const bar = progressBar(progress.current, progress.total);
+    process.stdout.write(`\r${chalk.cyan(phaseName)}: ${bar}${file}`.padEnd(100));
+  } else {
+    // No known total (e.g. scanning) — show a running count
+    const count = progress.current > 0 ? ` ${chalk.green(formatNumber(progress.current))} found` : '';
+    process.stdout.write(`\r${chalk.cyan(phaseName)}:${count}${file}`.padEnd(100));
+  }
 }
 
 /**
@@ -227,6 +232,121 @@ function warn(message: string): void {
   console.log(chalk.yellow('⚠') + ' ' + message);
 }
 
+/**
+ * Print a summary of indexing results with clear error breakdown
+ */
+function printIndexResult(result: { success: boolean; filesIndexed: number; filesSkipped: number; filesErrored: number; nodesCreated: number; edgesCreated: number; errors: Array<{ message: string; filePath?: string; severity: string; code?: string }>; durationMs: number }, projectPath?: string): void {
+  const hasErrors = result.filesErrored > 0;
+
+  // Always show what was indexed
+  if (result.filesIndexed > 0) {
+    if (hasErrors) {
+      success(`Indexed ${formatNumber(result.filesIndexed)} files (${formatNumber(result.filesErrored)} could not be parsed)`);
+    } else {
+      success(`Indexed ${formatNumber(result.filesIndexed)} files`);
+    }
+    info(`Created ${formatNumber(result.nodesCreated)} nodes and ${formatNumber(result.edgesCreated)} edges`);
+    info(`Completed in ${formatDuration(result.durationMs)}`);
+  } else if (hasErrors) {
+    error(`Indexing failed — all ${formatNumber(result.filesErrored)} files had errors`);
+  } else {
+    warn('No files found to index');
+  }
+
+  // Show error breakdown if there were errors
+  if (hasErrors) {
+    // Group errors by code for a concise summary
+    const errorsByCode = new Map<string, number>();
+    for (const err of result.errors) {
+      if (err.severity === 'error') {
+        const code = err.code || 'unknown';
+        errorsByCode.set(code, (errorsByCode.get(code) || 0) + 1);
+      }
+    }
+
+    const codeLabels: Record<string, string> = {
+      parse_error: 'files failed to parse',
+      read_error: 'files could not be read',
+      size_exceeded: 'files exceeded size limit',
+      path_traversal: 'blocked paths',
+      unsupported_language: 'unsupported language',
+      parser_error: 'parser initialization failures',
+    };
+
+    console.log('');
+    console.log(chalk.dim('  Error breakdown:'));
+    for (const [code, count] of errorsByCode) {
+      const label = codeLabels[code] || code;
+      console.log(chalk.dim(`    ${formatNumber(count)} ${label}`));
+    }
+
+    // Write detailed error log to .codegraph/errors.log
+    if (projectPath) {
+      writeErrorLog(projectPath, result.errors);
+    }
+
+    // Reassure the user the index is usable
+    if (result.filesIndexed > 0) {
+      console.log('');
+      info('The index is fully usable — only the failed files are missing from the graph.');
+      info('This is common in large repos with test fixtures or generated files that use non-standard syntax.');
+    }
+  } else if (projectPath) {
+    // No errors — clean up any stale error log
+    const logPath = path.join(projectPath, '.codegraph', 'errors.log');
+    if (fs.existsSync(logPath)) {
+      fs.unlinkSync(logPath);
+    }
+  }
+}
+
+/**
+ * Write detailed error log to .codegraph/errors.log
+ */
+function writeErrorLog(projectPath: string, errors: Array<{ message: string; filePath?: string; severity: string; code?: string }>): void {
+  const cgDir = path.join(projectPath, '.codegraph');
+  if (!fs.existsSync(cgDir)) return;
+
+  const logPath = path.join(cgDir, 'errors.log');
+
+  // Group errors by file path
+  const errorsByFile = new Map<string, Array<{ message: string; code?: string }>>();
+  const noFileErrors: Array<{ message: string; code?: string }> = [];
+
+  for (const err of errors) {
+    if (err.severity !== 'error') continue;
+    if (err.filePath) {
+      let list = errorsByFile.get(err.filePath);
+      if (!list) {
+        list = [];
+        errorsByFile.set(err.filePath, list);
+      }
+      list.push({ message: err.message, code: err.code });
+    } else {
+      noFileErrors.push({ message: err.message, code: err.code });
+    }
+  }
+
+  const lines: string[] = [
+    `CodeGraph Error Log — ${new Date().toISOString()}`,
+    `${errorsByFile.size} files with errors`,
+    '',
+  ];
+
+  for (const [filePath, fileErrors] of errorsByFile) {
+    for (const err of fileErrors) {
+      lines.push(`${filePath}: ${err.message}`);
+    }
+  }
+
+  for (const err of noFileErrors) {
+    lines.push(err.message);
+  }
+
+  fs.writeFileSync(logPath, lines.join('\n') + '\n');
+  info(`See .codegraph/errors.log for the full list of failed files`);
+}
+
 // =============================================================================
 // Commands
 // =============================================================================
@@ -239,7 +359,8 @@ program
   .description('Initialize CodeGraph in a project directory')
   .option('-i, --index', 'Run initial indexing after initialization')
   .action(async (pathArg: string | undefined, options: { index?: boolean }) => {
-    const projectPath = resolveProjectPath(pathArg);
+    // init should always target the exact path given (or cwd), never walk up parents
+    const projectPath = path.resolve(pathArg || process.cwd());
 
     console.log(chalk.bold('\nInitializing CodeGraph...\n'));
 
@@ -271,13 +392,7 @@ program
         // Clear progress line
         process.stdout.write('\r' + ' '.repeat(100) + '\r');
 
-        if (result.success) {
-          success(`Indexed ${formatNumber(result.filesIndexed)} files`);
-          info(`Created ${formatNumber(result.nodesCreated)} nodes and ${formatNumber(result.edgesCreated)} edges`);
-          info(`Completed in ${formatDuration(result.durationMs)}`);
-        } else {
-          warn(`Indexing completed with ${result.errors.length} errors`);
-        }
+        printIndexResult(result, projectPath);
       } else {
         info('Run "codegraph index" to index the project');
       }
@@ -376,22 +491,11 @@ program
         process.stdout.write('\r' + ' '.repeat(100) + '\r');
       }
 
-      if (result.success) {
-        if (!options.quiet) {
-          success(`Indexed ${formatNumber(result.filesIndexed)} files`);
-          info(`Created ${formatNumber(result.nodesCreated)} nodes and ${formatNumber(result.edgesCreated)} edges`);
-          info(`Completed in ${formatDuration(result.durationMs)}`);
-        }
-      } else {
-        if (!options.quiet) {
-          warn(`Indexing completed with ${result.errors.length} errors`);
-          for (const err of result.errors.slice(0, 5)) {
-            console.log(chalk.dim(`  - ${err.message}`));
-          }
-          if (result.errors.length > 5) {
-            console.log(chalk.dim(`  ... and ${result.errors.length - 5} more`));
-          }
-        }
+      if (!options.quiet) {
+        printIndexResult(result, projectPath);
+      }
+
+      if (!result.success) {
         process.exit(1);
       }
 

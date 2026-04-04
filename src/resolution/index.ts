@@ -34,13 +34,8 @@ export class ReferenceResolver {
   private queries: QueryBuilder;
   private context: ResolutionContext;
   private frameworks: FrameworkResolver[] = [];
-  private nodeCache: Map<string, Node[]> = new Map();
-  private fileCache: Map<string, string | null> = new Map();
-  private nameCache: Map<string, Node[]> = new Map();
-  private qualifiedNameCache: Map<string, Node[]> = new Map();
-  private kindCache: Map<string, Node[]> = new Map();
-  private nodeByIdCache: Map<string, Node> = new Map();
-  private lowerNameCache: Map<string, Node[]> = new Map();
+  private nodeCache: Map<string, Node[]> = new Map(); // per-file node cache (bounded)
+  private fileCache: Map<string, string | null> = new Map(); // per-file content cache (bounded)
   private importMappingCache: Map<string, ImportMapping[]> = new Map();
   private knownFiles: Set<string> | null = null;
   private cachesWarmed = false;
@@ -60,53 +55,15 @@ export class ReferenceResolver {
   }
 
   /**
-   * Pre-load all nodes into memory maps for fast lookup during resolution.
-   * This eliminates repeated SQLite queries and provides the core speedup.
+   * Pre-build lightweight caches for resolution.
+   * Node lookups are now handled by indexed SQLite queries instead of
+   * loading all nodes into memory (which caused OOM on large codebases).
    */
   warmCaches(): void {
     if (this.cachesWarmed) return;
 
-    const allNodes = this.queries.getAllNodes();
-    for (const node of allNodes) {
-      // Index by name
-      const byName = this.nameCache.get(node.name);
-      if (byName) {
-        byName.push(node);
-      } else {
-        this.nameCache.set(node.name, [node]);
-      }
-
-      // Index by qualified name
-      const byQName = this.qualifiedNameCache.get(node.qualifiedName);
-      if (byQName) {
-        byQName.push(node);
-      } else {
-        this.qualifiedNameCache.set(node.qualifiedName, [node]);
-      }
-
-      // Index by kind
-      const byKind = this.kindCache.get(node.kind);
-      if (byKind) {
-        byKind.push(node);
-      } else {
-        this.kindCache.set(node.kind, [node]);
-      }
-
-      // Index by ID
-      this.nodeByIdCache.set(node.id, node);
-
-      // Index by lowercase name (for fuzzy matching)
-      const lowerName = node.name.toLowerCase();
-      const byLower = this.lowerNameCache.get(lowerName);
-      if (byLower) {
-        byLower.push(node);
-      } else {
-        this.lowerNameCache.set(lowerName, [node]);
-      }
-    }
-
-    // Pre-build known files set from index
-    this.knownFiles = new Set(this.queries.getAllFiles().map((f) => f.path));
+    // Only cache the set of known file paths (lightweight string set)
+    this.knownFiles = new Set(this.queries.getAllFilePaths());
 
     this.cachesWarmed = true;
   }
@@ -117,11 +74,6 @@ export class ReferenceResolver {
   clearCaches(): void {
     this.nodeCache.clear();
     this.fileCache.clear();
-    this.nameCache.clear();
-    this.qualifiedNameCache.clear();
-    this.kindCache.clear();
-    this.nodeByIdCache.clear();
-    this.lowerNameCache.clear();
     this.importMappingCache.clear();
     this.knownFiles = null;
     this.cachesWarmed = false;
@@ -140,28 +92,14 @@ export class ReferenceResolver {
       },
 
       getNodesByName: (name: string) => {
-        // Use warm cache if available, otherwise fall back to search
-        if (this.cachesWarmed) {
-          return this.nameCache.get(name) ?? [];
-        }
-        return this.queries.searchNodes(name, { limit: 100 }).map((r) => r.node);
+        return this.queries.getNodesByName(name);
       },
 
       getNodesByQualifiedName: (qualifiedName: string) => {
-        // Use warm cache if available, otherwise fall back to search + filter
-        if (this.cachesWarmed) {
-          return this.qualifiedNameCache.get(qualifiedName) ?? [];
-        }
-        return this.queries
-          .searchNodes(qualifiedName, { limit: 50 })
-          .filter((r) => r.node.qualifiedName === qualifiedName)
-          .map((r) => r.node);
+        return this.queries.getNodesByQualifiedNameExact(qualifiedName);
       },
 
       getNodesByKind: (kind: Node['kind']) => {
-        if (this.cachesWarmed) {
-          return this.kindCache.get(kind) ?? [];
-        }
         return this.queries.getNodesByKind(kind);
       },
 
@@ -203,17 +141,11 @@ export class ReferenceResolver {
       getProjectRoot: () => this.projectRoot,
 
       getAllFiles: () => {
-        return this.queries.getAllFiles().map((f) => f.path);
+        return this.queries.getAllFilePaths();
       },
 
       getNodesByLowerName: (lowerName: string) => {
-        if (this.cachesWarmed) {
-          return this.lowerNameCache.get(lowerName) ?? [];
-        }
-        // Fallback: scan all nodes (expensive, but only used if cache not warm)
-        return this.queries.getAllNodes().filter(
-          (n) => n.name.toLowerCase() === lowerName
-        );
+        return this.queries.getNodesByLowerName(lowerName);
       },
 
       getImportMappings: (filePath: string, language) => {
@@ -390,6 +322,87 @@ export class ReferenceResolver {
   }
 
   /**
+   * Resolve and persist in batches to keep memory bounded.
+   * Processes unresolved references in chunks, persisting edges and cleaning
+   * up resolved refs after each batch to avoid accumulating large arrays.
+   */
+  resolveAndPersistBatched(
+    onProgress?: (current: number, total: number) => void,
+    batchSize: number = 5000
+  ): ResolutionResult {
+    this.warmCaches();
+
+    const total = this.queries.getUnresolvedReferencesCount();
+    let processed = 0;
+    const aggregateStats = {
+      total: 0,
+      resolved: 0,
+      unresolved: 0,
+      byMethod: {} as Record<string, number>,
+    };
+
+    // Process in batches. We always read from offset 0 because resolved refs
+    // are deleted after each batch, shifting the remaining rows forward.
+    while (true) {
+      const batch = this.queries.getUnresolvedReferencesBatch(0, batchSize);
+      if (batch.length === 0) break;
+
+      const result = this.resolveAll(batch);
+
+      // Persist edges immediately
+      const edges = this.createEdges(result.resolved);
+      if (edges.length > 0) {
+        this.queries.insertEdges(edges);
+      }
+
+      // Clean up resolved refs so they don't appear in the next batch
+      if (result.resolved.length > 0) {
+        this.queries.deleteSpecificResolvedReferences(
+          result.resolved.map((r) => ({
+            fromNodeId: r.original.fromNodeId,
+            referenceName: r.original.referenceName,
+            referenceKind: r.original.referenceKind,
+          }))
+        );
+      }
+
+      // Delete unresolvable refs from this batch to avoid re-processing them
+      if (result.unresolved.length > 0) {
+        this.queries.deleteSpecificResolvedReferences(
+          result.unresolved.map((r) => ({
+            fromNodeId: r.fromNodeId,
+            referenceName: r.referenceName,
+            referenceKind: r.referenceKind,
+          }))
+        );
+      }
+
+      // Aggregate stats
+      aggregateStats.total += result.stats.total;
+      aggregateStats.resolved += result.stats.resolved;
+      aggregateStats.unresolved += result.stats.unresolved;
+      for (const [method, count] of Object.entries(result.stats.byMethod)) {
+        aggregateStats.byMethod[method] = (aggregateStats.byMethod[method] || 0) + count;
+      }
+
+      processed += batch.length;
+      onProgress?.(processed, total);
+
+      // If nothing was resolved or removed in this batch, we'd loop forever
+      // on the same rows. Break to avoid infinite loop.
+      if (result.resolved.length === 0 && result.unresolved.length === batch.length) {
+        break;
+      }
+    }
+
+    return {
+      resolved: [],
+      unresolved: [],
+      stats: aggregateStats,
+    };
+  }
+
+  /**
    * Get detected frameworks
    */
   getDetectedFrameworks(): string[] {
@@ -513,9 +526,6 @@ export class ReferenceResolver {
    * Get file path from node ID
    */
   private getFilePathFromNodeId(nodeId: string): string {
-    // Check warm cache first
-    const cached = this.nodeByIdCache.get(nodeId);
-    if (cached) return cached.filePath;
     const node = this.queries.getNodeById(nodeId);
     return node?.filePath || '';
   }
@@ -524,9 +534,6 @@ export class ReferenceResolver {
    * Get language from node ID
    */
   private getLanguageFromNodeId(nodeId: string): UnresolvedRef['language'] {
-    // Check warm cache first
-    const cached = this.nodeByIdCache.get(nodeId);
-    if (cached) return cached.language;
     const node = this.queries.getNodeById(nodeId);
     return node?.language || 'unknown';
   }

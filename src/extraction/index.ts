@@ -46,6 +46,7 @@ export interface IndexResult {
   success: boolean;
   filesIndexed: number;
   filesSkipped: number;
+  filesErrored: number;
   nodesCreated: number;
   edgesCreated: number;
   errors: ExtractionError[];
@@ -369,6 +370,7 @@ export class ExtractionOrchestrator {
     const errors: ExtractionError[] = [];
     let filesIndexed = 0;
     let filesSkipped = 0;
+    let filesErrored = 0;
     let totalNodes = 0;
     let totalEdges = 0;
 
@@ -393,6 +395,7 @@ export class ExtractionOrchestrator {
         success: false,
         filesIndexed: 0,
         filesSkipped: 0,
+        filesErrored: 0,
         nodesCreated: 0,
         edgesCreated: 0,
         errors: [{ message: 'Aborted', severity: 'error' }],
@@ -416,6 +419,7 @@ export class ExtractionOrchestrator {
           success: false,
           filesIndexed,
           filesSkipped,
+          filesErrored,
           nodesCreated: totalNodes,
           edgesCreated: totalEdges,
           errors: [{ message: 'Aborted', severity: 'error' }, ...errors],
@@ -450,6 +454,7 @@ export class ExtractionOrchestrator {
             success: false,
             filesIndexed,
             filesSkipped,
+            filesErrored,
             nodesCreated: totalNodes,
             edgesCreated: totalEdges,
             errors: [{ message: 'Aborted', severity: 'error' }, ...errors],
@@ -466,9 +471,12 @@ export class ExtractionOrchestrator {
         });
 
         if (error || content === null || stats === null) {
+          filesErrored++;
           errors.push({
             message: `Failed to read file: ${error instanceof Error ? error.message : String(error)}`,
+            filePath,
             severity: 'error',
+            code: 'read_error',
           });
           continue;
         }
@@ -476,6 +484,10 @@ export class ExtractionOrchestrator {
         const result = await this.indexFileWithContent(filePath, content, stats);
 
         if (result.errors.length > 0) {
+          // Annotate errors with file path if not already set
+          for (const err of result.errors) {
+            if (!err.filePath) err.filePath = filePath;
+          }
           errors.push(...result.errors);
         }
 
@@ -483,7 +495,9 @@ export class ExtractionOrchestrator {
           filesIndexed++;
           totalNodes += result.nodes.length;
           totalEdges += result.edges.length;
-        } else if (result.errors.length === 0) {
+        } else if (result.errors.some((e) => e.severity === 'error')) {
+          filesErrored++;
+        } else {
           filesSkipped++;
         }
       }
@@ -499,9 +513,10 @@ export class ExtractionOrchestrator {
     // TODO: Implement reference resolution in Phase 3
 
     return {
-      success: errors.filter((e) => e.severity === 'error').length === 0,
+      success: filesIndexed > 0 || errors.filter((e) => e.severity === 'error').length === 0,
       filesIndexed,
       filesSkipped,
+      filesErrored,
       nodesCreated: totalNodes,
       edgesCreated: totalEdges,
       errors,
@@ -517,6 +532,7 @@ export class ExtractionOrchestrator {
     const errors: ExtractionError[] = [];
     let filesIndexed = 0;
     let filesSkipped = 0;
+    let filesErrored = 0;
     let totalNodes = 0;
     let totalEdges = 0;
 
@@ -531,15 +547,18 @@ export class ExtractionOrchestrator {
         filesIndexed++;
         totalNodes += result.nodes.length;
         totalEdges += result.edges.length;
+      } else if (result.errors.some((e) => e.severity === 'error')) {
+        filesErrored++;
       } else {
         filesSkipped++;
       }
     }
 
     return {
-      success: errors.filter((e) => e.severity === 'error').length === 0,
+      success: filesIndexed > 0 || errors.filter((e) => e.severity === 'error').length === 0,
       filesIndexed,
       filesSkipped,
+      filesErrored,
       nodesCreated: totalNodes,
       edgesCreated: totalEdges,
       errors,
@@ -558,7 +577,7 @@ export class ExtractionOrchestrator {
         nodes: [],
         edges: [],
         unresolvedReferences: [],
-        errors: [{ message: `Path traversal blocked: ${relativePath}`, severity: 'error' }],
+        errors: [{ message: `Path traversal blocked: ${relativePath}`, filePath: relativePath, severity: 'error', code: 'path_traversal' }],
         durationMs: 0,
       };
     }
@@ -577,7 +596,9 @@ export class ExtractionOrchestrator {
         errors: [
           {
             message: `Failed to read file: ${error instanceof Error ? error.message : String(error)}`,
+            filePath: relativePath,
             severity: 'error',
+            code: 'read_error',
           },
         ],
         durationMs: 0,
@@ -604,7 +625,7 @@ export class ExtractionOrchestrator {
         nodes: [],
         edges: [],
         unresolvedReferences: [],
-        errors: [{ message: 'Path traversal blocked', severity: 'error' }],
+        errors: [{ message: 'Path traversal blocked', filePath: relativePath, severity: 'error', code: 'path_traversal' }],
         durationMs: 0,
       };
     }
@@ -618,7 +639,9 @@ export class ExtractionOrchestrator {
         errors: [
           {
             message: `File exceeds max size (${stats.size} > ${this.config.maxFileSize})`,
+            filePath: relativePath,
             severity: 'warning',
+            code: 'size_exceeded',
           },
         ],
         durationMs: 0,

@@ -117,7 +117,9 @@ export class TreeSitterExtractor {
         errors: [
           {
             message: `Unsupported language: ${this.language}`,
+            filePath: this.filePath,
             severity: 'error',
+            code: 'unsupported_language',
           },
         ],
         durationMs: Date.now() - startTime,
@@ -133,7 +135,9 @@ export class TreeSitterExtractor {
         errors: [
           {
             message: `Failed to get parser for language: ${this.language}`,
+            filePath: this.filePath,
             severity: 'error',
+            code: 'parser_error',
           },
         ],
         durationMs: Date.now() - startTime,
@@ -170,8 +174,19 @@ export class TreeSitterExtractor {
     } catch (error) {
       this.errors.push({
         message: `Parse error: ${error instanceof Error ? error.message : String(error)}`,
+        filePath: this.filePath,
         severity: 'error',
+        code: 'parse_error',
       });
+    } finally {
+      // Free tree-sitter WASM memory immediately — trees hold native heap memory
+      // invisible to V8's GC that accumulates across thousands of files.
+      if (this.tree) {
+        this.tree.delete();
+        this.tree = null;
+      }
+      // Release source string to reduce GC pressure
+      this.source = '';
     }
 
     return {

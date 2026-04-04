@@ -39,6 +39,7 @@ export class DfmExtractor {
       this.errors.push({
         message: `DFM extraction error: ${error instanceof Error ? error.message : String(error)}`,
         severity: 'error',
+        code: 'parse_error',
       });
     }
 

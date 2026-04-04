@@ -48,6 +48,7 @@ export class LiquidExtractor {
       this.errors.push({
         message: `Liquid extraction error: ${error instanceof Error ? error.message : String(error)}`,
         severity: 'error',
+        code: 'parse_error',
       });
     }
 

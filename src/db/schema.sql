@@ -91,6 +91,7 @@ CREATE INDEX IF NOT EXISTS idx_nodes_qualified_name ON nodes(qualified_name);
 CREATE INDEX IF NOT EXISTS idx_nodes_file_path ON nodes(file_path);
 CREATE INDEX IF NOT EXISTS idx_nodes_language ON nodes(language);
 CREATE INDEX IF NOT EXISTS idx_nodes_file_line ON nodes(file_path, start_line);
+CREATE INDEX IF NOT EXISTS idx_nodes_lower_name ON nodes(lower(name));
 
 -- Full-text search index on node names, docstrings, and signatures
 CREATE VIRTUAL TABLE IF NOT EXISTS nodes_fts USING fts5(

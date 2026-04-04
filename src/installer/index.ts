@@ -167,10 +167,10 @@ async function initializeLocalProject(): Promise<void> {
   // Clear progress line
   process.stdout.write('\r' + ' '.repeat(50) + '\r');
 
-  if (result.success) {
-    success(`Indexed ${formatNumber(result.filesIndexed)} files (${formatNumber(result.nodesCreated)} symbols)`);
+  if (result.filesErrored > 0) {
+    success(`Indexed ${formatNumber(result.filesIndexed)} files (${formatNumber(result.filesErrored)} files failed, ${formatNumber(result.nodesCreated)} symbols)`);
   } else {
-    success(`Indexed ${formatNumber(result.filesIndexed)} files with ${result.errors.length} warnings`);
+    success(`Indexed ${formatNumber(result.filesIndexed)} files (${formatNumber(result.nodesCreated)} symbols)`);
   }
 
   cg.close();

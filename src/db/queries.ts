@@ -172,6 +172,12 @@ export class QueryBuilder {
     insertUnresolved?: SqliteStatement;
     deleteUnresolvedByNode?: SqliteStatement;
     getUnresolvedByName?: SqliteStatement;
+    getNodesByName?: SqliteStatement;
+    getNodesByQualifiedNameExact?: SqliteStatement;
+    getNodesByLowerName?: SqliteStatement;
+    getUnresolvedCount?: SqliteStatement;
+    getUnresolvedBatch?: SqliteStatement;
+    getAllFilePaths?: SqliteStatement;
   } = {};
 
   constructor(db: SqliteDatabase) {
@@ -422,6 +428,43 @@ export class QueryBuilder {
    */
   getAllNodes(): Node[] {
     const rows = this.db.prepare('SELECT * FROM nodes').all() as NodeRow[];
+    return rows.map(rowToNode);
+  }
+
+  /**
+   * Get nodes by exact name match (uses idx_nodes_name index)
+   */
+  getNodesByName(name: string): Node[] {
+    if (!this.stmts.getNodesByName) {
+      this.stmts.getNodesByName = this.db.prepare('SELECT * FROM nodes WHERE name = ?');
+    }
+    const rows = this.stmts.getNodesByName.all(name) as NodeRow[];
+    return rows.map(rowToNode);
+  }
+
+  /**
+   * Get nodes by exact qualified name match (uses idx_nodes_qualified_name index)
+   */
+  getNodesByQualifiedNameExact(qualifiedName: string): Node[] {
+    if (!this.stmts.getNodesByQualifiedNameExact) {
+      this.stmts.getNodesByQualifiedNameExact = this.db.prepare(
+        'SELECT * FROM nodes WHERE qualified_name = ?'
+      );
+    }
+    const rows = this.stmts.getNodesByQualifiedNameExact.all(qualifiedName) as NodeRow[];
+    return rows.map(rowToNode);
+  }
+
+  /**
+   * Get nodes by lowercase name match (uses idx_nodes_lower_name expression index)
+   */
+  getNodesByLowerName(lowerName: string): Node[] {
+    if (!this.stmts.getNodesByLowerName) {
+      this.stmts.getNodesByLowerName = this.db.prepare(
+        'SELECT * FROM nodes WHERE lower(name) = ?'
+      );
+    }
+    const rows = this.stmts.getNodesByLowerName.all(lowerName) as NodeRow[];
     return rows.map(rowToNode);
   }
 
@@ -884,6 +927,53 @@ export class QueryBuilder {
       filePath: row.file_path,
       language: row.language as Language,
     }));
+  }
+
+  /**
+   * Get the count of unresolved references without loading them into memory
+   */
+  getUnresolvedReferencesCount(): number {
+    if (!this.stmts.getUnresolvedCount) {
+      this.stmts.getUnresolvedCount = this.db.prepare(
+        'SELECT COUNT(*) as count FROM unresolved_refs'
+      );
+    }
+    const row = this.stmts.getUnresolvedCount.get() as { count: number };
+    return row.count;
+  }
+
+  /**
+   * Get a batch of unresolved references using LIMIT/OFFSET pagination.
+   * Used to process references in bounded memory chunks.
+   */
+  getUnresolvedReferencesBatch(offset: number, limit: number): UnresolvedReference[] {
+    if (!this.stmts.getUnresolvedBatch) {
+      this.stmts.getUnresolvedBatch = this.db.prepare(
+        'SELECT * FROM unresolved_refs LIMIT ? OFFSET ?'
+      );
+    }
+    const rows = this.stmts.getUnresolvedBatch.all(limit, offset) as UnresolvedRefRow[];
+    return rows.map((row) => ({
+      fromNodeId: row.from_node_id,
+      referenceName: row.reference_name,
+      referenceKind: row.reference_kind as EdgeKind,
+      line: row.line,
+      column: row.col,
+      candidates: row.candidates ? safeJsonParse(row.candidates, undefined) : undefined,
+      filePath: row.file_path,
+      language: row.language as Language,
+    }));
+  }
+
+  /**
+   * Get all tracked file paths (lightweight — no full FileRecord objects)
+   */
+  getAllFilePaths(): string[] {
+    if (!this.stmts.getAllFilePaths) {
+      this.stmts.getAllFilePaths = this.db.prepare('SELECT path FROM files ORDER BY path');
+    }
+    const rows = this.stmts.getAllFilePaths.all() as Array<{ path: string }>;
+    return rows.map((r) => r.path);
   }
 
   /**

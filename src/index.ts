@@ -380,15 +380,15 @@ export class CodeGraph {
       try {
         this.fileLock.acquire();
       } catch {
-        return { success: false, filesIndexed: 0, filesSkipped: 0, nodesCreated: 0, edgesCreated: 0, errors: [{ message: 'Could not acquire file lock - another process may be indexing', severity: 'error' as const }], durationMs: 0 };
+        return { success: false, filesIndexed: 0, filesSkipped: 0, filesErrored: 0, nodesCreated: 0, edgesCreated: 0, errors: [{ message: 'Could not acquire file lock - another process may be indexing', severity: 'error' as const }], durationMs: 0 };
       }
       try {
         const result = await this.orchestrator.indexAll(options.onProgress, options.signal);
 
         // Resolve references to create call/import/extends edges
         if (result.success && result.filesIndexed > 0) {
-          // Get count of unresolved references for accurate progress
-          const unresolvedCount = this.queries.getUnresolvedReferences().length;
+          // Get count without loading all refs into memory
+          const unresolvedCount = this.queries.getUnresolvedReferencesCount();
 
           options.onProgress?.({
             phase: 'resolving',
@@ -396,7 +396,7 @@ export class CodeGraph {
             total: unresolvedCount,
           });
 
-          this.resolveReferences((current, total) => {
+          this.resolveReferencesBatched((current, total) => {
             options.onProgress?.({
               phase: 'resolving',
               current,
@@ -422,7 +422,7 @@ export class CodeGraph {
       try {
         this.fileLock.acquire();
       } catch {
-        return { success: false, filesIndexed: 0, filesSkipped: 0, nodesCreated: 0, edgesCreated: 0, errors: [{ message: 'Could not acquire file lock - another process may be indexing', severity: 'error' as const }], durationMs: 0 };
+        return { success: false, filesIndexed: 0, filesSkipped: 0, filesErrored: 0, nodesCreated: 0, edgesCreated: 0, errors: [{ message: 'Could not acquire file lock - another process may be indexing', severity: 'error' as const }], durationMs: 0 };
       }
       try {
         return this.orchestrator.indexFiles(filePaths);
@@ -449,24 +449,41 @@ export class CodeGraph {
 
         // Resolve references if files were updated
         if (result.filesAdded > 0 || result.filesModified > 0) {
-          // Scope resolution to changed files when available (git fast path)
-          const unresolvedRefs = result.changedFilePaths
-            ? this.queries.getUnresolvedReferencesByFiles(result.changedFilePaths)
-            : this.queries.getUnresolvedReferences();
+          if (result.changedFilePaths) {
+            // Scope resolution to changed files (git fast path — bounded set)
+            const unresolvedRefs = this.queries.getUnresolvedReferencesByFiles(result.changedFilePaths);
 
-          options.onProgress?.({
-            phase: 'resolving',
-            current: 0,
-            total: unresolvedRefs.length,
-          });
-
-          this.resolver.resolveAndPersist(unresolvedRefs, (current, total) => {
             options.onProgress?.({
               phase: 'resolving',
-              current,
-              total,
+              current: 0,
+              total: unresolvedRefs.length,
             });
-          });
+
+            this.resolver.resolveAndPersist(unresolvedRefs, (current, total) => {
+              options.onProgress?.({
+                phase: 'resolving',
+                current,
+                total,
+              });
+            });
+          } else {
+            // No git info — use batched resolution to avoid OOM
+            const unresolvedCount = this.queries.getUnresolvedReferencesCount();
+
+            options.onProgress?.({
+              phase: 'resolving',
+              current: 0,
+              total: unresolvedCount,
+            });
+
+            this.resolveReferencesBatched((current, total) => {
+              options.onProgress?.({
+                phase: 'resolving',
+                current,
+                total,
+              });
+            });
+          }
         }
 
         return result;
@@ -514,6 +531,14 @@ export class CodeGraph {
     // Get all unresolved references from the database
     const unresolvedRefs = this.queries.getUnresolvedReferences();
     return this.resolver.resolveAndPersist(unresolvedRefs, onProgress);
+  }
+
+  /**
+   * Resolve references in batches to keep memory bounded on large codebases.
+   * Processes chunks of unresolved refs, persisting results after each batch.
+   */
+  resolveReferencesBatched(onProgress?: (current: number, total: number) => void): ResolutionResult {
+    return this.resolver.resolveAndPersistBatched(onProgress);
   }
 
   /**

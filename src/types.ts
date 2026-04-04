@@ -232,6 +232,9 @@ export interface ExtractionError {
   /** Error message */
   message: string;
 
+  /** File path where the error occurred */
+  filePath?: string;
+
   /** Line number if available */
   line?: number;
 

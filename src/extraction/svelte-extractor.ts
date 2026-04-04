@@ -45,6 +45,7 @@ export class SvelteExtractor {
       this.errors.push({
         message: `Svelte extraction error: ${error instanceof Error ? error.message : String(error)}`,
         severity: 'error',
+        code: 'parse_error',
       });
     }
 

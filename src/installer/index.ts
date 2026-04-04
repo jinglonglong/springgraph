@@ -184,92 +184,16 @@ async function initializeLocalProject(clack: typeof import('@clack/prompts')): P
   const cg = await CodeGraph.init(projectPath);
   clack.log.success('Created .codegraph/ directory');
 
-  // Index the project with shimmer progress
-  const SPINNER_GLYPHS = ['·', '✢', '✳', '✶', '✻', '✽'];
-  const ANIM_INTERVAL = 150;
-  const FRAMES_PER_GLYPH = 3;
-  const _lerp = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
-  const _shimmerColor = (frame: number) => {
-    const t = (Math.sin(frame * 2 * Math.PI / 13) + 1) / 2;
-    return `\x1b[38;2;${_lerp(160, 251, t)};${_lerp(100, 191, t)};${_lerp(9, 36, t)}m\x1b[1m`;
-  };
-  const rst = '\x1b[0m';
-  const dm = '\x1b[2m';
-  const grn = '\x1b[32m';
-  const phaseNames: Record<string, string> = {
-    scanning: 'Scanning files',
-    parsing: 'Parsing code',
-    storing: 'Storing data',
-    resolving: 'Resolving refs',
-  };
-
-  const _startTime = Date.now();
-  const _animFrame = () => Math.floor((Date.now() - _startTime) / ANIM_INTERVAL);
-  let curMsg = '';
-  let curPercent = -1;
-  let curCount = 0;
-  let lastPhase = '';
-
-  const renderBar = (filled: number, empty: number): string => {
-    if (filled === 0) return `${dm}${'░'.repeat(empty)}${rst}`;
-    const cycleFrames = 24;
-    const shimmerPos = ((_animFrame() % cycleFrames) / cycleFrames) * (filled + 6) - 3;
-    const shimmerWidth = 3;
-    let bar = '';
-    for (let i = 0; i < filled; i++) {
-      const dist = Math.abs(i - shimmerPos);
-      const t = Math.max(0, 1 - dist / shimmerWidth);
-      const r = _lerp(160, 251, t);
-      const g = _lerp(100, 191, t);
-      const b = _lerp(9, 36, t);
-      bar += `\x1b[38;2;${r};${g};${b}m\x1b[1m█`;
-    }
-    return bar + `${rst}${dm}${'░'.repeat(empty)}${rst}`;
-  };
-
-  const renderTick = () => {
-    const frame = _animFrame();
-    const glyph = SPINNER_GLYPHS[Math.floor(frame / FRAMES_PER_GLYPH) % SPINNER_GLYPHS.length];
-    const color = _shimmerColor(frame);
-    let line: string;
-    if (curPercent >= 0) {
-      const barW = 25, filled = Math.round(barW * curPercent / 100), empty = barW - filled;
-      line = `${dm}│${rst}  ${color}${glyph}${rst} ${curMsg}  ${renderBar(filled, empty)}  ${curPercent}%`;
-    } else if (curCount > 0) {
-      line = `${dm}│${rst}  ${color}${glyph}${rst} ${curMsg}... ${formatNumber(curCount)} found`;
-    } else {
-      line = `${dm}│${rst}  ${color}${glyph}${rst} ${curMsg}...`;
-    }
-    process.stdout.write(`\r\x1b[K${line}`);
-  };
-
-  const finishPhase = () => {
-    if (!curMsg) return;
-    process.stdout.write(`\r\x1b[K`);
-    let detail = '';
-    if (curPercent >= 0) detail = ' — done';
-    else if (curCount > 0) detail = ` — ${formatNumber(curCount)} found`;
-    process.stdout.write(`${dm}│${rst}  ${grn}◆${rst} ${curMsg}${detail}\n`);
-  };
-
-  process.stdout.write(`${dm}│${rst}\n`);
-  const ticker = setInterval(renderTick, ANIM_INTERVAL);
+  // Index the project with shimmer progress (worker thread for smooth animation)
+  const { createShimmerProgress } = await import('../ui/shimmer-progress');
+  process.stdout.write(`\x1b[2m│\x1b[0m\n`);
+  const progress = createShimmerProgress();
 
   const result = await cg.indexAll({
-    onProgress: (progress) => {
-      const phaseName = phaseNames[progress.phase] || progress.phase;
-      if (progress.phase !== lastPhase && lastPhase) finishPhase();
-      lastPhase = progress.phase;
-      curMsg = phaseName;
-      if (progress.total > 0) { curPercent = Math.round((progress.current / progress.total) * 100); curCount = 0; }
-      else if (progress.current > 0) { curPercent = -1; curCount = progress.current; }
-      else { curPercent = -1; curCount = 0; }
-      renderTick();
-    },
+    onProgress: progress.onProgress,
   });
 
-  clearInterval(ticker);
-  finishPhase();
+  await progress.stop();
 
   if (result.filesErrored > 0) {
     clack.log.success(`Indexed ${formatNumber(result.filesIndexed)} files (${formatNumber(result.filesErrored)} failed, ${formatNumber(result.nodesCreated)} symbols)`);

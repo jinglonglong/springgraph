@@ -18,7 +18,7 @@ import {
 } from '../types';
 import { QueryBuilder } from '../db/queries';
 import { extractFromSource } from './tree-sitter';
-import { detectLanguage, isLanguageSupported, initGrammars, loadGrammarsForLanguages, resetParser } from './grammars';
+import { detectLanguage, isLanguageSupported, initGrammars, loadGrammarsForLanguages } from './grammars';
 import { logDebug, logWarn } from '../errors';
 import { validatePathWithinRoot, normalizePath } from '../utils';
 import picomatch from 'picomatch';
@@ -29,11 +29,7 @@ import picomatch from 'picomatch';
  */
 const FILE_IO_BATCH_SIZE = 10;
 
-/**
- * Reset tree-sitter parser after this many parses per language to reclaim
- * WASM heap memory and prevent "memory access out of bounds" crashes.
- */
-const PARSER_RESET_INTERVAL = 5000;
+// PARSER_RESET_INTERVAL moved to parse-worker.ts (runs in worker thread)
 
 /**
  * Progress callback for indexing operations
@@ -250,6 +246,36 @@ export function scanDirectory(
 }
 
 /**
+ * Async variant of scanDirectory that yields to the event loop periodically,
+ * allowing worker threads to receive and render progress messages.
+ */
+export async function scanDirectoryAsync(
+  rootDir: string,
+  config: CodeGraphConfig,
+  onProgress?: (current: number, file: string) => void
+): Promise<string[]> {
+  const gitFiles = getGitVisibleFiles(rootDir);
+  if (gitFiles) {
+    const files: string[] = [];
+    let count = 0;
+    for (const filePath of gitFiles) {
+      if (shouldIncludeFile(filePath, config)) {
+        files.push(filePath);
+        count++;
+        onProgress?.(count, filePath);
+        // Yield every 100 files so worker threads can render progress
+        if (count % 100 === 0) {
+          await new Promise<void>(r => setImmediate(r));
+        }
+      }
+    }
+    return files;
+  }
+
+  return scanDirectoryWalk(rootDir, config, onProgress);
+}
+
+/**
  * Filesystem walk fallback for non-git projects.
  */
 function scanDirectoryWalk(
@@ -387,7 +413,7 @@ export class ExtractionOrchestrator {
       total: 0,
     });
 
-    const files = scanDirectory(this.rootDir, this.config, (current, file) => {
+    const files = await scanDirectoryAsync(this.rootDir, this.config, (current, file) => {
       onProgress?.({
         phase: 'scanning',
         current,
@@ -409,19 +435,69 @@ export class ExtractionOrchestrator {
       };
     }
 
-    // Load only the grammars needed for languages actually present in the project.
-    // This avoids compiling all 16+ WASM grammar modules upfront, which can cause
-    // V8 WASM Zone OOM on large codebases (see issue #54).
-    const neededLanguages = [...new Set(files.map((f) => detectLanguage(f)))];
-    await loadGrammarsForLanguages(neededLanguages);
-
-    // Phase 2: Parse files (read in parallel batches, parse/store sequentially)
+    // Phase 2: Parse files in a worker thread (keeps main thread unblocked for UI)
     const total = files.length;
     let processed = 0;
-    const parseCounts = new Map<Language, number>(); // track parses per language for WASM reset
+
+    // Detect needed languages and load grammars in the parse worker
+    const neededLanguages = [...new Set(files.map((f) => detectLanguage(f)))];
+
+    // Try to use a worker thread for parsing (keeps main thread unblocked for UI).
+    // Falls back to in-process parsing if the compiled worker is unavailable (e.g. tests).
+    const parseWorkerPath = path.join(__dirname, 'parse-worker.js');
+    const useWorker = fs.existsSync(parseWorkerPath);
+    let parseWorker: import('worker_threads').Worker | null = null;
+
+    if (useWorker) {
+      const { Worker } = await import('worker_threads');
+      parseWorker = new Worker(parseWorkerPath);
+    } else {
+      // In-process fallback: load grammars locally
+      await loadGrammarsForLanguages(neededLanguages);
+    }
+
+    // Set up worker-based or in-process parsing
+    let nextId = 0;
+    const pendingParses = new Map<number, {
+      resolve: (result: ExtractionResult) => void;
+    }>();
+
+    if (parseWorker) {
+      // Wait for grammars to load in the worker
+      await new Promise<void>((resolve, reject) => {
+        parseWorker!.once('message', (msg: { type: string }) => {
+          if (msg.type === 'grammars-loaded') resolve();
+          else reject(new Error(`Unexpected message: ${msg.type}`));
+        });
+        parseWorker!.postMessage({ type: 'load-grammars', languages: neededLanguages });
+      });
+
+      parseWorker.on('message', (msg: { type: string; id?: number; result?: ExtractionResult }) => {
+        if (msg.type === 'parse-result' && msg.id !== undefined) {
+          const pending = pendingParses.get(msg.id);
+          if (pending) {
+            pendingParses.delete(msg.id);
+            pending.resolve(msg.result!);
+          }
+        }
+      });
+    }
+
+    function requestParse(filePath: string, content: string): Promise<ExtractionResult> {
+      if (parseWorker) {
+        return new Promise<ExtractionResult>((resolve) => {
+          const id = nextId++;
+          pendingParses.set(id, { resolve });
+          parseWorker!.postMessage({ type: 'parse', id, filePath, content });
+        });
+      }
+      // In-process fallback
+      return Promise.resolve(extractFromSource(filePath, content, detectLanguage(filePath)));
+    }
 
     for (let i = 0; i < files.length; i += FILE_IO_BATCH_SIZE) {
       if (signal?.aborted) {
+        if (parseWorker) await parseWorker.terminate();
         return {
           success: false,
           filesIndexed,
@@ -454,9 +530,10 @@ export class ExtractionOrchestrator {
         })
       );
 
-      // Parse and store sequentially
+      // Send to worker for parsing, store results on main thread
       for (const { filePath, content, stats, error } of fileContents) {
         if (signal?.aborted) {
+          if (parseWorker) await parseWorker.terminate();
           return {
             success: false,
             filesIndexed,
@@ -488,20 +565,16 @@ export class ExtractionOrchestrator {
           continue;
         }
 
-        const result = await this.indexFileWithContent(filePath, content, stats);
+        // Parse in worker thread (main thread stays unblocked)
+        const result = await requestParse(filePath, content);
 
-        // Periodically reset the parser to reclaim WASM heap memory.
-        // Without this, tree-sitter's WASM runtime fragments its heap
-        // across thousands of parses and eventually crashes.
-        const lang = detectLanguage(filePath);
-        const count = (parseCounts.get(lang) ?? 0) + 1;
-        parseCounts.set(lang, count);
-        if (count % PARSER_RESET_INTERVAL === 0) {
-          resetParser(lang);
+        // Store in database on main thread (SQLite is not thread-safe)
+        if (result.nodes.length > 0 || result.errors.length === 0) {
+          const language = detectLanguage(filePath);
+          this.storeExtractionResult(filePath, content, language, stats, result);
         }
 
         if (result.errors.length > 0) {
-          // Annotate errors with file path if not already set
           for (const err of result.errors) {
             if (!err.filePath) err.filePath = filePath;
           }
@@ -519,6 +592,9 @@ export class ExtractionOrchestrator {
         }
       }
     }
+
+    // Shut down parse worker
+    if (parseWorker) await parseWorker.terminate();
 
     // Phase 3: Resolve references
     onProgress?.({

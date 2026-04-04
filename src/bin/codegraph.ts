@@ -28,6 +28,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
 import { getCodeGraphDir, findNearestCodeGraphRoot, isInitialized } from '../directory';
+import { createShimmerProgress } from '../ui/shimmer-progress';
 
 // Lazy-load heavy modules (CodeGraph, runInstaller) to keep CLI startup fast.
 async function loadCodeGraph(): Promise<typeof import('../index')> {
@@ -42,8 +43,6 @@ async function loadCodeGraph(): Promise<typeof import('../index')> {
     process.exit(1);
   }
 }
-
-type IndexProgress = import('../index').IndexProgress;
 
 // Dynamic import helper — tsc compiles import() to require() in CJS mode,
 // which fails for ESM-only packages. This bypasses the transformation.
@@ -174,141 +173,8 @@ function formatDuration(ms: number): string {
   return `${minutes}m ${remainingSeconds.toFixed(0)}s`;
 }
 
-// =============================================================================
-// Shimmer Progress Renderer (devpit-style animation)
-// =============================================================================
-
-const SPINNER_GLYPHS = ['·', '✢', '✳', '✶', '✻', '✽'];
-const ANIM_INTERVAL = 150;
-const FRAMES_PER_GLYPH = 3;
-
-function lerp(a: number, b: number, t: number): number {
-  return Math.round(a + (b - a) * t);
-}
-
-function shimmerColor(frame: number): string {
-  const t = (Math.sin(frame * 2 * Math.PI / 13) + 1) / 2;
-  const r = lerp(160, 251, t);
-  const g = lerp(100, 191, t);
-  const b = lerp(9, 36, t);
-  return `\x1b[38;2;${r};${g};${b}m\x1b[1m`;
-}
-
-const PHASE_NAMES: Record<string, string> = {
-  scanning: 'Scanning files',
-  parsing: 'Parsing code',
-  storing: 'Storing data',
-  resolving: 'Resolving refs',
-};
-
-interface ShimmerProgress {
-  onProgress: (progress: IndexProgress) => void;
-  stop: () => void;
-}
-
-function createShimmerProgress(): ShimmerProgress {
-  const startTime = Date.now();
-  let interval: ReturnType<typeof setInterval> | null = null;
-  let currentMessage = '';
-  let currentPercent = -1;
-  let currentCount = 0;
-  let lastPhase = '';
-
-  function animFrame(): number {
-    return Math.floor((Date.now() - startTime) / ANIM_INTERVAL);
-  }
-
-  function spinnerGlyph(): string {
-    const idx = Math.floor(animFrame() / FRAMES_PER_GLYPH) % SPINNER_GLYPHS.length;
-    return SPINNER_GLYPHS[idx] ?? '·';
-  }
-
-  function renderBar(filled: number, empty: number): string {
-    if (filled === 0) return `${colors.dim}${'░'.repeat(empty)}${colors.reset}`;
-    // Shimmer sweeps left-to-right across the filled portion
-    const cycleFrames = 24;
-    const shimmerPos = ((animFrame() % cycleFrames) / cycleFrames) * (filled + 6) - 3;
-    const shimmerWidth = 3;
-    let bar = '';
-    for (let i = 0; i < filled; i++) {
-      const dist = Math.abs(i - shimmerPos);
-      const t = Math.max(0, 1 - dist / shimmerWidth);
-      const r = lerp(160, 251, t);
-      const g = lerp(100, 191, t);
-      const b = lerp(9, 36, t);
-      bar += `\x1b[38;2;${r};${g};${b}m\x1b[1m█`;
-    }
-    bar += `${colors.reset}${colors.dim}${'░'.repeat(empty)}${colors.reset}`;
-    return bar;
-  }
-
-  function render() {
-    const glyph = spinnerGlyph();
-    const frame = animFrame();
-    const color = shimmerColor(frame);
-    const rst = colors.reset;
-    const dm = colors.dim;
-
-    let line: string;
-    if (currentPercent >= 0) {
-      const barWidth = 25;
-      const filled = Math.round(barWidth * currentPercent / 100);
-      const empty = barWidth - filled;
-      line = `${dm}│${rst}  ${color}${glyph}${rst} ${currentMessage}  ${renderBar(filled, empty)}  ${currentPercent}%`;
-    } else if (currentCount > 0) {
-      line = `${dm}│${rst}  ${color}${glyph}${rst} ${currentMessage}... ${formatNumber(currentCount)} found`;
-    } else {
-      line = `${dm}│${rst}  ${color}${glyph}${rst} ${currentMessage}...`;
-    }
-
-    process.stdout.write(`\r\x1b[K${line}`);
-  }
-
-  function finishPhase() {
-    if (!currentMessage) return;
-    process.stdout.write(`\r\x1b[K`);
-    let detail = '';
-    if (currentPercent >= 0) detail = ' — done';
-    else if (currentCount > 0) detail = ` — ${formatNumber(currentCount)} found`;
-    process.stdout.write(`${colors.dim}│${colors.reset}  ${colors.green}◆${colors.reset} ${currentMessage}${detail}\n`);
-  }
-
-  // Start animation loop
-  interval = setInterval(render, ANIM_INTERVAL);
-
-  return {
-    onProgress(progress: IndexProgress) {
-      const phaseName = PHASE_NAMES[progress.phase] || progress.phase;
-
-      if (progress.phase !== lastPhase && lastPhase) {
-        finishPhase();
-      }
-      lastPhase = progress.phase;
-      currentMessage = phaseName;
-
-      if (progress.total > 0) {
-        currentPercent = Math.round((progress.current / progress.total) * 100);
-        currentCount = 0;
-      } else if (progress.current > 0) {
-        currentPercent = -1;
-        currentCount = progress.current;
-      } else {
-        currentPercent = -1;
-        currentCount = 0;
-      }
-
-      // Render immediately — scanning is synchronous so setInterval can't fire
-      render();
-    },
-    stop() {
-      if (interval) {
-        clearInterval(interval);
-        interval = null;
-      }
-      finishPhase();
-    },
-  };
-}
+// Shimmer progress renderer (runs in a worker thread for smooth animation)
+// Imported at top of file from '../ui/shimmer-progress'
 
 /**
  * Print success message
@@ -490,7 +356,7 @@ program
           onProgress: progress.onProgress,
         });
 
-        progress.stop();
+        await progress.stop();
         printIndexResult(clack, result, projectPath);
       } else {
         clack.log.info('Run "codegraph index" to index the project');
@@ -594,7 +460,7 @@ program
         onProgress: progress.onProgress,
       });
 
-      progress.stop();
+      await progress.stop();
       printIndexResult(clack, result, projectPath);
 
       if (!result.success) {
@@ -646,7 +512,7 @@ program
         onProgress: progress.onProgress,
       });
 
-      progress.stop();
+      await progress.stop();
 
       const totalChanges = result.filesAdded + result.filesModified + result.filesRemoved;
 

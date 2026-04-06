@@ -505,6 +505,27 @@ export class ContextBuilder {
     // (matches "shard" + "search" + "request").
     const queryTermsForBoost = extractSearchTerms(query);
     if (queryTermsForBoost.length >= 2) {
+      // Group terms that are substrings of each other (stem variants of the same
+      // root word). "indexed", "indexe", "index" should count as ONE concept match,
+      // not three. Without this, stem variants inflate matchCount and give false
+      // multi-term boosts to symbols matching one root word multiple times.
+      const termGroups: string[][] = [];
+      const sorted = [...queryTermsForBoost].sort((a, b) => b.length - a.length);
+      const assigned = new Set<string>();
+      for (const term of sorted) {
+        if (assigned.has(term)) continue;
+        const group = [term];
+        assigned.add(term);
+        for (const other of sorted) {
+          if (assigned.has(other)) continue;
+          if (term.includes(other) || other.includes(term)) {
+            group.push(other);
+            assigned.add(other);
+          }
+        }
+        termGroups.push(group);
+      }
+
       for (const result of searchResults) {
         // Check term matches in name (substring) and path DIRECTORIES (exact).
         // Directory segments must match exactly — "search" matches directory
@@ -513,10 +534,13 @@ export class ContextBuilder {
         const nameLower = result.node.name.toLowerCase();
         const dirSegments = path.dirname(result.node.filePath).toLowerCase().split('/');
         let matchCount = 0;
-        for (const term of queryTermsForBoost) {
-          const inName = nameLower.includes(term);
-          const inDir = dirSegments.some(seg => seg === term);
-          if (inName || inDir) matchCount++;
+        for (const group of termGroups) {
+          const groupMatches = group.some(term => {
+            const inName = nameLower.includes(term);
+            const inDir = dirSegments.some(seg => seg === term);
+            return inName || inDir;
+          });
+          if (groupMatches) matchCount++;
         }
         if (matchCount >= 2) {
           // Multiplicative boost — 2 terms → 2x, 3 terms → 2.5x

@@ -878,6 +878,8 @@ export class TreeSitterExtractor {
       this.nodeStack.push(structNode.id);
       const typeChild = getChildByField(node, 'type');
       if (typeChild) {
+        // Extract struct embedding (e.g. Go: `type DB struct { *Head; Queryable }`)
+        this.extractInheritance(typeChild, structNode.id);
         const body = getChildByField(typeChild, this.extractor.bodyField) || typeChild;
         for (let i = 0; i < body.namedChildCount; i++) {
           const child = body.namedChild(i);
@@ -1224,6 +1226,46 @@ export class TreeSitterExtractor {
             });
           }
         }
+      }
+
+      // Go interface embedding: `type Querier interface { LabelQuerier; ... }`
+      // constraint_elem wraps the embedded interface type identifier
+      if (child.type === 'constraint_elem') {
+        const typeId = child.namedChildren.find((c: SyntaxNode) => c.type === 'type_identifier');
+        if (typeId) {
+          const name = getNodeText(typeId, this.source);
+          this.unresolvedReferences.push({
+            fromNodeId: classId,
+            referenceName: name,
+            referenceKind: 'extends',
+            line: typeId.startPosition.row + 1,
+            column: typeId.startPosition.column,
+          });
+        }
+      }
+
+      // Go struct embedding: field_declaration without field_identifier
+      // e.g. `type DB struct { *Head; Queryable }` — no field name means embedded type
+      if (child.type === 'field_declaration') {
+        const hasFieldIdentifier = child.namedChildren.some((c: SyntaxNode) => c.type === 'field_identifier');
+        if (!hasFieldIdentifier) {
+          const typeId = child.namedChildren.find((c: SyntaxNode) => c.type === 'type_identifier');
+          if (typeId) {
+            const name = getNodeText(typeId, this.source);
+            this.unresolvedReferences.push({
+              fromNodeId: classId,
+              referenceName: name,
+              referenceKind: 'extends',
+              line: typeId.startPosition.row + 1,
+              column: typeId.startPosition.column,
+            });
+          }
+        }
+      }
+
+      // Recurse into container nodes (e.g. field_declaration_list in Go structs)
+      if (child.type === 'field_declaration_list') {
+        this.extractInheritance(child, classId);
       }
     }
   }

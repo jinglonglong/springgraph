@@ -68,6 +68,14 @@ function extractSymbolsFromQuery(query: string): string[] {
     }
   }
 
+  // Extract ALL_CAPS acronyms (2+ chars, e.g., REST, HTTP, LRU, API)
+  const acronymPattern = /\b([A-Z]{2,})\b/g;
+  while ((match = acronymPattern.exec(query)) !== null) {
+    if (match[1]) {
+      symbols.add(match[1]);
+    }
+  }
+
   // Extract dot.notation and split into parts (e.g., "app.isPackaged" -> ["app", "isPackaged"])
   const dotPattern = /\b([a-zA-Z][a-zA-Z0-9]*(?:\.[a-zA-Z][a-zA-Z0-9]*)+)\b/g;
   while ((match = dotPattern.exec(query)) !== null) {
@@ -107,6 +115,19 @@ function extractSymbolsFromQuery(query: string): string[] {
     'more', 'most', 'very', 'being', 'having', 'doing',
     'system', 'need', 'needs', 'want', 'wants', 'like', 'look',
     'change', 'changes', 'changed', 'changing',
+    // Common English nouns/verbs that match thousands of unrelated code symbols
+    'layer', 'handle', 'handles', 'handling', 'incoming', 'outgoing',
+    'data', 'flow', 'flows', 'level', 'levels', 'request', 'requests',
+    'response', 'responses', 'implement', 'implements', 'implementation',
+    'interface', 'interfaces', 'class', 'classes', 'method', 'methods',
+    'trigger', 'triggers', 'affected', 'affect', 'affects',
+    'else', 'code', 'failing', 'failed', 'silently', 'decide', 'decides',
+    'connect', 'connection', 'connections',
+    'return', 'returns', 'returned', 'take', 'takes', 'taken',
+    'send', 'sends', 'receive', 'receives', 'process', 'processes',
+    'check', 'checks', 'checked', 'create', 'creates', 'created',
+    'read', 'reads', 'write', 'writes', 'written',
+    'start', 'starts', 'stop', 'stops', 'run', 'runs', 'running',
   ]);
 
   return Array.from(symbols).filter(s => !commonWords.has(s.toLowerCase()));
@@ -327,6 +348,43 @@ export class ContextBuilder {
       }
     }
 
+    // Step 2b: Search for extracted symbols as definition (class/interface) prefixes.
+    // When the user writes "REST", "bulk", or "allocation", they usually mean classes
+    // like RestController, BulkRequest, AllocationService — not nodes named exactly that.
+    if (symbolsFromQuery.length > 0) {
+      const definitionKinds: NodeKind[] = ['class', 'interface', 'struct', 'trait',
+        'protocol', 'enum', 'type_alias'];
+      for (const sym of symbolsFromQuery) {
+        // Title-case the symbol: "REST" → "Rest", "bulk" → "Bulk", "allocation" → "Allocation"
+        const titleCased = sym.charAt(0).toUpperCase() + sym.slice(1).toLowerCase();
+        if (titleCased === sym) continue; // already title-case (e.g., "Engine") — handled by exact match
+        // Fetch more results since popular prefixes have many matches
+        const prefixResults = this.queries.searchNodes(titleCased, {
+          limit: 30,
+          kinds: definitionKinds,
+        });
+        const matched: SearchResult[] = [];
+        for (const r of prefixResults) {
+          if (r.node.name.toLowerCase().startsWith(titleCased.toLowerCase())) {
+            // Favor shorter names: "AllocationService" (18 chars) over
+            // "AllocationBalancingRoundMetrics" (31 chars). Core classes tend
+            // to have concise names; test/helper classes are verbose.
+            const brevityBonus = Math.max(0, 10 - (r.node.name.length - titleCased.length) / 3);
+            matched.push({ ...r, score: r.score + 15 + brevityBonus });
+          }
+        }
+        matched.sort((a, b) => b.score - a.score);
+        for (const r of matched.slice(0, Math.ceil(opts.searchLimit))) {
+          const existing = exactMatches.find(e => e.node.id === r.node.id);
+          if (!existing) {
+            exactMatches.push(r);
+          }
+        }
+      }
+      exactMatches.sort((a, b) => b.score - a.score);
+      exactMatches = exactMatches.slice(0, Math.ceil(opts.searchLimit * 3));
+    }
+
     // Step 3: Try semantic search if vector manager is available
     let semanticResults: SearchResult[] = [];
     if (this.vectorManager && this.vectorManager.isInitialized()) {
@@ -352,10 +410,19 @@ export class ContextBuilder {
         // Search each term individually to get broader coverage,
         // then boost results that match multiple terms
         const termResultsMap = new Map<string, { result: SearchResult; termHits: number }>();
+        // When no explicit kind filter is set, exclude imports — they flood FTS
+        // results with qualified name matches (e.g., "REST" matches 445K import paths)
+        // but are almost never what exploration queries want.
+        const searchKinds = opts.nodeKinds && opts.nodeKinds.length > 0
+          ? opts.nodeKinds
+          : ['file', 'module', 'class', 'struct', 'interface', 'trait', 'protocol',
+             'function', 'method', 'property', 'field', 'variable', 'constant',
+             'enum', 'enum_member', 'type_alias', 'namespace', 'export',
+             'route', 'component'] as NodeKind[];
         for (const term of searchTerms) {
           const termResults = this.queries.searchNodes(term, {
             limit: opts.searchLimit * 2,
-            kinds: opts.nodeKinds && opts.nodeKinds.length > 0 ? opts.nodeKinds : undefined,
+            kinds: searchKinds,
           });
           for (const r of termResults) {
             const existing = termResultsMap.get(r.node.id);

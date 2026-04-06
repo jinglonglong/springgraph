@@ -174,4 +174,13 @@ export interface LanguageExtractor {
    * When present, the receiver type is included in the qualified name for better searchability.
    */
   getReceiverType?: (node: SyntaxNode, source: string) => string | undefined;
+
+  /**
+   * Resolve the actual node kind for a type alias declaration.
+   * Used by Go where `type_spec` is the named declaration wrapper for structs/interfaces:
+   *   `type Foo struct { ... }` → type_spec (name: "Foo") → struct_type
+   * Returns 'struct', 'interface', etc. to override the default 'type_alias' kind,
+   * or undefined to keep it as a type alias.
+   */
+  resolveTypeAliasKind?: (node: SyntaxNode, source: string) => NodeKind | undefined;
 }

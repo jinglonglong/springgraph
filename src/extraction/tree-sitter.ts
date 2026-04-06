@@ -273,8 +273,10 @@ export class TreeSitterExtractor {
       skipChildren = true; // extractEnum visits body children
     }
     // Check for type alias declarations (e.g. `type X = ...` in TypeScript)
+    // For Go, type_spec wraps struct/interface definitions — resolveTypeAliasKind
+    // detects these and extractTypeAlias creates the correct node kind.
     else if (this.extractor.typeAliasTypes.includes(nodeType)) {
-      this.extractTypeAlias(node);
+      skipChildren = this.extractTypeAlias(node);
     }
     // Check for class fields (e.g. Java field_declaration, C# field_declaration)
     else if (this.extractor.fieldTypes?.includes(nodeType) && this.isInsideClassLikeNode()) {
@@ -852,15 +854,49 @@ export class TreeSitterExtractor {
   }
 
   /**
-   * Extract a type alias (e.g. `export type X = ...` in TypeScript)
+   * Extract a type alias (e.g. `export type X = ...` in TypeScript).
+   * For languages like Go, resolveTypeAliasKind detects when the type_spec
+   * wraps a struct or interface definition and creates the correct node kind.
+   * Returns true if children should be skipped (struct/interface handled body visiting).
    */
-  private extractTypeAlias(node: SyntaxNode): void {
-    if (!this.extractor) return;
+  private extractTypeAlias(node: SyntaxNode): boolean {
+    if (!this.extractor) return false;
 
     const name = extractName(node, this.source, this.extractor);
-    if (name === '<anonymous>') return;
+    if (name === '<anonymous>') return false;
     const docstring = getPrecedingDocstring(node, this.source);
     const isExported = this.extractor.isExported?.(node, this.source);
+
+    // Check if this type alias is actually a struct or interface definition
+    // (e.g. Go: `type Foo struct { ... }` is a type_spec wrapping struct_type)
+    const resolvedKind = this.extractor.resolveTypeAliasKind?.(node, this.source);
+
+    if (resolvedKind === 'struct') {
+      const structNode = this.createNode('struct', name, node, { docstring, isExported });
+      if (!structNode) return true;
+      // Visit body children for field extraction
+      this.nodeStack.push(structNode.id);
+      const typeChild = getChildByField(node, 'type');
+      if (typeChild) {
+        const body = getChildByField(typeChild, this.extractor.bodyField) || typeChild;
+        for (let i = 0; i < body.namedChildCount; i++) {
+          const child = body.namedChild(i);
+          if (child) this.visitNode(child);
+        }
+      }
+      this.nodeStack.pop();
+      return true;
+    }
+
+    if (resolvedKind === 'interface') {
+      const kind: NodeKind = this.extractor.interfaceKind ?? 'interface';
+      const interfaceNode = this.createNode(kind, name, node, { docstring, isExported });
+      if (!interfaceNode) return true;
+      // Extract interface inheritance from the inner type node
+      const typeChild = getChildByField(node, 'type');
+      if (typeChild) this.extractInheritance(typeChild, interfaceNode.id);
+      return true;
+    }
 
     const typeAliasNode = this.createNode('type_alias', name, node, {
       docstring,
@@ -876,6 +912,7 @@ export class TreeSitterExtractor {
         this.extractTypeRefsFromSubtree(value, typeAliasNode.id);
       }
     }
+    return false;
   }
 
   /**

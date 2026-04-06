@@ -8,6 +8,7 @@ export const typescriptExtractor: LanguageExtractor = {
   interfaceTypes: ['interface_declaration'],
   structTypes: [],
   enumTypes: ['enum_declaration'],
+  enumMemberTypes: ['property_identifier', 'enum_assignment'],
   typeAliasTypes: ['type_alias_declaration'],
   importTypes: ['import_statement'],
   callTypes: ['call_expression'],

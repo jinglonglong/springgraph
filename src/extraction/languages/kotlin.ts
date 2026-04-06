@@ -9,6 +9,7 @@ export const kotlinExtractor: LanguageExtractor = {
   interfaceTypes: ['class_declaration'], // Interfaces use class_declaration with 'interface' modifier
   structTypes: [], // Kotlin uses data classes
   enumTypes: ['class_declaration'], // Enums use class_declaration with 'enum' modifier
+  enumMemberTypes: ['enum_entry'],
   typeAliasTypes: ['type_alias'],
   importTypes: ['import_header'],
   callTypes: ['call_expression'],

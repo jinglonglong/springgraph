@@ -9,6 +9,7 @@ export const swiftExtractor: LanguageExtractor = {
   interfaceTypes: ['protocol_declaration'],
   structTypes: ['struct_declaration'],
   enumTypes: ['enum_declaration'],
+  enumMemberTypes: ['enum_entry'],
   typeAliasTypes: ['typealias_declaration'],
   importTypes: ['import_declaration'],
   callTypes: ['call_expression'],

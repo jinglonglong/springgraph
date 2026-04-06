@@ -9,6 +9,7 @@ export const csharpExtractor: LanguageExtractor = {
   interfaceTypes: ['interface_declaration'],
   structTypes: ['struct_declaration'],
   enumTypes: ['enum_declaration'],
+  enumMemberTypes: ['enum_member_declaration'],
   typeAliasTypes: [],
   importTypes: ['using_directive'],
   callTypes: ['invocation_expression'],

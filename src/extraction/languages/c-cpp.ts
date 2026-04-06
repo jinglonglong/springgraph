@@ -9,6 +9,7 @@ export const cExtractor: LanguageExtractor = {
   interfaceTypes: [],
   structTypes: ['struct_specifier'],
   enumTypes: ['enum_specifier'],
+  enumMemberTypes: ['enumerator'],
   typeAliasTypes: ['type_definition'], // typedef
   importTypes: ['preproc_include'],
   callTypes: ['call_expression'],
@@ -41,6 +42,7 @@ export const cppExtractor: LanguageExtractor = {
   interfaceTypes: [],
   structTypes: ['struct_specifier'],
   enumTypes: ['enum_specifier'],
+  enumMemberTypes: ['enumerator'],
   typeAliasTypes: ['type_definition', 'alias_declaration'], // typedef and using
   importTypes: ['preproc_include'],
   callTypes: ['call_expression'],

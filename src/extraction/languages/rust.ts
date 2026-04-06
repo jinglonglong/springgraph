@@ -9,6 +9,7 @@ export const rustExtractor: LanguageExtractor = {
   interfaceTypes: ['trait_item'],
   structTypes: ['struct_item'],
   enumTypes: ['enum_item'],
+  enumMemberTypes: ['enum_variant'],
   typeAliasTypes: ['type_item'], // Rust type aliases
   importTypes: ['use_declaration'],
   callTypes: ['call_expression'],

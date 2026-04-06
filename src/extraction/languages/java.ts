@@ -9,6 +9,7 @@ export const javaExtractor: LanguageExtractor = {
   interfaceTypes: ['interface_declaration'],
   structTypes: [],
   enumTypes: ['enum_declaration'],
+  enumMemberTypes: ['enum_constant'],
   typeAliasTypes: [],
   importTypes: ['import_declaration'],
   callTypes: ['method_invocation'],

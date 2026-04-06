@@ -598,11 +598,62 @@ export class TreeSitterExtractor {
     const visibility = this.extractor.getVisibility?.(node);
     const isExported = this.extractor.isExported?.(node, this.source);
 
-    this.createNode('enum', name, node, {
+    const enumNode = this.createNode('enum', name, node, {
       docstring,
       visibility,
       isExported,
     });
+    if (!enumNode) return;
+
+    // Extract inheritance (e.g. Swift: enum AFError: Error)
+    this.extractInheritance(node, enumNode.id);
+
+    // Push to stack and visit body children (enum members, nested types, methods)
+    this.nodeStack.push(enumNode.id);
+    const body = this.extractor.resolveBody?.(node, this.extractor.bodyField)
+      ?? getChildByField(node, this.extractor.bodyField)
+      ?? node;
+
+    const memberTypes = this.extractor.enumMemberTypes;
+    for (let i = 0; i < body.namedChildCount; i++) {
+      const child = body.namedChild(i);
+      if (!child) continue;
+
+      if (memberTypes?.includes(child.type)) {
+        this.extractEnumMembers(child);
+      } else {
+        this.visitNode(child);
+      }
+    }
+    this.nodeStack.pop();
+  }
+
+  /**
+   * Extract enum member names from an enum member node.
+   * Handles multi-case declarations (Swift: `case put, delete`) and single-case patterns.
+   */
+  private extractEnumMembers(node: SyntaxNode): void {
+    // Try field-based name first (e.g. Rust enum_variant has a 'name' field)
+    const nameNode = getChildByField(node, 'name');
+    if (nameNode) {
+      this.createNode('enum_member', getNodeText(nameNode, this.source), node);
+      return;
+    }
+
+    // Check for identifier-like children (Swift: simple_identifier, TS: property_identifier)
+    let found = false;
+    for (let i = 0; i < node.namedChildCount; i++) {
+      const child = node.namedChild(i);
+      if (child && (child.type === 'simple_identifier' || child.type === 'identifier' || child.type === 'property_identifier')) {
+        this.createNode('enum_member', getNodeText(child, this.source), child);
+        found = true;
+      }
+    }
+
+    // If the node itself IS the identifier (e.g. TS property_identifier directly in enum body)
+    if (!found && node.namedChildCount === 0) {
+      this.createNode('enum_member', getNodeText(node, this.source), node);
+    }
   }
 
   /**

@@ -9,6 +9,7 @@ export const phpExtractor: LanguageExtractor = {
   interfaceTypes: ['interface_declaration'],
   structTypes: [],
   enumTypes: ['enum_declaration'],
+  enumMemberTypes: ['enum_case'],
   typeAliasTypes: [],
   importTypes: ['namespace_use_declaration'],
   callTypes: ['function_call_expression', 'member_call_expression', 'scoped_call_expression'],

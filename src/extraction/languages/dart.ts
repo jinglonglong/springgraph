@@ -9,6 +9,7 @@ export const dartExtractor: LanguageExtractor = {
   interfaceTypes: [],
   structTypes: [],
   enumTypes: ['enum_declaration'],
+  enumMemberTypes: ['enum_constant'],
   typeAliasTypes: ['type_alias'],
   importTypes: ['import_or_export'],
   callTypes: [],  // Dart calls use identifier+selector, handled via function body traversal

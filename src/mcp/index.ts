@@ -255,8 +255,9 @@ export class MCPServer {
    * Handle tools/list request
    */
   private async handleToolsList(request: JsonRpcRequest): Promise<void> {
+    this.retryInitIfNeeded();
     this.transport.sendResult(request.id, {
-      tools: tools,
+      tools: this.toolHandler.getTools(),
     });
   }
 

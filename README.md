@@ -262,7 +262,7 @@ CodeGraph builds a semantic knowledge graph of codebases for faster, smarter cod
 > This project has CodeGraph initialized (.codegraph/ exists). Use `codegraph_explore` as your PRIMARY tool — it returns full source code sections from all relevant files in one call.
 >
 > **Rules:**
-> 1. Make at most 6 `codegraph_explore` calls — one broad query, then up to 5 focused follow-ups.
+> 1. Follow the explore call budget in the `codegraph_explore` tool description — it scales automatically based on project size.
 > 2. Do NOT re-read files that codegraph_explore already returned source code for. The source sections are complete and authoritative.
 > 3. Only fall back to grep/glob/read for files listed under "Additional relevant files" if you need more detail, or if codegraph returned no results.
 

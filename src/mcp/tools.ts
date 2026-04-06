@@ -16,6 +16,19 @@ import { join } from 'path';
 const MAX_OUTPUT_LENGTH = 15000;
 
 /**
+ * Calculate the recommended number of codegraph_explore calls based on project size.
+ * Larger codebases need more exploration calls to cover their surface area,
+ * but smaller ones should use fewer to avoid unnecessary overhead.
+ */
+export function getExploreBudget(fileCount: number): number {
+  if (fileCount < 1000) return 2;
+  if (fileCount < 5000) return 3;
+  if (fileCount < 15000) return 4;
+  if (fileCount < 25000) return 5;
+  return 6;
+}
+
+/**
  * Mark a Claude session as having consulted MCP tools.
  * This enables Grep/Glob/Bash commands that would otherwise be blocked.
  */
@@ -296,6 +309,32 @@ export class ToolHandler {
    */
   hasDefaultCodeGraph(): boolean {
     return this.cg !== null;
+  }
+
+  /**
+   * Get tool definitions with dynamic descriptions based on project size.
+   * The codegraph_explore tool description includes a budget recommendation
+   * scaled to the number of indexed files.
+   */
+  getTools(): ToolDefinition[] {
+    if (!this.cg) return tools;
+
+    try {
+      const stats = this.cg.getStats();
+      const budget = getExploreBudget(stats.fileCount);
+
+      return tools.map(tool => {
+        if (tool.name === 'codegraph_explore') {
+          return {
+            ...tool,
+            description: `${tool.description} Budget: make at most ${budget} calls for this project (${stats.fileCount.toLocaleString()} files indexed).`,
+          };
+        }
+        return tool;
+      });
+    } catch {
+      return tools;
+    }
   }
 
   /**
@@ -853,6 +892,16 @@ export class ToolHandler {
     lines.push('');
     lines.push('---');
     lines.push(`> **Complete source code is included above for ${filesIncluded} files.** You do NOT need to re-read these files — the relevant sections are already shown in full. Only use Read/Grep for files listed under "Additional relevant files" if you need more detail.`);
+
+    // Add explore budget note based on project size
+    try {
+      const stats = cg.getStats();
+      const budget = getExploreBudget(stats.fileCount);
+      lines.push('');
+      lines.push(`> **Explore budget: ${budget} calls max for this project (${stats.fileCount.toLocaleString()} files indexed).** Stop exploring and synthesize your answer once you've used ${budget} calls — do NOT make additional explore calls beyond this budget.`);
+    } catch {
+      // Stats unavailable — skip budget note
+    }
 
     return this.textResult(lines.join('\n'));
   }

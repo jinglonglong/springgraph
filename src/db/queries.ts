@@ -18,7 +18,7 @@ import {
   SearchResult,
 } from '../types';
 import { safeJsonParse } from '../utils';
-import { kindBonus, scorePathRelevance } from '../search/query-utils';
+import { kindBonus, nameMatchBonus, scorePathRelevance } from '../search/query-utils';
 
 /**
  * Database row types (snake_case from SQLite)
@@ -492,9 +492,16 @@ export class QueryBuilder {
     if (results.length > 0 && query) {
       results = results.map(r => ({
         ...r,
-        score: r.score + kindBonus(r.node.kind) + scorePathRelevance(r.node.filePath, query),
+        score: r.score
+          + kindBonus(r.node.kind)
+          + scorePathRelevance(r.node.filePath, query)
+          + nameMatchBonus(r.node.name, query),
       }));
       results.sort((a, b) => b.score - a.score);
+      // Trim to requested limit after rescoring
+      if (results.length > limit) {
+        results = results.slice(0, limit);
+      }
     }
 
     return results;
@@ -521,8 +528,15 @@ export class QueryBuilder {
       return [];
     }
 
+    // BM25 column weights: id=0, name=20, qualified_name=5, docstring=1, signature=2
+    // Heavy name weight ensures exact/prefix name matches rank above incidental
+    // mentions in long docstrings or qualified names of nested symbols.
+    // Fetch 5x requested limit so post-hoc rescoring (kindBonus, pathRelevance,
+    // nameMatchBonus) can promote results that BM25 alone undervalues.
+    const ftsLimit = Math.max(limit * 5, 100);
+
     let sql = `
-      SELECT nodes.*, bm25(nodes_fts) as score
+      SELECT nodes.*, bm25(nodes_fts, 0, 20, 5, 1, 2) as score
       FROM nodes_fts
       JOIN nodes ON nodes_fts.id = nodes.id
       WHERE nodes_fts MATCH ?
@@ -541,7 +555,7 @@ export class QueryBuilder {
     }
 
     sql += ' ORDER BY score LIMIT ? OFFSET ?';
-    params.push(limit, offset);
+    params.push(ftsLimit, offset);
 
     try {
       const rows = this.db.prepare(sql).all(...params) as (NodeRow & { score: number })[];

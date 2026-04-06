@@ -276,6 +276,11 @@ export class TreeSitterExtractor {
     else if (this.extractor.typeAliasTypes.includes(nodeType)) {
       this.extractTypeAlias(node);
     }
+    // Check for class fields (e.g. Java field_declaration, C# field_declaration)
+    else if (this.extractor.fieldTypes?.includes(nodeType) && this.isInsideClassLikeNode()) {
+      this.extractField(node);
+      skipChildren = true;
+    }
     // Check for variable declarations (const, let, var, etc.)
     // Only extract top-level variables (not inside functions/methods)
     else if (this.extractor.variableTypes.includes(nodeType) && !this.isInsideClassLikeNode()) {
@@ -653,6 +658,58 @@ export class TreeSitterExtractor {
     // If the node itself IS the identifier (e.g. TS property_identifier directly in enum body)
     if (!found && node.namedChildCount === 0) {
       this.createNode('enum_member', getNodeText(node, this.source), node);
+    }
+  }
+
+  /**
+   * Extract a class field declaration (e.g. Java field_declaration, C# field_declaration).
+   * Extracts each declarator as a 'field' kind node inside the owning class.
+   */
+  private extractField(node: SyntaxNode): void {
+    if (!this.extractor) return;
+
+    const docstring = getPrecedingDocstring(node, this.source);
+    const visibility = this.extractor.getVisibility?.(node);
+    const isStatic = this.extractor.isStatic?.(node) ?? false;
+
+    // Java field_declaration: "private final String name = value;"
+    // Children include modifiers, type, variable_declarator(s)
+    const declarators = node.namedChildren.filter(
+      c => c.type === 'variable_declarator'
+    );
+
+    if (declarators.length > 0) {
+      // Get field type from the type child
+      const typeNode = node.namedChildren.find(
+        c => c.type !== 'modifiers' && c.type !== 'variable_declarator'
+          && c.type !== 'marker_annotation' && c.type !== 'annotation'
+      );
+      const typeText = typeNode ? getNodeText(typeNode, this.source) : undefined;
+
+      for (const decl of declarators) {
+        const nameNode = getChildByField(decl, 'name');
+        if (!nameNode) continue;
+        const name = getNodeText(nameNode, this.source);
+        const signature = typeText ? `${typeText} ${name}` : name;
+        this.createNode('field', name, decl, {
+          docstring,
+          signature,
+          visibility,
+          isStatic,
+        });
+      }
+    } else {
+      // Fallback: try to find an identifier child directly
+      const nameNode = getChildByField(node, 'name')
+        || node.namedChildren.find(c => c.type === 'identifier');
+      if (nameNode) {
+        const name = getNodeText(nameNode, this.source);
+        this.createNode('field', name, node, {
+          docstring,
+          visibility,
+          isStatic,
+        });
+      }
     }
   }
 

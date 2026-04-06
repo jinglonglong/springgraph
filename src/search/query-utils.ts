@@ -19,13 +19,13 @@ export const STOP_WORDS = new Set([
   'should', 'may', 'might', 'can', 'shall', 'not', 'no', 'all', 'each',
   'every', 'how', 'what', 'where', 'when', 'who', 'which', 'why',
   'i', 'me', 'my', 'we', 'our', 'you', 'your', 'he', 'she', 'they',
-  'find', 'show', 'get', 'list', 'give', 'tell',
-  'been', 'done', 'made', 'used', 'using', 'work', 'works', 'found',
+  'show', 'give', 'tell',
+  'been', 'done', 'made', 'used', 'using', 'works', 'found',
   'also', 'into', 'then', 'than', 'just', 'more', 'some', 'such',
-  'over', 'only', 'new', 'out', 'its', 'so', 'up', 'as', 'if',
-  // Code-specific noise
+  'over', 'only', 'out', 'its', 'so', 'up', 'as', 'if',
+  // Code-specific noise (avoid filtering common symbol names like get/set/add/build/find/list)
   'code', 'file', 'files', 'function', 'method', 'class', 'type',
-  'build', 'fix', 'bug', 'called', 'set', 'add',
+  'fix', 'bug', 'called',
 ]);
 
 /**
@@ -138,6 +138,48 @@ export function isTestFile(filePath: string): boolean {
     lower.includes('/__tests__/') ||
     lower.includes('/spec/')
   );
+}
+
+/**
+ * Bonus when a node's name matches the search query.
+ * Exact matches get the largest boost; prefix matches get smaller boosts.
+ * Multi-word queries also check individual term matches against the name.
+ */
+export function nameMatchBonus(nodeName: string, query: string): number {
+  const nameLower = nodeName.toLowerCase();
+
+  // Split query into word-level terms (handles "CacheBuilder build" → ["cache","builder","build"])
+  const rawTerms = query
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .split(/[\s_.\-]+/)
+    .map(t => t.toLowerCase())
+    .filter(t => t.length >= 2);
+
+  // Also keep original space-separated tokens for exact-term matching
+  const queryTokens = query.split(/\s+/).map(t => t.toLowerCase()).filter(t => t.length >= 2);
+
+  // Full query as a single token (for compound identifiers like "CacheBuilder")
+  const queryLower = query.replace(/[\s]+/g, '').toLowerCase();
+
+  // Exact match: query exactly equals the node name
+  if (nameLower === queryLower) return 30;
+
+  // Exact match on a query token: "CacheBuilder build" and node name is "build"
+  if (queryTokens.length > 1 && queryTokens.includes(nameLower)) return 25;
+
+  // Name starts with query (prefix search: "Cache" → "CacheBuilder")
+  if (nameLower.startsWith(queryLower)) return 20;
+
+  // All camelCase-split terms appear in the name
+  if (rawTerms.length > 1) {
+    const allMatch = rawTerms.every(t => nameLower.includes(t));
+    if (allMatch) return 15;
+  }
+
+  // Name contains the full query as substring
+  if (nameLower.includes(queryLower)) return 10;
+
+  return 0;
 }
 
 /**

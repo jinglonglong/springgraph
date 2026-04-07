@@ -183,4 +183,13 @@ export interface LanguageExtractor {
    * or undefined to keep it as a type alias.
    */
   resolveTypeAliasKind?: (node: SyntaxNode, source: string) => NodeKind | undefined;
+
+  /**
+   * Check if a function/method name is a misparse artifact that should be skipped.
+   * Used by C/C++ where macros (e.g. NLOHMANN_JSON_NAMESPACE_BEGIN) cause tree-sitter
+   * to misparse namespace blocks as function_definitions. When this returns true,
+   * the function node is NOT created, but the body is still visited for calls and
+   * structural nodes (classes, structs, enums).
+   */
+  isMisparsedFunction?: (name: string, node: SyntaxNode) => boolean;
 }

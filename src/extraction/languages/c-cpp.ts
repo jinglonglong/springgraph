@@ -88,6 +88,15 @@ export const cppExtractor: LanguageExtractor = {
     }
     return undefined;
   },
+  isMisparsedFunction: (name) => {
+    // C++ macros like NLOHMANN_JSON_NAMESPACE_BEGIN cause tree-sitter to misparse
+    // namespace blocks as function_definitions (e.g. name = "namespace detail").
+    // Also filter C++ keywords that tree-sitter occasionally misinterprets as
+    // function/method names (e.g. switch statements inside macro-confused scopes).
+    if (name.startsWith('namespace')) return true;
+    const cppKeywords = ['switch', 'if', 'for', 'while', 'do', 'case', 'return'];
+    return cppKeywords.includes(name);
+  },
   extractImport: (node, source) => {
     const importText = source.substring(node.startIndex, node.endIndex).trim();
     // C++ includes: #include <iostream>, #include "myheader.h"

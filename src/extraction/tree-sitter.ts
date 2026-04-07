@@ -455,6 +455,17 @@ export class TreeSitterExtractor {
     }
     if (name === '<anonymous>') return; // Skip anonymous functions
 
+    // Check for misparse artifacts (e.g. C++ macros causing "namespace detail" functions)
+    // Skip the node but still visit the body for calls and structural nodes
+    if (this.extractor.isMisparsedFunction?.(name, node)) {
+      const body = this.extractor.resolveBody?.(node, this.extractor.bodyField)
+        ?? getChildByField(node, this.extractor.bodyField);
+      if (body) {
+        this.visitFunctionBody(body, '');
+      }
+      return;
+    }
+
     const docstring = getPrecedingDocstring(node, this.source);
     const signature = this.extractor.getSignature?.(node, this.source);
     const visibility = this.extractor.getVisibility?.(node);
@@ -542,6 +553,17 @@ export class TreeSitterExtractor {
     }
 
     const name = extractName(node, this.source, this.extractor);
+
+    // Check for misparse artifacts (e.g. C++ "switch" inside macro-confused class body)
+    if (this.extractor.isMisparsedFunction?.(name, node)) {
+      const body = this.extractor.resolveBody?.(node, this.extractor.bodyField)
+        ?? getChildByField(node, this.extractor.bodyField);
+      if (body) {
+        this.visitFunctionBody(body, '');
+      }
+      return;
+    }
+
     const docstring = getPrecedingDocstring(node, this.source);
     const signature = this.extractor.getSignature?.(node, this.source);
     const visibility = this.extractor.getVisibility?.(node);
@@ -1272,26 +1294,56 @@ export class TreeSitterExtractor {
   }
 
   /**
-   * Visit function body and extract calls
+   * Visit function body and extract calls (and structural nodes).
+   *
+   * In addition to call expressions, this also detects class/struct/enum
+   * definitions inside function bodies. This handles two cases:
+   *   1. Local class/struct/enum definitions (valid in C++, Java, etc.)
+   *   2. C++ macro misparsing — macros like NLOHMANN_JSON_NAMESPACE_BEGIN cause
+   *      tree-sitter to interpret the namespace block as a function_definition,
+   *      hiding real class/struct/enum nodes inside the "function body".
    */
   private visitFunctionBody(body: SyntaxNode, _functionId: string): void {
     if (!this.extractor) return;
 
-    // Recursively find all call expressions
-    const visitForCalls = (node: SyntaxNode): void => {
-      if (this.extractor!.callTypes.includes(node.type)) {
+    const visitForCallsAndStructure = (node: SyntaxNode): void => {
+      const nodeType = node.type;
+
+      if (this.extractor!.callTypes.includes(nodeType)) {
         this.extractCall(node);
+      }
+
+      // Extract structural nodes found inside function bodies.
+      // Each extract method visits its own children, so we return after extracting.
+      if (this.extractor!.classTypes.includes(nodeType)) {
+        const classification = this.extractor!.classifyClassNode?.(node) ?? 'class';
+        if (classification === 'struct') this.extractStruct(node);
+        else if (classification === 'enum') this.extractEnum(node);
+        else this.extractClass(node);
+        return;
+      }
+      if (this.extractor!.structTypes.includes(nodeType)) {
+        this.extractStruct(node);
+        return;
+      }
+      if (this.extractor!.enumTypes.includes(nodeType)) {
+        this.extractEnum(node);
+        return;
+      }
+      if (this.extractor!.interfaceTypes.includes(nodeType)) {
+        this.extractInterface(node);
+        return;
       }
 
       for (let i = 0; i < node.namedChildCount; i++) {
         const child = node.namedChild(i);
         if (child) {
-          visitForCalls(child);
+          visitForCallsAndStructure(child);
         }
       }
     };
 
-    visitForCalls(body);
+    visitForCallsAndStructure(body);
   }
 
   /**

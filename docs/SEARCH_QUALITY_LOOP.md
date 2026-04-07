@@ -445,6 +445,7 @@ test().catch(console.error);
 | Search term dropped from query | Term is in the stop words list | `src/search/query-utils.ts: STOP_WORDS` |
 | `qualified_name` missing class for nested methods | Extraction not walking parent stack correctly | `src/extraction/tree-sitter.ts: visitNode()` |
 | Import edges missing | `extractImport` returns null for this syntax | `src/extraction/languages/<lang>.ts: extractImport` |
+| C++ classes/structs/enums missing from macro namespaces | Macros like `NLOHMANN_JSON_NAMESPACE_BEGIN` cause tree-sitter to misparse namespace blocks as `function_definition` | `src/extraction/languages/c-cpp.ts: isMisparsedFunction` filters bad names; `src/extraction/tree-sitter.ts: visitFunctionBody` extracts structural nodes |
 
 ## After Fixing Issues
 
@@ -524,12 +525,13 @@ if (receiverType) {
 - [x] **Java** — NOT needed. Methods nested in class body. Verified against Guava
 - [x] **Python** — NOT needed. Methods nested in class body. Verified against Flask
 - [x] **Rust** — `getReceiverType` walks up to parent `impl_item` to extract type name. Also adds `contains` edges from struct to impl methods. Verified against Deno
+- [x] **C** — NOT needed. No methods in C. Strong function/struct/enum extraction with excellent call edge density. Verified against Redis
+- [x] **C++** — NOT needed for header-only libs. `isMisparsedFunction` hook filters macro-caused misparse artifacts (e.g. `NLOHMANN_JSON_NAMESPACE_BEGIN`). `visitFunctionBody` now extracts structural nodes (classes/structs/enums) inside macro-confused "function" bodies. Verified against nlohmann/json. Note: out-of-class `Type::method()` definitions would need `getReceiverType` but are uncommon in header-only codebases.
 
 ### Needs Verification
 
 Check these — may need `getReceiverType` if methods are top-level in the AST:
 
-- [ ] C++ — out-of-class method definitions `Type::method()`
 - [ ] Kotlin — extension functions `fun Type.method()`
 
 Verify these DON'T need `getReceiverType` (methods nested in class body):

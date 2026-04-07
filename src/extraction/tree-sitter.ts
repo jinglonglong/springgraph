@@ -1214,7 +1214,6 @@ export class TreeSitterExtractor {
 
       if (
         child.type === 'extends_clause' ||
-        child.type === 'class_heritage' ||
         child.type === 'superclass' ||
         child.type === 'extends_interfaces' // Java interface extends
       ) {
@@ -1329,8 +1328,9 @@ export class TreeSitterExtractor {
         }
       }
 
-      // Recurse into container nodes (e.g. field_declaration_list in Go structs)
-      if (child.type === 'field_declaration_list') {
+      // Recurse into container nodes (e.g. field_declaration_list in Go structs,
+      // class_heritage in TypeScript which wraps extends_clause/implements_clause)
+      if (child.type === 'field_declaration_list' || child.type === 'class_heritage') {
         this.extractInheritance(child, classId);
       }
     }

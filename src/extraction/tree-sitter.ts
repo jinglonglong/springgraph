@@ -583,6 +583,9 @@ export class TreeSitterExtractor {
     });
     if (!structNode) return;
 
+    // Extract inheritance (e.g. Swift: struct HTTPMethod: RawRepresentable)
+    this.extractInheritance(node, structNode.id);
+
     // Push to stack for field extraction
     this.nodeStack.push(structNode.id);
     const body = getChildByField(node, this.extractor.bodyField) || node;
@@ -1306,6 +1309,23 @@ export class TreeSitterExtractor {
               column: typeId.startPosition.column,
             });
           }
+        }
+      }
+
+      // Swift: inheritance_specifier > user_type > type_identifier
+      // Used for class inheritance, protocol conformance, and protocol inheritance
+      if (child.type === 'inheritance_specifier') {
+        const userType = child.namedChildren.find((c: SyntaxNode) => c.type === 'user_type');
+        const typeId = userType?.namedChildren.find((c: SyntaxNode) => c.type === 'type_identifier');
+        if (typeId) {
+          const name = getNodeText(typeId, this.source);
+          this.unresolvedReferences.push({
+            fromNodeId: classId,
+            referenceName: name,
+            referenceKind: 'extends',
+            line: typeId.startPosition.row + 1,
+            column: typeId.startPosition.column,
+          });
         }
       }
 

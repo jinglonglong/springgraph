@@ -818,6 +818,47 @@ public protocol Repository {
     expect(protocolNode).toBeDefined();
     expect(protocolNode?.name).toBe('Repository');
   });
+
+  it('should extract class inheritance and protocol conformance', () => {
+    const code = `
+class DataRequest: Request {
+    func validate() {}
+}
+
+class UploadRequest: DataRequest, Sendable {
+    func upload() {}
+}
+
+enum AFError: Error {
+    case invalidURL
+}
+
+struct HTTPMethod: RawRepresentable {
+    let rawValue: String
+}
+
+protocol UploadConvertible: URLRequestConvertible {
+    func asURLRequest() throws -> URLRequest
+}
+`;
+    const result = extractFromSource('Inheritance.swift', code);
+
+    const extendsRefs = result.unresolvedReferences.filter(
+      (r) => r.referenceKind === 'extends'
+    );
+
+    // DataRequest extends Request
+    expect(extendsRefs.find((r) => r.referenceName === 'Request')).toBeDefined();
+    // UploadRequest extends DataRequest and Sendable
+    expect(extendsRefs.find((r) => r.referenceName === 'DataRequest')).toBeDefined();
+    expect(extendsRefs.find((r) => r.referenceName === 'Sendable')).toBeDefined();
+    // AFError extends Error
+    expect(extendsRefs.find((r) => r.referenceName === 'Error')).toBeDefined();
+    // HTTPMethod extends RawRepresentable
+    expect(extendsRefs.find((r) => r.referenceName === 'RawRepresentable')).toBeDefined();
+    // UploadConvertible extends URLRequestConvertible
+    expect(extendsRefs.find((r) => r.referenceName === 'URLRequestConvertible')).toBeDefined();
+  });
 });
 
 describe('Kotlin Extraction', () => {

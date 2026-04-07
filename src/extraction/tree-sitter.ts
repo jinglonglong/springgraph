@@ -70,6 +70,14 @@ function extractName(node: SyntaxNode, source: string, extractor: LanguageExtrac
     }
   }
 
+  // Arrow/function expressions get their name from the parent variable_declarator,
+  // not from identifiers in their body. Without this, single-expression arrow
+  // functions like `const fn = () => someIdentifier` get named "someIdentifier"
+  // instead of "fn", because the fallback below finds the body identifier.
+  if (node.type === 'arrow_function' || node.type === 'function_expression') {
+    return '<anonymous>';
+  }
+
   // Fall back to first identifier child
   for (let i = 0; i < node.namedChildCount; i++) {
     const child = node.namedChild(i);

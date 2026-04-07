@@ -3,7 +3,7 @@ import type { LanguageExtractor } from '../tree-sitter-types';
 
 export const typescriptExtractor: LanguageExtractor = {
   functionTypes: ['function_declaration', 'arrow_function', 'function_expression'],
-  classTypes: ['class_declaration'],
+  classTypes: ['class_declaration', 'abstract_class_declaration'],
   methodTypes: ['method_definition', 'public_field_definition'],
   interfaceTypes: ['interface_declaration'],
   structTypes: [],

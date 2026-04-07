@@ -56,6 +56,10 @@ export interface ExtractorContext {
   visitFunctionBody(body: SyntaxNode, functionId: string): void;
   /** Add an unresolved reference */
   addUnresolvedReference(ref: UnresolvedReference): void;
+  /** Push a node ID onto the scope stack (for containment/qualified name building) */
+  pushScope(nodeId: string): void;
+  /** Pop the last node ID from the scope stack */
+  popScope(): void;
   /** Current file path */
   readonly filePath: string;
   /** Current source text */

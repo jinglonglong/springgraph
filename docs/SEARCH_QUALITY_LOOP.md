@@ -447,6 +447,7 @@ test().catch(console.error);
 | Import edges missing | `extractImport` returns null for this syntax | `src/extraction/languages/<lang>.ts: extractImport` |
 | C++ classes/structs/enums missing from macro namespaces | Macros like `NLOHMANN_JSON_NAMESPACE_BEGIN` cause tree-sitter to misparse namespace blocks as `function_definition` | `src/extraction/languages/c-cpp.ts: isMisparsedFunction` filters bad names; `src/extraction/tree-sitter.ts: visitFunctionBody` extracts structural nodes |
 | C++ classes missing from `.h` headers | `.h` files default to `c` language which has `classTypes: []` | `src/extraction/grammars.ts: looksLikeCpp()` — content-based heuristic promotes `.h` files to `cpp` when C++ patterns detected |
+| Ruby methods inside modules missing owner in `qualified_name` | Ruby `module` AST nodes not being extracted | `src/extraction/languages/ruby.ts: visitNode` hook extracts modules; `src/extraction/tree-sitter.ts: isInsideClassLikeNode` includes `module` kind |
 
 ## After Fixing Issues
 
@@ -529,6 +530,7 @@ if (receiverType) {
 - [x] **C** — NOT needed. No methods in C. Strong function/struct/enum extraction with excellent call edge density. Verified against Redis
 - [x] **C++** — NOT needed for header-only libs. `isMisparsedFunction` hook filters macro-caused misparse artifacts (e.g. `NLOHMANN_JSON_NAMESPACE_BEGIN`). `visitFunctionBody` now extracts structural nodes (classes/structs/enums) inside macro-confused "function" bodies. Content-based `.h` detection (`looksLikeCpp` in `grammars.ts`) promotes C++ headers to `cpp` language so classes in `.h` files are extracted. Verified against nlohmann/json and gRPC. Note: out-of-class `Type::method()` definitions would need `getReceiverType` but are uncommon in header-only codebases.
 - [x] **C#** — NOT needed. Methods nested in class body. Added `base_list` handling in `extractInheritance` for C#'s `: Parent, IInterface` syntax. Added `propertyTypes` support for C# `property_declaration` nodes. Fixed `extractField` to handle C#'s nested `variable_declaration > variable_declarator` structure. Verified against Jellyfin
+- [x] **Ruby** — NOT needed for `getReceiverType`. Methods nested in class body. Added `visitNode` hook to extract Ruby `module` nodes (concerns, namespaces) with proper containment and qualified names. Methods inside modules get `Module::method` qualified names. Also wired up the `ExtractorContext` with `pushScope`/`popScope` for language hooks. Verified against Discourse
 
 ### Needs Verification
 

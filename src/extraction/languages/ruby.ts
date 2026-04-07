@@ -6,7 +6,7 @@ export const rubyExtractor: LanguageExtractor = {
   functionTypes: ['method'],
   classTypes: ['class'],
   methodTypes: ['method', 'singleton_method'],
-  interfaceTypes: [], // Ruby uses modules
+  interfaceTypes: [], // Ruby uses modules (handled via visitNode hook)
   structTypes: [],
   enumTypes: [],
   typeAliasTypes: [],
@@ -16,6 +16,28 @@ export const rubyExtractor: LanguageExtractor = {
   nameField: 'name',
   bodyField: 'body',
   paramsField: 'parameters',
+  visitNode: (node, ctx) => {
+    if (node.type !== 'module') return false;
+
+    const nameNode = node.childForFieldName('name');
+    if (!nameNode) return false;
+    const name = nameNode.text;
+
+    const moduleNode = ctx.createNode('module', name, node);
+    if (!moduleNode) return false;
+
+    // Push module onto scope stack so children get proper qualified names
+    ctx.pushScope(moduleNode.id);
+    const body = node.childForFieldName('body');
+    if (body) {
+      for (let i = 0; i < body.namedChildCount; i++) {
+        const child = body.namedChild(i);
+        if (child) ctx.visitNode(child);
+      }
+    }
+    ctx.popScope();
+    return true; // handled
+  },
   getVisibility: (node) => {
     // Ruby visibility is based on preceding visibility modifiers
     let sibling = node.previousNamedSibling;

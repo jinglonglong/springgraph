@@ -17,7 +17,7 @@ import {
 } from '../types';
 import { getParser, detectLanguage, isLanguageSupported } from './grammars';
 import { generateNodeId, getNodeText, getChildByField, getPrecedingDocstring } from './tree-sitter-helpers';
-import type { LanguageExtractor } from './tree-sitter-types';
+import type { LanguageExtractor, ExtractorContext } from './tree-sitter-types';
 import { EXTRACTORS } from './languages';
 import { LiquidExtractor } from './liquid-extractor';
 import { SvelteExtractor } from './svelte-extractor';
@@ -223,6 +223,13 @@ export class TreeSitterExtractor {
     const nodeType = node.type;
     let skipChildren = false;
 
+    // Language-specific custom visitor hook
+    if (this.extractor.visitNode) {
+      const ctx = this.makeExtractorContext();
+      const handled = this.extractor.visitNode(node, ctx);
+      if (handled) return;
+    }
+
     // Pascal-specific AST handling
     if (this.language === 'pascal') {
       skipChildren = this.visitPascalNode(node);
@@ -410,6 +417,26 @@ export class TreeSitterExtractor {
   }
 
   /**
+   * Build an ExtractorContext for passing to language-specific visitNode hooks.
+   */
+  private makeExtractorContext(): ExtractorContext {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
+    return {
+      createNode: (kind, name, node, extra) => self.createNode(kind, name, node, extra),
+      visitNode: (node) => self.visitNode(node),
+      visitFunctionBody: (body, functionId) => self.visitFunctionBody(body, functionId),
+      addUnresolvedReference: (ref) => self.unresolvedReferences.push(ref),
+      pushScope: (nodeId) => self.nodeStack.push(nodeId),
+      popScope: () => self.nodeStack.pop(),
+      get filePath() { return self.filePath; },
+      get source() { return self.source; },
+      get nodeStack() { return self.nodeStack; },
+      get nodes() { return self.nodes; },
+    };
+  }
+
+  /**
    * Check if the current node stack indicates we are inside a class-like node
    * (class, struct, interface, trait). File nodes do not count as class-like.
    */
@@ -424,7 +451,8 @@ export class TreeSitterExtractor {
       parentNode.kind === 'struct' ||
       parentNode.kind === 'interface' ||
       parentNode.kind === 'trait' ||
-      parentNode.kind === 'enum'
+      parentNode.kind === 'enum' ||
+      parentNode.kind === 'module'
     );
   }
 

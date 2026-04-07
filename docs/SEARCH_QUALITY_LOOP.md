@@ -522,6 +522,7 @@ if (receiverType) {
 - [x] **Go** — `getReceiverType` extracts receiver from `func (sl *Type) method()`
 - [x] **Swift** — NOT needed. Tree-sitter nests methods inside class/extension bodies
 - [x] **Java** — NOT needed. Methods nested in class body. Verified against Guava
+- [x] **Python** — NOT needed. Methods nested in class body. Verified against Flask
 
 ### Needs Verification
 
@@ -533,6 +534,5 @@ Check these — may need `getReceiverType` if methods are top-level in the AST:
 
 Verify these DON'T need `getReceiverType` (methods nested in class body):
 
-- [ ] Python
 - [ ] TypeScript
 - [ ] C#

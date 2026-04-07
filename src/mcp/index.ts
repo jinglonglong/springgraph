@@ -116,6 +116,7 @@ export class MCPServer {
     try {
       this.cg = await CodeGraph.open(resolvedRoot);
       this.toolHandler.setDefaultCodeGraph(this.cg);
+      this.startWatching();
     } catch (err) {
       // Log the error so transient failures are diagnosable (see issue #47)
       const msg = err instanceof Error ? err.message : String(err);
@@ -147,8 +148,34 @@ export class MCPServer {
       this.cg = CodeGraph.openSync(resolvedRoot);
       this.projectPath = resolvedRoot;
       this.toolHandler.setDefaultCodeGraph(this.cg);
+      this.startWatching();
     } catch {
       // Still failing — will retry on next tool call
+    }
+  }
+
+  /**
+   * Start file watching on the active CodeGraph instance.
+   * Logs sync activity to stderr for diagnostics.
+   */
+  private startWatching(): void {
+    if (!this.cg) return;
+
+    const started = this.cg.watch({
+      onSyncComplete: (result) => {
+        if (result.filesChanged > 0) {
+          process.stderr.write(
+            `[CodeGraph MCP] Auto-synced ${result.filesChanged} file(s) in ${result.durationMs}ms\n`
+          );
+        }
+      },
+      onSyncError: (err) => {
+        process.stderr.write(`[CodeGraph MCP] Auto-sync error: ${err.message}\n`);
+      },
+    });
+
+    if (started) {
+      process.stderr.write('[CodeGraph MCP] File watcher active — graph will auto-sync on changes\n');
     }
   }
 

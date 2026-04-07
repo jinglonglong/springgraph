@@ -48,6 +48,7 @@ import {
 import { GraphTraverser, GraphQueryManager } from './graph';
 import { ContextBuilder, createContextBuilder } from './context';
 import { Mutex, FileLock } from './utils';
+import { FileWatcher, WatchOptions } from './sync';
 
 // Re-export types for consumers
 export * from './types';
@@ -77,6 +78,7 @@ export {
   defaultLogger,
 } from './errors';
 export { Mutex, FileLock, processInBatches, debounce, throttle, MemoryMonitor } from './utils';
+export { FileWatcher, WatchOptions } from './sync';
 export { MCPServer } from './mcp';
 
 /**
@@ -139,6 +141,9 @@ export class CodeGraph {
 
   // File lock for preventing concurrent writes across processes (CLI, MCP, git hooks)
   private fileLock: FileLock;
+
+  // File watcher for auto-sync on file changes
+  private watcher: FileWatcher | null = null;
 
   private constructor(
     db: DatabaseConnection,
@@ -319,6 +324,7 @@ export class CodeGraph {
    * Close the CodeGraph instance and release resources
    */
   close(): void {
+    this.unwatch();
     // Release file lock if held
     this.fileLock.release();
     this.db.close();
@@ -489,6 +495,53 @@ export class CodeGraph {
    */
   isIndexing(): boolean {
     return this.indexMutex.isLocked();
+  }
+
+  // ===========================================================================
+  // File Watching
+  // ===========================================================================
+
+  /**
+   * Start watching for file changes and auto-syncing.
+   *
+   * Uses native OS file events (FSEvents on macOS, inotify on Linux 19+,
+   * ReadDirectoryChangesW on Windows) with debouncing to avoid thrashing.
+   *
+   * @param options - Watch options (debounce delay, callbacks)
+   * @returns true if watching started successfully
+   */
+  watch(options: WatchOptions = {}): boolean {
+    if (this.watcher?.isActive()) return true;
+
+    this.watcher = new FileWatcher(
+      this.projectRoot,
+      this.config,
+      async () => {
+        const result = await this.sync();
+        const filesChanged = result.filesAdded + result.filesModified + result.filesRemoved;
+        return { filesChanged, durationMs: result.durationMs };
+      },
+      options
+    );
+
+    return this.watcher.start();
+  }
+
+  /**
+   * Stop watching for file changes.
+   */
+  unwatch(): void {
+    if (this.watcher) {
+      this.watcher.stop();
+      this.watcher = null;
+    }
+  }
+
+  /**
+   * Check if the file watcher is active.
+   */
+  isWatching(): boolean {
+    return this.watcher?.isActive() ?? false;
   }
 
   /**

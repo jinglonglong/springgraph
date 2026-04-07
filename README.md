@@ -146,8 +146,8 @@ One tool call returns everything Claude needs—entry points, related symbols, a
 </td>
 <td width="33%" valign="top">
 
-### 🔍 Semantic Search
-Find code by meaning, not just text. Search for "authentication" and find `login`, `validateToken`, `AuthService`—even with different naming conventions.
+### 🔍 Full-Text Search
+Find code by name across your entire codebase instantly. Search for "auth" and find `authenticate`, `AuthService`, `validateToken` — powered by FTS5.
 
 </td>
 <td width="33%" valign="top">
@@ -173,11 +173,17 @@ No data leaves your machine. No API keys. No external services. Everything runs 
 <td width="33%" valign="top">
 
 ### ⚡ Always Fresh
-Claude Code hooks automatically sync the index as you work. Your code intelligence is always up to date.
+The MCP server watches your files and auto-syncs on save — debounced, filtered to source files only, zero config. Your code intelligence is always up to date.
 
 </td>
 </tr>
 </table>
+
+---
+
+## 📋 Requirements
+
+- **Node.js >= 18.0.0**
 
 ---
 
@@ -190,11 +196,10 @@ npx @colbymchenry/codegraph
 ```
 
 The interactive installer will:
-- Prompt to install `codegraph` globally (needed for hooks & MCP server to work)
+- Prompt to install `codegraph` globally (needed for the MCP server to work)
 - Configure the MCP server in `~/.claude.json`
 - Set up auto-allow permissions for CodeGraph tools
 - Add global instructions to `~/.claude/CLAUDE.md` (teaches Claude how to use CodeGraph)
-- Install Claude Code hooks for automatic index syncing
 - Optionally initialize your current project
 
 ### 2. Restart Claude Code
@@ -298,12 +303,6 @@ At the start of a session, ask the user if they'd like to initialize CodeGraph:
 
 ---
 
-## 📋 Requirements
-
-- Node.js >= 18.0.0
-
----
-
 ## 💻 CLI Usage
 
 ```bash
@@ -334,13 +333,12 @@ npx @colbymchenry/codegraph       # Run via npx (no global install needed)
 ```
 
 The installer will:
-1. Prompt to install `codegraph` globally (needed for hooks & MCP server)
+1. Prompt to install `codegraph` globally (needed for the MCP server)
 2. Ask for installation location (global `~/.claude` or local `./.claude`)
 3. Optionally set up auto-allow permissions
 4. Configure the MCP server in `claude.json`
 5. Add global instructions to `~/.claude/CLAUDE.md` (teaches Claude how to use CodeGraph)
-6. Install Claude Code hooks for automatic index syncing
-7. For local installs: initialize and index the current project
+6. For local installs: initialize and index the current project
 
 ### `codegraph init [path]`
 
@@ -422,7 +420,7 @@ codegraph files --json                    # Output as JSON
 
 ### `codegraph context <task>`
 
-Build relevant code context for a task. Uses semantic search to find entry points, then expands through the graph to find related code.
+Build relevant code context for a task. Uses full-text search to find entry points, then expands through the graph to find related code.
 
 ```bash
 codegraph context "fix checkout bug"
@@ -589,8 +587,12 @@ const context = await cg.buildContext('fix login bug', {
 // Get impact radius
 const impact = cg.getImpactRadius(node.id, 2);
 
-// Sync changes
+// Sync changes manually
 const syncResult = await cg.sync();
+
+// Or watch for changes and auto-sync
+cg.watch(); // uses native OS file events, debounced
+cg.unwatch(); // stop watching
 
 // Clean up
 cg.close();
@@ -615,7 +617,6 @@ All data is stored in a local SQLite database (`.codegraph/codegraph.db`):
 - **edges** table: Relationships between nodes
 - **files** table: File tracking for incremental updates
 - **unresolved_refs** table: References pending resolution
-- **vectors** table: Embeddings stored as BLOBs for semantic search
 - **nodes_fts**: FTS5 virtual table for full-text search
 - **schema_versions** table: Schema version tracking
 - **project_metadata** table: Project-level key-value metadata
@@ -629,13 +630,17 @@ After extraction, CodeGraph resolves references:
 3. Link class inheritance and interface implementations
 4. Apply framework-specific patterns (Express routes, etc.)
 
-### 4. Semantic Search
+### 4. File Watching
 
-CodeGraph uses local embeddings (via [@xenova/transformers](https://github.com/xenova/transformers.js)) to enable semantic search:
+The MCP server automatically watches your project for file changes using native OS file events (FSEvents on macOS, inotify on Linux, ReadDirectoryChangesW on Windows):
 
-1. Code symbols are embedded using a transformer model
-2. Queries are embedded and compared using cosine similarity
-3. Results are ranked by relevance
+1. File saves are detected instantly via OS-level events — no polling
+2. Changes are **debounced** (2-second quiet window) so rapid saves don't thrash
+3. Only source files matching your include/exclude patterns trigger a sync
+4. Build outputs, node_modules, and `.codegraph/` changes are ignored
+5. Incremental sync runs automatically — only changed files are re-parsed
+
+No configuration needed. The graph stays fresh as you code.
 
 ### 5. Graph Queries
 
@@ -650,7 +655,7 @@ The graph structure enables powerful queries:
 
 When you request context for a task:
 
-1. Semantic search finds relevant entry points
+1. FTS search finds relevant entry points
 2. Graph traversal expands to related code
 3. Code snippets are extracted
 4. Results are formatted for AI consumption
@@ -730,7 +735,8 @@ Run `codegraph init` in your project directory first.
 
 ### Missing symbols in search
 
-- Run `codegraph sync` to pick up recent changes
+- The MCP server auto-syncs on file changes — wait a couple seconds after saving
+- Run `codegraph sync` manually if needed
 - Check if the file's language is supported
 - Verify the file isn't excluded by config patterns
 

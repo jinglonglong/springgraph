@@ -8,6 +8,61 @@ import { Node } from '../types';
 import { UnresolvedRef, ResolvedRef, ResolutionContext } from './types';
 
 /**
+ * Try to resolve a path-like reference (e.g., "snippets/drawer-menu.liquid")
+ * by matching the filename against file nodes.
+ */
+export function matchByFilePath(
+  ref: UnresolvedRef,
+  context: ResolutionContext
+): ResolvedRef | null {
+  if (!ref.referenceName.includes('/')) return null;
+
+  // Extract the filename from the path
+  const fileName = ref.referenceName.split('/').pop();
+  if (!fileName) return null;
+
+  // Search for file nodes with this name
+  const candidates = context.getNodesByName(fileName);
+  const fileNodes = candidates.filter(n => n.kind === 'file');
+
+  if (fileNodes.length === 0) return null;
+
+  // Prefer exact path match on qualified_name
+  const exactMatch = fileNodes.find(n => n.qualifiedName === ref.referenceName || n.filePath === ref.referenceName);
+  if (exactMatch) {
+    return {
+      original: ref,
+      targetNodeId: exactMatch.id,
+      confidence: 0.95,
+      resolvedBy: 'file-path',
+    };
+  }
+
+  // Fall back to suffix match (e.g., ref="snippets/foo.liquid" matches "src/snippets/foo.liquid")
+  const suffixMatch = fileNodes.find(n => n.qualifiedName.endsWith(ref.referenceName) || n.filePath.endsWith(ref.referenceName));
+  if (suffixMatch) {
+    return {
+      original: ref,
+      targetNodeId: suffixMatch.id,
+      confidence: 0.85,
+      resolvedBy: 'file-path',
+    };
+  }
+
+  // If only one file node with this name, use it with lower confidence
+  if (fileNodes.length === 1) {
+    return {
+      original: ref,
+      targetNodeId: fileNodes[0]!.id,
+      confidence: 0.7,
+      resolvedBy: 'file-path',
+    };
+  }
+
+  return null;
+}
+
+/**
  * Try to resolve a reference by exact name match
  */
 export function matchByExactName(
@@ -359,6 +414,10 @@ export function matchReference(
 ): ResolvedRef | null {
   // Try strategies in order of confidence
   let result: ResolvedRef | null;
+
+  // 0. File path match (e.g., "snippets/drawer-menu.liquid" → file node)
+  result = matchByFilePath(ref, context);
+  if (result) return result;
 
   // 1. Qualified name match (highest confidence)
   result = matchByQualifiedName(ref, context);

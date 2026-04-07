@@ -266,6 +266,8 @@ export class TreeSitterExtractor {
         this.extractEnum(node);
       } else if (classification === 'interface') {
         this.extractInterface(node);
+      } else if (classification === 'trait') {
+        this.extractClass(node, 'trait');
       } else {
         this.extractClass(node);
       }
@@ -542,7 +544,7 @@ export class TreeSitterExtractor {
   /**
    * Extract a class
    */
-  private extractClass(node: SyntaxNode): void {
+  private extractClass(node: SyntaxNode, kind: NodeKind = 'class'): void {
     if (!this.extractor) return;
 
     const name = extractName(node, this.source, this.extractor);
@@ -550,7 +552,7 @@ export class TreeSitterExtractor {
     const visibility = this.extractor.getVisibility?.(node);
     const isExported = this.extractor.isExported?.(node, this.source);
 
-    const classNode = this.createNode('class', name, node, {
+    const classNode = this.createNode(kind, name, node, {
       docstring,
       visibility,
       isExported,
@@ -861,6 +863,35 @@ export class TreeSitterExtractor {
       const varDecl = node.namedChildren.find(c => c.type === 'variable_declaration');
       if (varDecl) {
         declarators = varDecl.namedChildren.filter(c => c.type === 'variable_declarator');
+      }
+    }
+
+    // PHP property_declaration: property_element → variable_name → name
+    if (declarators.length === 0) {
+      const propElements = node.namedChildren.filter(c => c.type === 'property_element');
+      if (propElements.length > 0) {
+        // Get type annotation if present (e.g. "string", "int", "?Foo")
+        const typeNode = node.namedChildren.find(
+          c => c.type !== 'visibility_modifier' && c.type !== 'static_modifier'
+            && c.type !== 'readonly_modifier' && c.type !== 'property_element'
+            && c.type !== 'var_modifier'
+        );
+        const typeText = typeNode ? getNodeText(typeNode, this.source) : undefined;
+
+        for (const elem of propElements) {
+          const varName = elem.namedChildren.find(c => c.type === 'variable_name');
+          const nameNode = varName?.namedChildren.find(c => c.type === 'name');
+          if (!nameNode) continue;
+          const name = getNodeText(nameNode, this.source);
+          const signature = typeText ? `${typeText} $${name}` : `$${name}`;
+          this.createNode('field', name, elem, {
+            docstring,
+            signature,
+            visibility,
+            isStatic,
+          });
+        }
+        return;
       }
     }
 
@@ -1458,6 +1489,7 @@ export class TreeSitterExtractor {
         if (classification === 'struct') this.extractStruct(node);
         else if (classification === 'enum') this.extractEnum(node);
         else if (classification === 'interface') this.extractInterface(node);
+        else if (classification === 'trait') this.extractClass(node, 'trait');
         else this.extractClass(node);
         return;
       }

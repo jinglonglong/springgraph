@@ -252,7 +252,10 @@ export class LiquidExtractor {
       try {
         const schemaJson = JSON.parse(schemaContent!);
         if (schemaJson.name) {
-          schemaName = schemaJson.name;
+          // Shopify schema names can be translation objects like {"en": "...", "fr": "..."}
+          schemaName = typeof schemaJson.name === 'string'
+            ? schemaJson.name
+            : schemaJson.name.en || Object.values(schemaJson.name)[0] as string || 'schema';
         }
       } catch {
         // Schema isn't valid JSON, use default name

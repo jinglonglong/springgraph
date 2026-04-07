@@ -154,7 +154,7 @@ export interface LanguageExtractor {
    * Classify a class_declaration node when the grammar reuses one node type
    * for multiple concepts (e.g. Swift uses class_declaration for classes, structs, and enums).
    */
-  classifyClassNode?: (node: SyntaxNode) => 'class' | 'struct' | 'enum' | 'interface';
+  classifyClassNode?: (node: SyntaxNode) => 'class' | 'struct' | 'enum' | 'interface' | 'trait';
 
   /**
    * Resolve the body node for a function/method/class when it's not a child field.

@@ -369,6 +369,13 @@ export class ReferenceResolver {
       if (this.knownNames.has(receiver) || this.knownNames.has(member)) return true;
     }
 
+    // For path-like references (e.g., "snippets/drawer-menu.liquid"), check the filename
+    const slashIdx = name.lastIndexOf('/');
+    if (slashIdx > 0) {
+      const fileName = name.substring(slashIdx + 1);
+      if (this.knownNames.has(fileName)) return true;
+    }
+
     return false;
   }
 

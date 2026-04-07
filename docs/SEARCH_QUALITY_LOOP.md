@@ -450,6 +450,10 @@ test().catch(console.error);
 | Ruby methods inside modules missing owner in `qualified_name` | Ruby `module` AST nodes not being extracted | `src/extraction/languages/ruby.ts: visitNode` hook extracts modules; `src/extraction/tree-sitter.ts: isInsideClassLikeNode` includes `module` kind |
 | TypeScript abstract classes missing | `abstract_class_declaration` not in `classTypes` | `src/extraction/languages/typescript.ts: classTypes` — add `abstract_class_declaration` |
 | Single-expression arrow functions silently dropped | `extractName` finds identifier in expression body instead of returning `<anonymous>` | `src/extraction/tree-sitter.ts: extractName` — skip identifier search for `arrow_function`/`function_expression` nodes |
+| Kotlin interfaces/enums extracted as classes | `class_declaration` matches `classTypes` first; `interfaceTypes`/`enumTypes` never fire | `src/extraction/languages/kotlin.ts: classifyClassNode` detects `interface`/`enum` keywords in AST children |
+| Kotlin functions have zero calls extracted | Tree-sitter grammar doesn't use field names, so `getChildByField(node, 'function_body')` returns null | `src/extraction/languages/kotlin.ts: resolveBody` finds body by type (`function_body`, `class_body`, `enum_class_body`) |
+| Kotlin `navigation_expression` calls not resolved cleanly | `navigation_expression` fell through to `getNodeText` producing messy names with parentheses | `src/extraction/tree-sitter.ts: extractCall` — handle `navigation_expression` by extracting method name from `navigation_suffix > simple_identifier` |
+| Kotlin `fun interface` declarations invisible | Tree-sitter-kotlin doesn't support `fun interface` syntax (Kotlin 1.4+), producing ERROR or misparse as `function_declaration` | `src/extraction/languages/kotlin.ts: visitNode` detects both misparse patterns (ERROR node + lambda body, or function_declaration with `user_type("interface")`) and extracts as interface |
 
 ## After Fixing Issues
 
@@ -535,9 +539,8 @@ if (receiverType) {
 - [x] **Ruby** — NOT needed for `getReceiverType`. Methods nested in class body. Added `visitNode` hook to extract Ruby `module` nodes (concerns, namespaces) with proper containment and qualified names. Methods inside modules get `Module::method` qualified names. Also wired up the `ExtractorContext` with `pushScope`/`popScope` for language hooks. Verified against Discourse
 - [x] **TypeScript** — NOT needed for `getReceiverType`. Methods nested in class body. Added `abstract_class_declaration` to `classTypes` so abstract classes are properly extracted. Fixed single-expression arrow function extraction (`const fn = () => expr` was silently dropped because `extractName` picked up the body identifier instead of returning `<anonymous>` for parent name resolution). Verified against Grafana
 - [x] **Dart** — NOT needed for `getReceiverType`. Methods nested in class body. Added bare call extraction for selector-based method calls (e.g. `object.method()`). Verified against Flutter
+- [x] **Kotlin** — `getReceiverType` extracts receiver from extension functions `fun Type.method()`. Added `classifyClassNode` to distinguish interfaces/enums from classes (all use `class_declaration` AST node). Added `resolveBody` hook since Kotlin's tree-sitter grammar doesn't use field names. Added `navigation_expression` handling for method call extraction. Added `object_declaration` via `extraClassNodeTypes`. Added `delegation_specifier` handling in `extractInheritance` for Kotlin's `: Parent, Interface` syntax. Also fixed `extractInterface` to visit body children (interface methods were not being extracted). Added `visitNode` hook to handle `fun interface` (SAM) declarations — tree-sitter-kotlin doesn't support this Kotlin 1.4+ syntax, producing ERROR or function_declaration misparse; the hook detects both patterns and extracts the interface. Verified against Koin, LeakCanary
 
 ### Needs Verification
 
-Check these — may need `getReceiverType` if methods are top-level in the AST:
-
-- [ ] Kotlin — extension functions `fun Type.method()`
+(none currently)

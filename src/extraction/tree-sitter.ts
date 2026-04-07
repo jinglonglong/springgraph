@@ -264,6 +264,8 @@ export class TreeSitterExtractor {
         this.extractStruct(node);
       } else if (classification === 'enum') {
         this.extractEnum(node);
+      } else if (classification === 'interface') {
+        this.extractInterface(node);
       } else {
         this.extractClass(node);
       }
@@ -675,6 +677,19 @@ export class TreeSitterExtractor {
 
     // Extract extends (interface inheritance)
     this.extractInheritance(node, interfaceNode.id);
+
+    // Visit body children for interface methods and nested types
+    this.nodeStack.push(interfaceNode.id);
+    let body = this.extractor.resolveBody?.(node, this.extractor.bodyField)
+      ?? getChildByField(node, this.extractor.bodyField);
+    if (!body) body = node;
+    for (let i = 0; i < body.namedChildCount; i++) {
+      const child = body.namedChild(i);
+      if (child) {
+        this.visitNode(child);
+      }
+    }
+    this.nodeStack.pop();
   }
 
   /**
@@ -1338,10 +1353,20 @@ export class TreeSitterExtractor {
       const func = getChildByField(node, 'function') || node.namedChild(0);
 
       if (func) {
-        if (func.type === 'member_expression' || func.type === 'attribute' || func.type === 'selector_expression') {
+        if (func.type === 'member_expression' || func.type === 'attribute' || func.type === 'selector_expression' || func.type === 'navigation_expression') {
           // Method call: obj.method() or obj.field.method()
           // Go uses selector_expression with 'field', JS/TS uses member_expression with 'property'
-          const property = getChildByField(func, 'property') || getChildByField(func, 'field') || func.namedChild(1);
+          // Kotlin uses navigation_expression with navigation_suffix > simple_identifier
+          let property = getChildByField(func, 'property') || getChildByField(func, 'field');
+          if (!property) {
+            const child1 = func.namedChild(1);
+            // Kotlin: navigation_suffix wraps the method name — extract simple_identifier from it
+            if (child1?.type === 'navigation_suffix') {
+              property = child1.namedChildren.find((c: SyntaxNode) => c.type === 'simple_identifier') ?? child1;
+            } else {
+              property = child1;
+            }
+          }
           if (property) {
             const methodName = getNodeText(property, this.source);
             // Include receiver name for qualified resolution (e.g., console.print → "console.print")
@@ -1350,7 +1375,7 @@ export class TreeSitterExtractor {
             // Skip self/this/cls as they don't aid resolution
             const receiver = getChildByField(func, 'object') || getChildByField(func, 'operand') || func.namedChild(0);
             const SKIP_RECEIVERS = new Set(['self', 'this', 'cls', 'super']);
-            if (receiver && receiver.type === 'identifier') {
+            if (receiver && (receiver.type === 'identifier' || receiver.type === 'simple_identifier')) {
               const receiverName = getNodeText(receiver, this.source);
               if (!SKIP_RECEIVERS.has(receiverName)) {
                 calleeName = `${receiverName}.${methodName}`;
@@ -1421,6 +1446,7 @@ export class TreeSitterExtractor {
         const classification = this.extractor!.classifyClassNode?.(node) ?? 'class';
         if (classification === 'struct') this.extractStruct(node);
         else if (classification === 'enum') this.extractEnum(node);
+        else if (classification === 'interface') this.extractInterface(node);
         else this.extractClass(node);
         return;
       }
@@ -1609,6 +1635,28 @@ export class TreeSitterExtractor {
               column: baseType.startPosition.column,
             });
           }
+        }
+      }
+
+      // Kotlin: `class Foo : Bar, Baz` → delegation_specifier > user_type > type_identifier
+      // Also handles `class Foo : Bar()` → delegation_specifier > constructor_invocation > user_type
+      if (child.type === 'delegation_specifier') {
+        const userType = child.namedChildren.find((c: SyntaxNode) => c.type === 'user_type');
+        const constructorInvocation = child.namedChildren.find((c: SyntaxNode) => c.type === 'constructor_invocation');
+        const target = userType ?? constructorInvocation;
+        if (target) {
+          const typeId = target.type === 'user_type'
+            ? target.namedChildren.find((c: SyntaxNode) => c.type === 'type_identifier') ?? target
+            : target.namedChildren.find((c: SyntaxNode) => c.type === 'user_type')?.namedChildren.find((c: SyntaxNode) => c.type === 'type_identifier')
+              ?? target.namedChildren.find((c: SyntaxNode) => c.type === 'user_type') ?? target;
+          const name = getNodeText(typeId, this.source);
+          this.unresolvedReferences.push({
+            fromNodeId: classId,
+            referenceName: name,
+            referenceKind: 'extends',
+            line: typeId.startPosition.row + 1,
+            column: typeId.startPosition.column,
+          });
         }
       }
 

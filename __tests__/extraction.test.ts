@@ -1013,6 +1013,69 @@ suspend fun loadData(): List<String> {
     expect(funcNode).toBeDefined();
     expect(funcNode?.isAsync).toBe(true);
   });
+
+  it('should extract fun interface declarations', () => {
+    const code = `
+fun interface OnObjectRetainedListener {
+  fun onObjectRetained()
+}
+`;
+    const result = extractFromSource('listener.kt', code);
+
+    const ifaceNode = result.nodes.find((n) => n.kind === 'interface');
+    expect(ifaceNode).toBeDefined();
+    expect(ifaceNode?.name).toBe('OnObjectRetainedListener');
+
+    const methodNode = result.nodes.find((n) => n.kind === 'method');
+    expect(methodNode).toBeDefined();
+    expect(methodNode?.name).toBe('onObjectRetained');
+    expect(methodNode?.qualifiedName).toBe('OnObjectRetainedListener::onObjectRetained');
+  });
+
+  it('should extract complex fun interface with nested classes', () => {
+    const code = `
+fun interface EventListener {
+  fun onEvent(event: Event)
+
+  sealed class Event {
+    class DumpingHeap : Event()
+  }
+}
+`;
+    const result = extractFromSource('events.kt', code);
+
+    const ifaceNode = result.nodes.find((n) => n.kind === 'interface');
+    expect(ifaceNode).toBeDefined();
+    expect(ifaceNode?.name).toBe('EventListener');
+
+    // Nested sealed class should still be extracted (as sibling due to grammar limitations)
+    const eventClass = result.nodes.find((n) => n.kind === 'class' && n.name === 'Event');
+    expect(eventClass).toBeDefined();
+
+    const dumpingHeap = result.nodes.find((n) => n.kind === 'class' && n.name === 'DumpingHeap');
+    expect(dumpingHeap).toBeDefined();
+  });
+
+  it('should not affect regular function declarations', () => {
+    const code = `
+fun interface MyCallback {
+  fun invoke(value: Int)
+}
+
+fun regularFunction(): String {
+  return "hello"
+}
+`;
+    const result = extractFromSource('mixed.kt', code);
+
+    const ifaceNode = result.nodes.find((n) => n.kind === 'interface');
+    expect(ifaceNode).toBeDefined();
+    expect(ifaceNode?.name).toBe('MyCallback');
+
+    const funcNode = result.nodes.find((n) => n.kind === 'function');
+    expect(funcNode).toBeDefined();
+    expect(funcNode?.name).toBe('regularFunction');
+  });
 });
 
 describe('Dart Extraction', () => {

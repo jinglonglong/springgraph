@@ -45,6 +45,43 @@ export const rustExtractor: LanguageExtractor = {
     }
     return 'private'; // Rust defaults to private
   },
+  getReceiverType: (node, source) => {
+    // Walk up the tree-sitter AST to find a parent impl_item
+    let parent = node.parent;
+    while (parent) {
+      if (parent.type === 'impl_item') {
+        // For `impl Type { ... }` — the type is a direct type_identifier child
+        // For `impl Trait for Type { ... }` — the type is the LAST type_identifier
+        // (the first is part of the trait path)
+        const children = parent.namedChildren;
+        // Find all direct type_identifier children (not nested in scoped paths)
+        const typeIdents = children.filter(
+          (c: SyntaxNode) => c.type === 'type_identifier'
+        );
+        if (typeIdents.length > 0) {
+          // Last type_identifier is always the implementing type
+          const typeNode = typeIdents[typeIdents.length - 1]!;
+          return source.substring(typeNode.startIndex, typeNode.endIndex);
+        }
+        // Handle generic types: impl<T> MyStruct<T> { ... }
+        const genericType = children.find(
+          (c: SyntaxNode) => c.type === 'generic_type'
+        );
+        if (genericType) {
+          const innerType = genericType.namedChildren.find(
+            (c: SyntaxNode) => c.type === 'type_identifier'
+          );
+          if (innerType) {
+            return source.substring(innerType.startIndex, innerType.endIndex);
+          }
+        }
+        return undefined;
+      }
+      parent = parent.parent;
+    }
+    return undefined;
+  },
+
   extractImport: (node, source) => {
     const importText = source.substring(node.startIndex, node.endIndex).trim();
 

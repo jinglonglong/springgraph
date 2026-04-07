@@ -303,6 +303,10 @@ export class TreeSitterExtractor {
     else if (this.extractor.callTypes.includes(nodeType)) {
       this.extractCall(node);
     }
+    // Rust: `impl Trait for Type { ... }` — creates implements edge from Type to Trait
+    else if (nodeType === 'impl_item') {
+      this.extractRustImplItem(node);
+    }
 
     // Visit children (unless the extract method already visited them)
     if (!skipChildren) {
@@ -406,6 +410,13 @@ export class TreeSitterExtractor {
   private extractFunction(node: SyntaxNode): void {
     if (!this.extractor) return;
 
+    // If the language provides getReceiverType and this function has a receiver
+    // (e.g., Rust function_item inside an impl block), extract as method instead
+    if (this.extractor.getReceiverType?.(node, this.source)) {
+      this.extractMethod(node);
+      return;
+    }
+
     let name = extractName(node, this.source, this.extractor);
     // For arrow functions and function expressions assigned to variables,
     // resolve the name from the parent variable_declarator.
@@ -498,10 +509,15 @@ export class TreeSitterExtractor {
   private extractMethod(node: SyntaxNode): void {
     if (!this.extractor) return;
 
+    // For languages with receiver types (Go, Rust), include receiver in qualified name
+    // so FTS can match "scrapeLoop.run" → qualified_name "...::scrapeLoop::run"
+    const receiverType = this.extractor.getReceiverType?.(node, this.source);
+
     // For most languages, only extract as method if inside a class-like node
     // Languages with methodsAreTopLevel (e.g. Go) always treat them as methods
-    if (!this.isInsideClassLikeNode() && !this.extractor.methodsAreTopLevel) {
-      // Not inside a class-like node and not Go, treat as function
+    // Languages with getReceiverType (e.g. Rust) extract as method when receiver is found
+    if (!this.isInsideClassLikeNode() && !this.extractor.methodsAreTopLevel && !receiverType) {
+      // Not inside a class-like node and no receiver type, treat as function
       this.extractFunction(node);
       return;
     }
@@ -512,10 +528,6 @@ export class TreeSitterExtractor {
     const visibility = this.extractor.getVisibility?.(node);
     const isAsync = this.extractor.isAsync?.(node);
     const isStatic = this.extractor.isStatic?.(node);
-
-    // For languages with receiver types (Go), include receiver in qualified name
-    // so FTS can match "scrapeLoop.run" → qualified_name "...::scrapeLoop::run"
-    const receiverType = this.extractor.getReceiverType?.(node, this.source);
     const extraProps: Partial<Node> = {
       docstring,
       signature,
@@ -529,6 +541,24 @@ export class TreeSitterExtractor {
 
     const methodNode = this.createNode('method', name, node, extraProps);
     if (!methodNode) return;
+
+    // For methods with a receiver type but no class-like parent on the stack
+    // (e.g., Rust impl blocks), add a contains edge from the owning struct/trait
+    if (receiverType && !this.isInsideClassLikeNode()) {
+      const ownerNode = this.nodes.find(
+        (n) =>
+          n.name === receiverType &&
+          n.filePath === this.filePath &&
+          (n.kind === 'struct' || n.kind === 'class' || n.kind === 'enum' || n.kind === 'trait')
+      );
+      if (ownerNode) {
+        this.edges.push({
+          source: ownerNode.id,
+          target: methodNode.id,
+          kind: 'contains',
+        });
+      }
+    }
 
     // Extract type annotations (parameter types and return type)
     this.extractTypeAnnotations(node, methodNode.id);
@@ -1311,6 +1341,40 @@ export class TreeSitterExtractor {
         }
       }
 
+      // Rust trait supertraits: `trait SubTrait: SuperTrait + Display { ... }`
+      // trait_bounds contains type_identifier, generic_type, or higher_ranked_trait_bound children
+      if (child.type === 'trait_bounds') {
+        for (const bound of child.namedChildren) {
+          let typeName: string | undefined;
+          let posNode: SyntaxNode | undefined;
+
+          if (bound.type === 'type_identifier') {
+            typeName = getNodeText(bound, this.source);
+            posNode = bound;
+          } else if (bound.type === 'generic_type') {
+            // e.g. `Deserialize<'de>`
+            const inner = bound.namedChildren.find((c: SyntaxNode) => c.type === 'type_identifier');
+            if (inner) { typeName = getNodeText(inner, this.source); posNode = inner; }
+          } else if (bound.type === 'higher_ranked_trait_bound') {
+            // e.g. `for<'de> Deserialize<'de>`
+            const generic = bound.namedChildren.find((c: SyntaxNode) => c.type === 'generic_type');
+            const typeId = generic?.namedChildren.find((c: SyntaxNode) => c.type === 'type_identifier')
+              ?? bound.namedChildren.find((c: SyntaxNode) => c.type === 'type_identifier');
+            if (typeId) { typeName = getNodeText(typeId, this.source); posNode = typeId; }
+          }
+
+          if (typeName && posNode) {
+            this.unresolvedReferences.push({
+              fromNodeId: classId,
+              referenceName: typeName,
+              referenceKind: 'extends',
+              line: posNode.startPosition.row + 1,
+              column: posNode.startPosition.column,
+            });
+          }
+        }
+      }
+
       // Swift: inheritance_specifier > user_type > type_identifier
       // Used for class inheritance, protocol conformance, and protocol inheritance
       if (child.type === 'inheritance_specifier') {
@@ -1334,6 +1398,69 @@ export class TreeSitterExtractor {
         this.extractInheritance(child, classId);
       }
     }
+  }
+
+  /**
+   * Rust `impl Trait for Type` — creates an implements edge from Type to Trait.
+   * For plain `impl Type { ... }` (no trait), no inheritance edge is needed.
+   */
+  private extractRustImplItem(node: SyntaxNode): void {
+    // Check if this is `impl Trait for Type` by looking for a `for` keyword
+    const hasFor = node.children.some(
+      (c: SyntaxNode) => c.type === 'for' && !c.isNamed
+    );
+    if (!hasFor) return;
+
+    // In `impl Trait for Type`, the type_identifiers are:
+    // first = Trait name, last = implementing Type name
+    // Also handle generic types like `impl<T> Trait for MyStruct<T>`
+    const typeIdents = node.namedChildren.filter(
+      (c: SyntaxNode) => c.type === 'type_identifier' || c.type === 'generic_type' || c.type === 'scoped_type_identifier'
+    );
+    if (typeIdents.length < 2) return;
+
+    const traitNode = typeIdents[0]!;
+    const typeNode = typeIdents[typeIdents.length - 1]!;
+
+    // Get the trait name (handle scoped paths like std::fmt::Display)
+    const traitName = traitNode.type === 'scoped_type_identifier'
+      ? this.source.substring(traitNode.startIndex, traitNode.endIndex)
+      : getNodeText(traitNode, this.source);
+
+    // Get the implementing type name (extract inner type_identifier for generics)
+    let typeName: string;
+    if (typeNode.type === 'generic_type') {
+      const inner = typeNode.namedChildren.find(
+        (c: SyntaxNode) => c.type === 'type_identifier'
+      );
+      typeName = inner ? getNodeText(inner, this.source) : getNodeText(typeNode, this.source);
+    } else {
+      typeName = getNodeText(typeNode, this.source);
+    }
+
+    // Find the struct/type node for the implementing type
+    const typeNodeId = this.findNodeByName(typeName);
+    if (typeNodeId) {
+      this.unresolvedReferences.push({
+        fromNodeId: typeNodeId,
+        referenceName: traitName,
+        referenceKind: 'implements',
+        line: traitNode.startPosition.row + 1,
+        column: traitNode.startPosition.column,
+      });
+    }
+  }
+
+  /**
+   * Find a previously-extracted node by name (used for back-references like impl blocks)
+   */
+  private findNodeByName(name: string): string | undefined {
+    for (const node of this.nodes) {
+      if (node.name === name && (node.kind === 'struct' || node.kind === 'enum' || node.kind === 'class')) {
+        return node.id;
+      }
+    }
+    return undefined;
   }
 
   /**

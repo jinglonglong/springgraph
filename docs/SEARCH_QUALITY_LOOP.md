@@ -523,12 +523,12 @@ if (receiverType) {
 - [x] **Swift** — NOT needed. Tree-sitter nests methods inside class/extension bodies
 - [x] **Java** — NOT needed. Methods nested in class body. Verified against Guava
 - [x] **Python** — NOT needed. Methods nested in class body. Verified against Flask
+- [x] **Rust** — `getReceiverType` walks up to parent `impl_item` to extract type name. Also adds `contains` edges from struct to impl methods. Verified against Deno
 
 ### Needs Verification
 
 Check these — may need `getReceiverType` if methods are top-level in the AST:
 
-- [ ] Rust — methods in `impl Type { }` blocks
 - [ ] C++ — out-of-class method definitions `Type::method()`
 - [ ] Kotlin — extension functions `fun Type.method()`
 

@@ -376,6 +376,18 @@ export class TreeSitterExtractor {
   }
 
   /**
+   * Find first named child whose type is in the given list.
+   * Used to locate inner type nodes (e.g. enum_specifier inside a typedef).
+   */
+  private findChildByTypes(node: SyntaxNode, types: string[]): SyntaxNode | null {
+    for (let i = 0; i < node.namedChildCount; i++) {
+      const child = node.namedChild(i);
+      if (child && types.includes(child.type)) return child;
+    }
+    return null;
+  }
+
+  /**
    * Build qualified name from node stack
    */
   private buildQualifiedName(name: string): string {
@@ -922,7 +934,9 @@ export class TreeSitterExtractor {
       if (!structNode) return true;
       // Visit body children for field extraction
       this.nodeStack.push(structNode.id);
-      const typeChild = getChildByField(node, 'type');
+      // Try Go-style 'type' field first, then find inner struct child (C typedef struct)
+      const typeChild = getChildByField(node, 'type')
+        || this.findChildByTypes(node, this.extractor.structTypes);
       if (typeChild) {
         // Extract struct embedding (e.g. Go: `type DB struct { *Head; Queryable }`)
         this.extractInheritance(typeChild, structNode.id);
@@ -930,6 +944,33 @@ export class TreeSitterExtractor {
         for (let i = 0; i < body.namedChildCount; i++) {
           const child = body.namedChild(i);
           if (child) this.visitNode(child);
+        }
+      }
+      this.nodeStack.pop();
+      return true;
+    }
+
+    if (resolvedKind === 'enum') {
+      const enumNode = this.createNode('enum', name, node, { docstring, isExported });
+      if (!enumNode) return true;
+      this.nodeStack.push(enumNode.id);
+      // Find the inner enum type child (e.g. C: typedef enum { ... } name)
+      const innerEnum = this.findChildByTypes(node, this.extractor.enumTypes);
+      if (innerEnum) {
+        this.extractInheritance(innerEnum, enumNode.id);
+        const body = this.extractor.resolveBody?.(innerEnum, this.extractor.bodyField)
+          ?? getChildByField(innerEnum, this.extractor.bodyField);
+        if (body) {
+          const memberTypes = this.extractor.enumMemberTypes;
+          for (let i = 0; i < body.namedChildCount; i++) {
+            const child = body.namedChild(i);
+            if (!child) continue;
+            if (memberTypes?.includes(child.type)) {
+              this.extractEnumMembers(child);
+            } else {
+              this.visitNode(child);
+            }
+          }
         }
       }
       this.nodeStack.pop();

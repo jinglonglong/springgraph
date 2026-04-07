@@ -1,5 +1,5 @@
 import type { Node as SyntaxNode } from 'web-tree-sitter';
-import { getNodeText } from '../tree-sitter-helpers';
+import { getChildByField, getNodeText } from '../tree-sitter-helpers';
 import type { LanguageExtractor } from '../tree-sitter-types';
 
 export const cExtractor: LanguageExtractor = {
@@ -17,6 +17,18 @@ export const cExtractor: LanguageExtractor = {
   nameField: 'declarator',
   bodyField: 'body',
   paramsField: 'parameters',
+  resolveTypeAliasKind: (node, _source) => {
+    // C typedef: `typedef enum { ... } name;` or `typedef struct { ... } name;`
+    // The inner enum_specifier/struct_specifier is anonymous, but we want the typedef name
+    // to become the enum/struct node name.
+    for (let i = 0; i < node.namedChildCount; i++) {
+      const child = node.namedChild(i);
+      if (!child) continue;
+      if (child.type === 'enum_specifier' && getChildByField(child, 'body')) return 'enum';
+      if (child.type === 'struct_specifier' && getChildByField(child, 'body')) return 'struct';
+    }
+    return undefined;
+  },
   extractImport: (node, source) => {
     const importText = source.substring(node.startIndex, node.endIndex).trim();
     // C includes: #include <stdio.h>, #include "myheader.h"
@@ -63,6 +75,16 @@ export const cppExtractor: LanguageExtractor = {
           if (text.includes('protected')) return 'protected';
         }
       }
+    }
+    return undefined;
+  },
+  resolveTypeAliasKind: (node, _source) => {
+    // C++ typedef: `typedef enum { ... } name;` or `typedef struct { ... } name;`
+    for (let i = 0; i < node.namedChildCount; i++) {
+      const child = node.namedChild(i);
+      if (!child) continue;
+      if (child.type === 'enum_specifier' && getChildByField(child, 'body')) return 'enum';
+      if (child.type === 'struct_specifier' && getChildByField(child, 'body')) return 'struct';
     }
     return undefined;
   },

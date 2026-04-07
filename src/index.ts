@@ -46,7 +46,6 @@ import {
   ResolutionResult,
 } from './resolution';
 import { GraphTraverser, GraphQueryManager } from './graph';
-import { VectorManager, createVectorManager, EmbeddingProgress } from './vectors';
 import { ContextBuilder, createContextBuilder } from './context';
 import { Mutex, FileLock } from './utils';
 
@@ -63,7 +62,6 @@ export {
 export { IndexProgress, IndexResult, SyncResult } from './extraction';
 export { detectLanguage, isLanguageSupported, isGrammarLoaded, getSupportedLanguages, initGrammars, loadGrammarsForLanguages, loadAllGrammars } from './extraction';
 export { ResolutionResult } from './resolution';
-export { EmbeddingProgress } from './vectors';
 export {
   CodeGraphError,
   FileError,
@@ -134,7 +132,6 @@ export class CodeGraph {
   private resolver: ReferenceResolver;
   private graphManager: GraphQueryManager;
   private traverser: GraphTraverser;
-  private vectorManager: VectorManager | null = null;
   private contextBuilder: ContextBuilder;
 
   // Mutex for preventing concurrent indexing operations (in-process)
@@ -160,14 +157,10 @@ export class CodeGraph {
     this.resolver = createResolver(projectRoot, queries);
     this.graphManager = new GraphQueryManager(queries);
     this.traverser = new GraphTraverser(queries);
-    // Vector manager — always created, embeddings generated lazily on first use
-    this.vectorManager = createVectorManager(db.getDb(), queries, {});
-    // Context builder (uses vector manager for semantic search)
     this.contextBuilder = createContextBuilder(
       projectRoot,
       queries,
-      this.traverser,
-      this.vectorManager
+      this.traverser
     );
   }
 
@@ -328,11 +321,6 @@ export class CodeGraph {
   close(): void {
     // Release file lock if held
     this.fileLock.release();
-    // Dispose vector manager first to release ONNX workers
-    if (this.vectorManager) {
-      this.vectorManager.dispose();
-      this.vectorManager = null;
-    }
     this.db.close();
   }
 
@@ -839,102 +827,6 @@ export class CodeGraph {
   }
 
   // ===========================================================================
-  // Semantic Search (Vector Embeddings)
-  // ===========================================================================
-
-  /**
-   * Initialize the embedding system
-   *
-   * This downloads the embedding model on first use and initializes
-   * the vector search system. Must be called before using semantic search.
-   */
-  async initializeEmbeddings(): Promise<void> {
-    if (!this.vectorManager) {
-      this.vectorManager = createVectorManager(this.db.getDb(), this.queries, {
-        embedder: {
-          showProgress: true,
-        },
-      });
-    }
-    await this.vectorManager.initialize();
-  }
-
-  /**
-   * Check if embeddings are initialized
-   */
-  isEmbeddingsInitialized(): boolean {
-    return this.vectorManager?.isInitialized() ?? false;
-  }
-
-  /**
-   * Generate embeddings for all eligible nodes
-   *
-   * @param onProgress - Optional progress callback
-   * @returns Number of nodes embedded
-   */
-  async generateEmbeddings(
-    onProgress?: (progress: EmbeddingProgress) => void
-  ): Promise<number> {
-    if (!this.vectorManager) {
-      await this.initializeEmbeddings();
-    }
-    return this.vectorManager!.embedAllNodes(onProgress);
-  }
-
-  /**
-   * Semantic search using embeddings
-   *
-   * Searches for code nodes semantically similar to the query.
-   * Requires embeddings to be initialized first.
-   *
-   * @param query - Natural language search query
-   * @param limit - Maximum number of results (default: 10)
-   * @returns Array of search results with similarity scores
-   */
-  async semanticSearch(query: string, limit: number = 10): Promise<SearchResult[]> {
-    if (!this.vectorManager || !this.vectorManager.isInitialized()) {
-      throw new Error(
-        'Embeddings not initialized. Call initializeEmbeddings() first.'
-      );
-    }
-    return this.vectorManager.search(query, { limit });
-  }
-
-  /**
-   * Find similar code blocks
-   *
-   * Finds nodes semantically similar to a given node.
-   * Requires embeddings to be initialized first.
-   *
-   * @param nodeId - ID of the node to find similar nodes for
-   * @param limit - Maximum number of results (default: 10)
-   * @returns Array of similar nodes with similarity scores
-   */
-  async findSimilar(nodeId: string, limit: number = 10): Promise<SearchResult[]> {
-    if (!this.vectorManager || !this.vectorManager.isInitialized()) {
-      throw new Error(
-        'Embeddings not initialized. Call initializeEmbeddings() first.'
-      );
-    }
-    return this.vectorManager.findSimilar(nodeId, { limit });
-  }
-
-  /**
-   * Get vector embedding statistics
-   */
-  getEmbeddingStats(): {
-    totalVectors: number;
-    vssEnabled: boolean;
-    modelId: string;
-    dimension: number;
-  } | null {
-    if (!this.vectorManager) {
-      return null;
-    }
-    return this.vectorManager.getStats();
-  }
-
-  // ===========================================================================
   // Context Building
   // ===========================================================================
 
@@ -964,13 +856,6 @@ export class CodeGraph {
     query: string,
     options?: FindRelevantContextOptions
   ): Promise<Subgraph> {
-    // Update context builder with current vector manager
-    this.contextBuilder = createContextBuilder(
-      this.projectRoot,
-      this.queries,
-      this.traverser,
-      this.vectorManager
-    );
     return this.contextBuilder.findRelevantContext(query, options);
   }
 
@@ -978,7 +863,7 @@ export class CodeGraph {
    * Build context for a task
    *
    * Creates comprehensive context by:
-   * 1. Running semantic search to find entry points
+   * 1. Running FTS search to find entry points
    * 2. Expanding the graph around entry points
    * 3. Extracting code blocks for key nodes
    * 4. Formatting output for Claude
@@ -991,13 +876,6 @@ export class CodeGraph {
     input: TaskInput,
     options?: BuildContextOptions
   ): Promise<TaskContext | string> {
-    // Update context builder with current vector manager
-    this.contextBuilder = createContextBuilder(
-      this.projectRoot,
-      this.queries,
-      this.traverser,
-      this.vectorManager
-    );
     return this.contextBuilder.buildContext(input, options);
   }
 

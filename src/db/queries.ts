@@ -1290,7 +1290,6 @@ export class QueryBuilder {
     this.nodeCache.clear();
     this.db.transaction(() => {
       this.db.exec('DELETE FROM unresolved_refs');
-      this.db.exec('DELETE FROM vectors');
       this.db.exec('DELETE FROM edges');
       this.db.exec('DELETE FROM nodes');
       this.db.exec('DELETE FROM files');

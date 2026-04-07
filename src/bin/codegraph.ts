@@ -1079,69 +1079,6 @@ program
   });
 
 /**
- * codegraph visualize [path]
- */
-program
-  .command('visualize [path]')
-  .description('Open interactive graph visualization in your browser')
-  .option('-p, --port <port>', 'Port to listen on (default: auto)', parseInt)
-  .option('--no-open', 'Do not open browser automatically')
-  .action(async (pathArg: string | undefined, options: { port?: number; open?: boolean }) => {
-    const projectPath = resolveProjectPath(pathArg);
-
-    try {
-      if (!isInitialized(projectPath)) {
-        error(`CodeGraph not initialized in ${projectPath}`);
-        info('Run "codegraph init -i" first');
-        process.exit(1);
-      }
-
-      const { default: CodeGraph } = await loadCodeGraph();
-      const cg = await CodeGraph.open(projectPath);
-      const stats = cg.getStats();
-
-      console.log(chalk.bold('\n  CodeGraph Explorer\n'));
-      info(`Project: ${projectPath}`);
-      info(`Indexed: ${formatNumber(stats.nodeCount)} nodes, ${formatNumber(stats.edgeCount)} edges, ${formatNumber(stats.fileCount)} files\n`);
-
-      const { VisualizerServer } = await import('../visualizer/server');
-      const server = new VisualizerServer(cg);
-      const { url } = await server.start({ port: options.port, openBrowser: options.open !== false });
-
-      success(`Visualizer running at ${chalk.cyan(url)}`);
-      console.log(chalk.dim('  Press Ctrl+C to stop\n'));
-
-      // Open browser
-      if (options.open !== false) {
-        const openCmd = process.platform === 'darwin' ? 'open' :
-                        process.platform === 'win32' ? 'start' : 'xdg-open';
-        spawn(openCmd, [url], { detached: true, stdio: 'ignore' }).unref();
-      }
-
-      // Handle shutdown — force exit on second Ctrl+C
-      let shuttingDown = false;
-      const shutdown = () => {
-        if (shuttingDown) {
-          process.exit(1);
-        }
-        shuttingDown = true;
-        console.log(chalk.dim('\n  Shutting down...'));
-        server.stop().then(() => {
-          cg.close();
-          process.exit(0);
-        }).catch(() => process.exit(1));
-        // Force exit after 2s if graceful shutdown hangs
-        setTimeout(() => process.exit(1), 2000).unref();
-      };
-      process.on('SIGINT', shutdown);
-      process.on('SIGTERM', shutdown);
-    } catch (err) {
-      error(`Failed to start visualizer: ${err instanceof Error ? err.message : String(err)}`);
-      process.exit(1);
-    }
-  });
-
-/**
  * codegraph mark-dirty [path]
  *
  * Touches .codegraph/.dirty to signal that files have changed.

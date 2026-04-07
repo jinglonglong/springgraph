@@ -14,9 +14,8 @@
   ],
   "scripts": {
     "build": "tsc && npm run copy-assets",
-    "postinstall": "node scripts/postinstall.js",
     "preuninstall": "node dist/bin/uninstall.js",
-    "copy-assets": "node -e \"const fs=require('fs');fs.mkdirSync('dist/db',{recursive:true});fs.copyFileSync('src/db/schema.sql','dist/db/schema.sql');fs.mkdirSync('dist/extraction/wasm',{recursive:true});fs.readdirSync('src/extraction/wasm').filter(f=>f.endsWith('.wasm')).forEach(f=>fs.copyFileSync('src/extraction/wasm/'+f,'dist/extraction/wasm/'+f));fs.mkdirSync('dist/visualizer/public',{recursive:true});fs.copyFileSync('src/visualizer/public/index.html','dist/visualizer/public/index.html')\"",
+    "copy-assets": "node -e \"const fs=require('fs');fs.mkdirSync('dist/db',{recursive:true});fs.copyFileSync('src/db/schema.sql','dist/db/schema.sql');fs.mkdirSync('dist/extraction/wasm',{recursive:true});fs.readdirSync('src/extraction/wasm').filter(f=>f.endsWith('.wasm')).forEach(f=>fs.copyFileSync('src/extraction/wasm/'+f,'dist/extraction/wasm/'+f))\"",
     "dev": "tsc --watch",
     "cli": "npm run build && node dist/bin/codegraph.js",
     "test": "vitest run",
@@ -28,14 +27,12 @@
   "keywords": [
     "code-intelligence",
     "knowledge-graph",
-    "static-analysis",
-    "semantic-search"
+    "static-analysis"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "@clack/prompts": "^1.2.0",
-    "@xenova/transformers": "^2.17.0",
     "commander": "^14.0.2",
     "node-sqlite3-wasm": "^0.8.30",
     "picomatch": "^4.0.3",
@@ -50,8 +47,7 @@
     "vitest": "^2.1.9"
   },
   "optionalDependencies": {
-    "better-sqlite3": "^11.0.0",
-    "sqlite-vss": "^0.1.2"
+    "better-sqlite3": "^11.0.0"
   },
   "engines": {
     "node": ">=18.0.0 <25.0.0"

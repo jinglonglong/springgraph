@@ -1241,6 +1241,23 @@ export class TreeSitterExtractor {
         }
       }
 
+      // Python superclass list: `class Flask(Scaffold, Mixin):`
+      // argument_list contains identifier children for each parent class
+      if (child.type === 'argument_list' && node.type === 'class_definition') {
+        for (const arg of child.namedChildren) {
+          if (arg.type === 'identifier' || arg.type === 'attribute') {
+            const name = getNodeText(arg, this.source);
+            this.unresolvedReferences.push({
+              fromNodeId: classId,
+              referenceName: name,
+              referenceKind: 'extends',
+              line: arg.startPosition.row + 1,
+              column: arg.startPosition.column,
+            });
+          }
+        }
+      }
+
       // Go interface embedding: `type Querier interface { LabelQuerier; ... }`
       // constraint_elem wraps the embedded interface type identifier
       if (child.type === 'constraint_elem') {

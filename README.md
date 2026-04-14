@@ -24,6 +24,8 @@ npx @colbymchenry/codegraph
 
 <sub>Interactive installer configures Claude Code automatically</sub>
 
+![1_C_VYnhpys0UHrOuOgpgoyw](https://github.com/user-attachments/assets/f168182f-4d9a-44e0-94d7-08d018cc8a3a)
+
 </div>
 
 ---

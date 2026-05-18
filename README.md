@@ -2,7 +2,7 @@
 
 # CodeGraph
 
-### Supercharge Claude Code, Cursor & Codex with Semantic Code Intelligence
+### Supercharge Claude Code, Cursor, Codex, and OpenCode with Semantic Code Intelligence
 
 **94% fewer tool calls · 77% faster exploration · 100% local**
 

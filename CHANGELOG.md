@@ -37,6 +37,29 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   [#168](https://github.com/colbymchenry/codegraph/issues/168). Thanks to
   [@starkleek](https://github.com/starkleek) for the report and to
   [@Bortlesboat](https://github.com/Bortlesboat) for the initial PR.
+- **MCP / search**: module-qualified symbol lookups now resolve. The
+  MCP tools (`codegraph_node`, `codegraph_callees`, `codegraph_impact`,
+  …) accept `module::symbol` (Rust / C++ / Ruby), `Module.symbol`
+  (TS / JS / Python), and `module/symbol` (path-style) — multi-level
+  forms (`crate::configurator::stage_apply::run`) and Rust path
+  prefixes (`crate`, `super`, `self`) are handled. Two underlying
+  fixes:
+    - The FTS5 query builder now treats `::` as a token separator
+      instead of stripping it to nothing, so `stage_apply::run` no
+      longer collapses to the unsearchable `stage_applyrun`.
+    - `matchesSymbol` falls back to a file-path containment check when
+      `qualifiedName` doesn't carry the module hierarchy (Rust file-
+      level functions, Python free functions in a package): a `run`
+      in `src/configurator/stage_apply.rs` now matches
+      `stage_apply::run` because `stage_apply` appears as a path
+      segment.
+    - Qualified lookups that don't match the qualifier no longer fall
+      through to fuzzy text matches — `stage_apply::nonexistent_fn`
+      returns `null` instead of resolving to an unrelated `rollback`
+      in the same file.
+  Closes [#173](https://github.com/colbymchenry/codegraph/issues/173).
+  Thanks to [@joselhurtado](https://github.com/joselhurtado) for the
+  detailed reproduction.
 
 [0.7.10]: https://github.com/colbymchenry/codegraph/releases/tag/v0.7.10
 

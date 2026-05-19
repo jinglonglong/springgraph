@@ -17,6 +17,21 @@ import { WASM_FALLBACK_FIX_RECIPE } from '../db';
 const MAX_OUTPUT_LENGTH = 15000;
 
 /**
+ * Rust path roots that have no file-system equivalent — `crate` is the
+ * current crate, `super` is the parent module, `self` is the current
+ * module. Used by `matchesSymbol` to strip these before file-path
+ * matching so `crate::configurator::stage_apply::run` resolves the
+ * same as `configurator::stage_apply::run`.
+ */
+const RUST_PATH_PREFIXES = new Set(['crate', 'super', 'self']);
+
+/** Last `::` / `.` / `/`-separated segment of a qualified symbol. */
+function lastQualifierPart(symbol: string): string {
+  const parts = symbol.split(/::|[./]/).filter((p) => p.length > 0);
+  return parts[parts.length - 1] ?? symbol;
+}
+
+/**
  * Calculate the recommended number of codegraph_explore calls based on project size.
  * Larger codebases need more exploration calls to cover their surface area,
  * but smaller ones should use fewer to avoid unnecessary overhead.
@@ -1204,9 +1219,22 @@ export class ToolHandler {
    * Returns the best match and a note about alternatives if any.
    */
   /**
-   * Check if a node matches a symbol query, supporting both simple names and
-   * qualified "Parent.child" notation (e.g., "Session.request" matches a method
-   * named "request" inside a class named "Session").
+   * Check if a node matches a symbol query.
+   *
+   * Accepts simple names (`run`) and three flavors of qualifier:
+   *   - dotted     `Session.request`         (TS/JS/Python)
+   *   - colon-pair `stage_apply::run`        (Rust, C++, Ruby)
+   *   - slash      `configurator/stage_apply` (path-ish)
+   *
+   * Multi-level qualifiers compose: `crate::configurator::stage_apply::run`
+   * works. Rust path prefixes (`crate`, `super`, `self`) are stripped so
+   * the canonical `crate::module::symbol` form resolves.
+   *
+   * Resolution order, last part must always equal `node.name`:
+   *   1. Suffix-match against `qualifiedName` (handles class-scoped methods
+   *      where the extractor builds the qualified name from the AST stack)
+   *   2. File-path containment (handles file-derived modules in Rust/
+   *      Python — `stage_apply::run` matches a `run` in `stage_apply.rs`)
    */
   private matchesSymbol(node: Node, symbol: string): boolean {
     // Simple name match
@@ -1214,21 +1242,52 @@ export class ToolHandler {
     // File basename match (e.g., "product-card" matches "product-card.liquid")
     if (node.kind === 'file' && node.name.replace(/\.[^.]+$/, '') === symbol) return true;
 
-    // Qualified name match: "Parent.child" → look for "::Parent::child" in qualified_name
-    if (symbol.includes('.')) {
-      const parts = symbol.split('.');
-      const qualifiedSuffix = parts.join('::');
-      if (node.qualifiedName.includes(qualifiedSuffix)) return true;
-    }
+    // Qualified-name lookups: split on any supported separator. `\w` keeps
+    // identifier chars (incl. `_`) intact; everything else is treated as
+    // a separator we tolerate.
+    if (!/[.\/]|::/.test(symbol)) return false;
+    const parts = symbol.split(/::|[./]/).filter((p) => p.length > 0);
+    if (parts.length < 2) return false;
 
-    return false;
+    const lastPart = parts[parts.length - 1]!;
+    if (node.name !== lastPart) return false;
+
+    // Stage 1: qualified-name suffix match. The extractor joins the
+    // semantic hierarchy with `::`, so `Session.request` and
+    // `Session::request` both become `Session::request` here.
+    const colonSuffix = parts.join('::');
+    if (node.qualifiedName.includes(colonSuffix)) return true;
+
+    // Stage 2: file-path containment. Rust modules and Python packages
+    // are not in `qualifiedName` — they're encoded in the file path. So
+    // `stage_apply::run` matches a `run` in any file whose path
+    // contains a `stage_apply` segment (with or without an extension).
+    //
+    // Filter out Rust path prefixes that have no file-system equivalent.
+    const containerHints = parts.slice(0, -1).filter((p) => !RUST_PATH_PREFIXES.has(p));
+    if (containerHints.length === 0) return false;
+
+    const segments = node.filePath.split('/').filter((s) => s.length > 0);
+    return containerHints.every((hint) =>
+      segments.some((seg) => seg === hint || seg.replace(/\.[^.]+$/, '') === hint)
+    );
   }
 
   private findSymbol(cg: CodeGraph, symbol: string): { node: Node; note: string } | null {
-    // Use higher limit for qualified lookups (e.g., "Session.request") since the
-    // target may rank lower in FTS when there are many partial matches
-    const limit = symbol.includes('.') ? 50 : 10;
-    const results = cg.searchNodes(symbol, { limit });
+    // Use higher limit for qualified lookups (e.g., "Session.request",
+    // "stage_apply::run") since the target may rank lower in FTS when
+    // there are many partial matches across the qualifier parts.
+    const isQualified = /[.\/]|::/.test(symbol);
+    const limit = isQualified ? 50 : 10;
+    let results = cg.searchNodes(symbol, { limit });
+
+    // FTS strips colons as a special char, so `stage_apply::run` searches
+    // for the literal `stage_applyrun` and finds nothing. Re-search by
+    // the bare last part and let `matchesSymbol` filter by qualifier.
+    if (isQualified && results.length === 0) {
+      const tail = lastQualifierPart(symbol);
+      if (tail && tail !== symbol) results = cg.searchNodes(tail, { limit });
+    }
 
     if (results.length === 0 || !results[0]) {
       return null;
@@ -1250,7 +1309,11 @@ export class ToolHandler {
       return { node: picked, note };
     }
 
-    // No exact match, use best fuzzy match
+    // No exact match. For qualified lookups, don't silently fall back
+    // to a fuzzy result — the user typed a specific qualifier, and
+    // resolving `stage_apply::nonexistent_fn` to the unrelated
+    // `stage_apply.rs` file would be actively misleading (#173).
+    if (isQualified) return null;
     return { node: results[0]!.node, note: '' };
   }
 
@@ -1259,7 +1322,15 @@ export class ToolHandler {
    * results across all matching symbols (e.g., multiple classes with an `execute` method).
    */
   private findAllSymbols(cg: CodeGraph, symbol: string): { nodes: Node[]; note: string } {
-    const results = cg.searchNodes(symbol, { limit: 50 });
+    let results = cg.searchNodes(symbol, { limit: 50 });
+
+    // Mirror the fallback in `findSymbol` for qualified queries — FTS
+    // strips colons, so a module-qualified lookup needs a second pass
+    // by the bare last part.
+    if (results.length === 0 && /[.\/]|::/.test(symbol)) {
+      const tail = lastQualifierPart(symbol);
+      if (tail && tail !== symbol) results = cg.searchNodes(tail, { limit: 50 });
+    }
 
     if (results.length === 0) {
       return { nodes: [], note: '' };

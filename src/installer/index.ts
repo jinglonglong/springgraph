@@ -21,6 +21,7 @@ import {
   resolveTargetFlag,
 } from './targets/registry';
 import type { AgentTarget, Location, WriteResult } from './targets/types';
+import { getGlyphs } from '../ui/glyphs';
 
 // Backwards-compat: keep these named exports — downstream code may
 // import them. The shim in `config-writer.ts` continues to re-export
@@ -331,7 +332,7 @@ async function initializeLocalProject(clack: typeof import('@clack/prompts')): P
 
   // Index the project with shimmer progress (worker thread for smooth animation)
   const { createShimmerProgress } = await import('../ui/shimmer-progress');
-  process.stdout.write(`\x1b[2m│\x1b[0m\n`);
+  process.stdout.write(`\x1b[2m${getGlyphs().rail}\x1b[0m\n`);
   const progress = createShimmerProgress();
 
   const result = await cg.indexAll({

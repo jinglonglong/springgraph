@@ -23,6 +23,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { getCodeGraphDir, isInitialized } from '../directory';
 import { createShimmerProgress } from '../ui/shimmer-progress';
+import { getGlyphs } from '../ui/glyphs';
 
 import { buildNode25BlockBanner } from './node-version-check';
 
@@ -32,7 +33,7 @@ async function loadCodeGraph(): Promise<typeof import('../index')> {
     return await import('../index');
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('\x1b[31m✗\x1b[0m Failed to load CodeGraph modules.');
+    console.error(`\x1b[31m${getGlyphs().err}\x1b[0m Failed to load CodeGraph modules.`);
     console.error(`\n  Node: ${process.version}  Platform: ${process.platform} ${process.arch}`);
     console.error(`\n  Error: ${msg}`);
     console.error('\n  Try reinstalling with: npm install -g @colbymchenry/codegraph\n');
@@ -212,7 +213,7 @@ function createVerboseProgress(): (progress: { phase: string; current: number; t
       // Log every 5% to keep output manageable
       if (pct >= lastPct + 5 || progress.current === progress.total) {
         lastPct = pct;
-        console.log(`[${elapsed}s]   ${progress.current}/${progress.total} (${pct}%)${progress.currentFile ? ` — ${progress.currentFile}` : ''}`);
+        console.log(`[${elapsed}s]   ${progress.current}/${progress.total} (${pct}%)${progress.currentFile ? ` ${getGlyphs().dash} ${progress.currentFile}` : ''}`);
       }
     } else if (progress.current > 0) {
       // Scanning phase (no total yet) — log periodically
@@ -227,28 +228,28 @@ function createVerboseProgress(): (progress: { phase: string; current: number; t
  * Print success message
  */
 function success(message: string): void {
-  console.log(chalk.green('✓') + ' ' + message);
+  console.log(chalk.green(getGlyphs().ok) + ' ' + message);
 }
 
 /**
  * Print error message
  */
 function error(message: string): void {
-  console.error(chalk.red('✗') + ' ' + message);
+  console.error(chalk.red(getGlyphs().err) + ' ' + message);
 }
 
 /**
  * Print info message
  */
 function info(message: string): void {
-  console.log(chalk.blue('ℹ') + ' ' + message);
+  console.log(chalk.blue(getGlyphs().info) + ' ' + message);
 }
 
 /**
  * Print warning message
  */
 function warn(message: string): void {
-  console.log(chalk.yellow('⚠') + ' ' + message);
+  console.log(chalk.yellow(getGlyphs().warn) + ' ' + message);
 }
 
 type IndexResult = {
@@ -281,7 +282,7 @@ function printIndexResult(clack: typeof import('@clack/prompts'), result: IndexR
   // continuing to the misleading "No files found" branch or throwing.
   if (!result.success && !hasErrors && result.filesIndexed === 0) {
     const generic = result.errors.find((e) => e.severity === 'error');
-    clack.log.error(generic?.message ?? 'Indexing failed — no further details available');
+    clack.log.error(generic?.message ?? `Indexing failed ${getGlyphs().dash} no further details available`);
     return;
   }
 
@@ -293,7 +294,7 @@ function printIndexResult(clack: typeof import('@clack/prompts'), result: IndexR
     }
     clack.log.info(`${formatNumber(result.nodesCreated)} nodes, ${formatNumber(result.edgesCreated)} edges in ${formatDuration(result.durationMs)}`);
   } else if (hasErrors) {
-    clack.log.error(`Indexing failed — all ${formatNumber(result.filesErrored)} files had errors`);
+    clack.log.error(`Indexing failed ${getGlyphs().dash} all ${formatNumber(result.filesErrored)} files had errors`);
   } else {
     clack.log.warn('No files found to index');
   }
@@ -327,7 +328,7 @@ function printIndexResult(clack: typeof import('@clack/prompts'), result: IndexR
     }
 
     if (result.filesIndexed > 0) {
-      clack.log.info('The index is fully usable — only the failed files are missing.');
+      clack.log.info(`The index is fully usable ${getGlyphs().dash} only the failed files are missing.`);
     }
   } else if (projectPath) {
     const logPath = path.join(projectPath, '.codegraph', 'errors.log');
@@ -365,7 +366,7 @@ function writeErrorLog(projectPath: string, errors: Array<{ message: string; fil
   }
 
   const lines: string[] = [
-    `CodeGraph Error Log — ${new Date().toISOString()}`,
+    `CodeGraph Error Log - ${new Date().toISOString()}`,
     `${errorsByFile.size} files with errors`,
     '',
   ];
@@ -445,7 +446,7 @@ program
             verbose: true,
           });
         } else {
-          process.stdout.write(`${colors.dim}│${colors.reset}\n`);
+          process.stdout.write(`${colors.dim}${getGlyphs().rail}${colors.reset}\n`);
           const progress = createShimmerProgress();
           result = await cg.indexAll({
             onProgress: progress.onProgress,
@@ -488,7 +489,7 @@ program
         const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
         const answer = await new Promise<string>((resolve) => {
           rl.question(
-            chalk.yellow('⚠ This will permanently delete all CodeGraph data. Continue? (y/N) '),
+            chalk.yellow(`${getGlyphs().warn} This will permanently delete all CodeGraph data. Continue? (y/N) `),
             resolve
           );
         });
@@ -558,7 +559,7 @@ program
           verbose: true,
         });
       } else {
-        process.stdout.write(`${colors.dim}│${colors.reset}\n`);
+        process.stdout.write(`${colors.dim}${getGlyphs().rail}${colors.reset}\n`);
         const progress = createShimmerProgress();
         result = await cg.indexAll({
           onProgress: progress.onProgress,
@@ -610,7 +611,7 @@ program
       const clack = await importESM('@clack/prompts');
       clack.intro('Syncing CodeGraph');
 
-      process.stdout.write(`${colors.dim}│${colors.reset}\n`);
+      process.stdout.write(`${colors.dim}${getGlyphs().rail}${colors.reset}\n`);
       const progress = createShimmerProgress();
 
       const result = await cg.sync({
@@ -629,7 +630,7 @@ program
         if (result.filesAdded > 0) details.push(`Added: ${result.filesAdded}`);
         if (result.filesModified > 0) details.push(`Modified: ${result.filesModified}`);
         if (result.filesRemoved > 0) details.push(`Removed: ${result.filesRemoved}`);
-        clack.log.info(`${details.join(', ')} — ${formatNumber(result.nodesUpdated)} nodes in ${formatDuration(result.durationMs)}`);
+        clack.log.info(`${details.join(', ')} ${getGlyphs().dash} ${formatNumber(result.nodesUpdated)} nodes in ${formatDuration(result.durationMs)}`);
       }
 
       clack.outro('Done');
@@ -711,7 +712,7 @@ program
       // when the native build fails.
       const backendLabel = backend === 'native'
         ? chalk.green('native')
-        : chalk.yellow('wasm — slower fallback; run `npm rebuild better-sqlite3`');
+        : chalk.yellow(`wasm ${getGlyphs().dash} slower fallback; run \`npm rebuild better-sqlite3\``);
       console.log(`  Backend:   ${backendLabel}`);
       console.log();
 
@@ -1000,8 +1001,9 @@ function printFileTree(
   const renderNode = (node: TreeNode, prefix: string, isLast: boolean, depth: number): void => {
     if (maxDepth !== undefined && depth > maxDepth) return;
 
-    const connector = isLast ? '└── ' : '├── ';
-    const childPrefix = isLast ? '    ' : '│   ';
+    const glyphs = getGlyphs();
+    const connector = isLast ? glyphs.treeLast : glyphs.treeBranch;
+    const childPrefix = isLast ? '    ' : glyphs.treePipe;
 
     if (node.name) {
       let line = prefix + connector + node.name;
@@ -1097,7 +1099,7 @@ program
         // Default: show info about MCP mode.
         // Use stderr so stdout stays clean for any piped/stdio usage.
         console.error(chalk.bold('\nCodeGraph MCP Server\n'));
-        console.error(chalk.blue('ℹ') + ' Use --mcp flag to start the MCP server');
+        console.error(chalk.blue(getGlyphs().info) + ' Use --mcp flag to start the MCP server');
         console.error('\nTo use with Claude Code, add to your MCP configuration:');
         console.error(chalk.dim(`
 {
@@ -1143,7 +1145,7 @@ program
       const lockPath = path.join(getCodeGraphDir(projectPath), 'codegraph.lock');
 
       if (!fs.existsSync(lockPath)) {
-        info('No lock file found — nothing to do');
+        info(`No lock file found ${getGlyphs().dash} nothing to do`);
         return;
       }
 

@@ -22,6 +22,21 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   [@sashanclrp](https://github.com/sashanclrp) for the original report and
   detailed reproduction, and [@sgrimm](https://github.com/sgrimm) for the
   decisive wire capture that isolated the actual root cause.
+- **CLI**: terminal output no longer mojibakes on Windows PowerShell /
+  cmd.exe during `codegraph index` and `codegraph sync`. The shimmer
+  progress renderer writes from a worker thread via `fs.writeSync(1, …)`
+  to keep the animation smooth while the main thread is busy in SQLite,
+  which bypasses Node's TTY-aware UTF-8→codepage conversion — so glyphs
+  like `│ ◆ —` were emitted as raw UTF-8 bytes and reinterpreted as the
+  console's OEM codepage (CP437, CP936, …), producing strings like
+  `鋍?[0m 鉒?[0m Scanning files 鈥?N found`. CodeGraph now picks an ASCII
+  glyph set on Windows by default (`| * -` instead of `│ ◆ —`); set
+  `CODEGRAPH_UNICODE=1` to opt back into the Unicode glyphs (e.g. on
+  pwsh 7 with UTF-8 codepage), or `CODEGRAPH_ASCII=1` on any platform to
+  force ASCII (useful for log collectors / non-TTY pipelines). Closes
+  [#168](https://github.com/colbymchenry/codegraph/issues/168). Thanks to
+  [@starkleek](https://github.com/starkleek) for the report and to
+  [@Bortlesboat](https://github.com/Bortlesboat) for the initial PR.
 
 [0.7.10]: https://github.com/colbymchenry/codegraph/releases/tag/v0.7.10
 

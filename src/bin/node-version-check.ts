@@ -13,9 +13,12 @@
  * unsupported Node.js major version (currently 25+). Pinned via unit
  * test so the recovery commands and override instructions can't be
  * silently stripped by future edits.
+ *
+ * Uses ASCII glyphs to stay readable on Windows OEM-codepage consoles
+ * (see ../ui/glyphs.ts for the rationale).
  */
 export function buildNode25BlockBanner(nodeVersion: string): string {
-  const sep = '─'.repeat(72);
+  const sep = '-'.repeat(72);
   return [
     sep,
     `[CodeGraph] Unsupported Node.js version: ${nodeVersion}`,
@@ -29,7 +32,7 @@ export function buildNode25BlockBanner(nodeVersion: string): string {
     '  nvm install 22 && nvm use 22                          # nvm',
     '  brew install node@22 && brew link --overwrite --force node@22  # Homebrew',
     '',
-    'To override (NOT recommended — you will likely OOM):',
+    'To override (NOT recommended - you will likely OOM):',
     '  CODEGRAPH_ALLOW_UNSAFE_NODE=1 codegraph ...',
     sep,
   ].join('\n');

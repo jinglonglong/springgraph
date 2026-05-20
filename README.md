@@ -499,7 +499,7 @@ MIT
 
 <div align="center">
 
-**Made for the Claude Code community**
+**Made for AI coding agents — Claude Code, Cursor, Codex CLI, and opencode**
 
 [Report Bug](https://github.com/colbymchenry/codegraph/issues) · [Request Feature](https://github.com/colbymchenry/codegraph/issues)
 

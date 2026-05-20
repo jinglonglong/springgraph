@@ -1,6 +1,6 @@
 ---
-name: audit
-description: Benchmark CodeGraph retrieval quality on a real codebase by comparing agent behavior with vs without CodeGraph. Use when the user runs /audit or asks to test, benchmark, audit, or validate a codegraph version (the local dev build or a published npm version) against a language's repo.
+name: agent-eval
+description: Benchmark CodeGraph retrieval quality on a real codebase by comparing agent behavior with vs without CodeGraph. Use when the user runs /agent-eval or asks to test, benchmark, audit, or validate a codegraph version (the local dev build or a published npm version) against a language's repo.
 ---
 
 # CodeGraph Quality Audit
@@ -32,7 +32,7 @@ user type a specific version (e.g. `0.7.10`). Map the answer to a VERSION token:
 - "Latest published" → `latest`
 - a typed version → that string (e.g. `0.7.10`)
 
-**Step 2 — language.** Read `.claude/skills/audit/corpus.json`. Ask with
+**Step 2 — language.** Read `.claude/skills/agent-eval/corpus.json`. Ask with
 `AskUserQuestion` which language to test, listing the languages that have entries.
 
 **Step 3 — repo.** From the chosen language's entries, ask which repo. Label each

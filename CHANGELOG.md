@@ -7,6 +7,19 @@ a [GitHub Release](https://github.com/colbymchenry/codegraph/releases) tagged
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-05-21
+
+### Fixed
+- **Standalone installers** (`curl … | sh`, `irm … | iex`): the bundled launcher
+  failed with `exec: …/node: not found` because it didn't resolve the symlink the
+  installer puts on your PATH. Installing on a machine with **no Node** now works.
+- **npm**: `@colbymchenry/codegraph-linux-x64` is now published — the 0.9.0
+  release silently shipped 6 of 7 packages, so `npm i -g` on linux-x64 couldn't
+  find its bundle. The release pipeline now verifies every package reached the
+  registry (and is idempotent), so a release can't pass green-but-broken again.
+
+[0.9.1]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.1
+
 ## [0.9.0] - 2026-05-21
 
 ### 🎉 Self-contained: CodeGraph bundles its own runtime — install anywhere, on any Node (or none)

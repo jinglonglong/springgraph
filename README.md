@@ -471,30 +471,10 @@ The `.codegraph/config.json` file controls indexing:
 
 **Indexing is slow** — Check that `node_modules` and other large directories are excluded. Use `--quiet` to reduce output overhead.
 
-**Indexing is slow, or MCP hits `database is locked`** — both trace to the SQLite backend. `codegraph` picks the best available, in order: native `better-sqlite3` (fastest; an `optionalDependencies` native module), then Node's built-in `node:sqlite` (Node ≥ 22.5), then a bundled WASM build. Run `codegraph status` and read the **`Backend:`** and **`Journal:`** lines:
+**MCP hits `database is locked`** — current builds shouldn't: CodeGraph bundles its own Node runtime and uses Node's built-in `node:sqlite` in WAL mode, where concurrent reads never block on a writer. If you still see it:
 
-- `Backend: native` or `node:sqlite` with `Journal: wal` — fast path with lock-free concurrent reads; nothing to do.
-- `Backend: wasm` — the native module didn't load *and* `node:sqlite` is unavailable (Node < 22.5). WASM is 5-10x slower and has no WAL, so heavy concurrent use can briefly hit `database is locked`. The simplest fix is Node ≥ 22.5 (you get `node:sqlite` automatically); otherwise restore the native backend:
-
-  ```bash
-  # macOS
-  xcode-select --install                                  # installs the C compiler
-
-  # Linux (Debian / Ubuntu)
-  sudo apt install build-essential python3 make
-
-  # Linux (RHEL / Fedora)
-  sudo yum groupinstall "Development Tools"
-
-  # Then rebuild on any platform:
-  npm rebuild better-sqlite3
-
-  # Or force-include as a hard dep:
-  npm install better-sqlite3 --save
-  ```
-
-  After the fix, `codegraph status` should show `Backend: native`.
-- `Journal:` shows anything other than `wal` on a `native` / `node:sqlite` backend — WAL couldn't be enabled on this filesystem (common on network shares and WSL2 `/mnt`), so reads can block on writes. Move the project (with its `.codegraph/` folder) onto a local disk.
+- **You're on an old (pre-0.9) install.** Reinstall to get the bundled runtime — `curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh` (macOS/Linux), `irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | iex` (Windows), or `npm i -g @colbymchenry/codegraph@latest`.
+- **`codegraph status` shows `Journal:` other than `wal`** — WAL couldn't be enabled on this filesystem (common on network shares and WSL2 `/mnt`), so reads can block on writes. Move the project (with its `.codegraph/` folder) onto a local disk.
 
 **MCP server not connecting** — Ensure the project is initialized/indexed, verify the path in your MCP config, and check that `codegraph serve --mcp` works from the command line.
 

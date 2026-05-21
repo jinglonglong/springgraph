@@ -7,6 +7,28 @@ a [GitHub Release](https://github.com/colbymchenry/codegraph/releases) tagged
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Framework support: Drupal 8/9/10/11** — CodeGraph now detects Drupal
+  projects (via a `drupal/*` dependency in `composer.json`) and adds three
+  levels of intelligence:
+  - **Route extraction**: `*.routing.yml` files emit a `route` node per route,
+    linked by a `references` edge to the `_controller`, `_form`, or
+    entity-handler class/method, so querying a controller method surfaces the
+    URL route that binds it.
+  - **Hook detection**: hook implementations in `.module`, `.install`, `.theme`,
+    and `.inc` files are detected via docblock (`Implements hook_X()`) with a
+    module-name-prefix fallback. Each emits a `references` edge to the canonical
+    `hook_X` name so `codegraph_callers("hook_form_alter")` returns every
+    implementation across modules.
+  - **Resolution**: `_controller`/`_form` FQCNs resolve to their PHP
+    class/method nodes.
+  New `yaml`/`twig` languages are tracked at the file level, the Drupal PHP
+  extensions (`.module`/`.install`/`.theme`/`.inc`) are indexed with the PHP
+  grammar, and `web/core`, `web/modules/contrib`, `web/themes/contrib` are
+  excluded by default. Resolves [#268](https://github.com/colbymchenry/codegraph/issues/268).
+
 ## [0.9.1] - 2026-05-21
 
 ### Fixed

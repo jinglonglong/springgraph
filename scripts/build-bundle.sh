@@ -78,7 +78,17 @@ else
   cp "$NODE_BIN" "$STAGE/node"
   cat > "$STAGE/bin/codegraph" <<'LAUNCH'
 #!/bin/sh
-DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# Resolve symlinks (e.g. the ~/.local/bin/codegraph link install.sh creates) so
+# we find the real bundle dir, not the symlink's location.
+SELF="$0"
+while [ -L "$SELF" ]; do
+  target="$(readlink "$SELF")"
+  case "$target" in
+    /*) SELF="$target" ;;
+    *) SELF="$(dirname "$SELF")/$target" ;;
+  esac
+done
+DIR="$(cd "$(dirname "$SELF")/.." && pwd)"
 exec "$DIR/node" "$DIR/lib/dist/bin/codegraph.js" "$@"
 LAUNCH
   chmod +x "$STAGE/bin/codegraph"

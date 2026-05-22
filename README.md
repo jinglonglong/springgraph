@@ -10,15 +10,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Self-contained](https://img.shields.io/badge/Node.js-bundled%20%C2%B7%20none%20required-brightgreen.svg)](https://nodejs.org/)
 
-[![Windows](https://img.shields.io/badge/Windows-supported-blue.svg)](#)
-[![macOS](https://img.shields.io/badge/macOS-supported-blue.svg)](#)
-[![Linux](https://img.shields.io/badge/Linux-supported-blue.svg)](#)
+[![Windows](https://img.shields.io/badge/Windows-supported-blue.svg)](#supported-platforms)
+[![macOS](https://img.shields.io/badge/macOS-supported-blue.svg)](#supported-platforms)
+[![Linux](https://img.shields.io/badge/Linux-supported-blue.svg)](#supported-platforms)
 
-[![Claude Code](https://img.shields.io/badge/Claude_Code-supported-blueviolet.svg)](#)
-[![Cursor](https://img.shields.io/badge/Cursor-supported-blueviolet.svg)](#)
-[![Codex CLI](https://img.shields.io/badge/Codex_CLI-supported-blueviolet.svg)](#)
-[![opencode](https://img.shields.io/badge/opencode-supported-blueviolet.svg)](#)
-[![Hermes Agent](https://img.shields.io/badge/Hermes_Agent-supported-blueviolet.svg)](#)
+[![Claude Code](https://img.shields.io/badge/Claude_Code-supported-blueviolet.svg)](#supported-agents)
+[![Cursor](https://img.shields.io/badge/Cursor-supported-blueviolet.svg)](#supported-agents)
+[![Codex CLI](https://img.shields.io/badge/Codex_CLI-supported-blueviolet.svg)](#supported-agents)
+[![opencode](https://img.shields.io/badge/opencode-supported-blueviolet.svg)](#supported-agents)
+[![Hermes Agent](https://img.shields.io/badge/Hermes_Agent-supported-blueviolet.svg)](#supported-agents)
 
 </div>
 
@@ -446,6 +446,30 @@ What that means in practice:
 > Committed files that aren't gitignored *are* indexed, even under `vendor/` or a
 > committed `dist/`. If you commit a dependency or build directory you don't want
 > in the graph, add it to `.gitignore`.
+
+## Supported Platforms
+
+Every release ships a self-contained build (bundled Node runtime — nothing to
+compile) for all three desktop OSes, on both Intel/AMD (x64) and ARM (arm64):
+
+| Platform | Architectures | Install |
+|----------|---------------|---------|
+| Windows | x64, arm64 | PowerShell installer or npm |
+| macOS | x64, arm64 | shell installer or npm |
+| Linux | x64, arm64 | shell installer or npm |
+
+See [Get Started](#get-started) for the one-line install commands.
+
+## Supported Agents
+
+The interactive installer auto-detects and configures each of these — wiring up
+the MCP server and writing its instructions file:
+
+- **Claude Code**
+- **Cursor**
+- **Codex CLI**
+- **opencode**
+- **Hermes Agent**
 
 ## Supported Languages
 

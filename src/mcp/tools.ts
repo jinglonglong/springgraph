@@ -15,7 +15,7 @@ import {
   readFileSync,
   writeSync,
 } from 'fs';
-import { clamp, validatePathWithinRoot } from '../utils';
+import { clamp, validatePathWithinRoot, validateProjectPath } from '../utils';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -577,6 +577,18 @@ export class ToolHandler {
     // Check cache first (using original path as key)
     if (this.projectCache.has(projectPath)) {
       return this.projectCache.get(projectPath)!;
+    }
+
+    // Reject sensitive system directories before opening. Only validate a
+    // path that actually exists — a nested or not-yet-created sub-path of a
+    // real project must still be allowed to resolve UP to its .codegraph/
+    // root below (issue #238), so we don't run the existence-checking
+    // validator on paths that are meant to walk up.
+    if (existsSync(projectPath)) {
+      const pathError = validateProjectPath(projectPath);
+      if (pathError) {
+        throw new Error(pathError);
+      }
     }
 
     // Walk up parent directories to find nearest .codegraph/

@@ -401,6 +401,7 @@ When running as an MCP server, CodeGraph exposes these tools to Claude Code:
 | `codegraph_callees` | Find what a function calls |
 | `codegraph_impact` | Analyze what code is affected by changing a symbol |
 | `codegraph_node` | Get details about a specific symbol (optionally with source code) |
+| `codegraph_explore` | Return source for several related symbols grouped by file, plus a relationship map, in one call |
 | `codegraph_files` | Get indexed file structure (faster than filesystem scanning) |
 | `codegraph_status` | Check index health and statistics |
 

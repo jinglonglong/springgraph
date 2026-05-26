@@ -232,6 +232,8 @@ export function extractImportMappings(
     mappings.push(...extractPythonImports(content));
   } else if (language === 'go') {
     mappings.push(...extractGoImports(content));
+  } else if (language === 'java' || language === 'kotlin') {
+    mappings.push(...extractJavaImports(content));
   } else if (language === 'php') {
     mappings.push(...extractPHPImports(content));
   }
@@ -442,6 +444,49 @@ function extractGoImports(content: string): ImportMapping[] {
 }
 
 /**
+ * Extract Java / Kotlin import mappings.
+ *
+ * Java/Kotlin imports carry the full qualified name of the imported
+ * symbol — `import com.example.dao.converter.FooConverter;` — which is
+ * exactly the disambiguation signal we need when two packages both
+ * declare a `FooConverter`. Pre-#314 the resolver had no Java branch
+ * here at all, so this mapping was empty and cross-module name
+ * collisions were resolved by file-path proximity (often wrongly).
+ *
+ * `import static com.example.Foo.bar;` is parsed as a local-name `bar`
+ * pointing at FQN `com.example.Foo.bar` so static-method call sites
+ * (`bar(...)`) can resolve through the same import lookup.
+ */
+function extractJavaImports(content: string): ImportMapping[] {
+  const mappings: ImportMapping[] = [];
+  // Strip line and block comments so `// import foo;` doesn't false-match.
+  const stripped = content
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+  // `import [static] <fqn>[.*];`
+  const re = /^\s*import\s+(static\s+)?([\w.]+(?:\.\*)?)\s*;/gm;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(stripped)) !== null) {
+    const fqn = match[2]!;
+    // `import com.example.*;` — wildcard. We can't materialize a single
+    // local name; skip and let name-matching handle members reachable
+    // through the wildcard. (Future enhancement: enumerate package files.)
+    if (fqn.endsWith('.*')) continue;
+    const parts = fqn.split('.');
+    const localName = parts[parts.length - 1];
+    if (!localName) continue;
+    mappings.push({
+      localName,
+      exportedName: localName,
+      source: fqn,
+      isDefault: false,
+      isNamespace: false,
+    });
+  }
+  return mappings;
+}
+
+/**
  * Extract PHP import mappings (use statements)
  */
 function extractPHPImports(content: string): ImportMapping[] {
@@ -619,6 +664,17 @@ export function resolveViaImport(
     if (goResult) return goResult;
   }
 
+  // Java / Kotlin: imports are FQNs (`import com.example.Foo;`) — no
+  // resolvable file path the JS/TS-style chain below could follow. Look
+  // up the symbol by name and filter to the candidate whose file path
+  // matches the imported FQN. This is the disambiguation signal that
+  // breaks the same-name class collision the path-proximity matcher
+  // can't resolve (issue #314).
+  if (ref.language === 'java' || ref.language === 'kotlin') {
+    const javaResult = resolveJavaImportedReference(ref, imports, context);
+    if (javaResult) return javaResult;
+  }
+
   // Check if the reference name matches any import
   for (const imp of imports) {
     if (imp.localName === ref.referenceName || ref.referenceName.startsWith(imp.localName + '.')) {
@@ -656,6 +712,83 @@ export function resolveViaImport(
     }
   }
 
+  return null;
+}
+
+/**
+ * Resolve a Java/Kotlin reference whose receiver is the simple name of
+ * an imported FQN: `Foo.bar(...)` where `import com.example.Foo;`. The
+ * imported FQN converts to a file-path suffix (`com/example/Foo.java`
+ * or `.kt`) which uniquely identifies the right symbol when multiple
+ * classes share the same simple name.
+ *
+ * Also handles bare references to the imported class itself
+ * (`new Foo()` extraction emits `Foo` as a `references`/`instantiates`
+ * ref) and `import static <Foo>.bar` style imports of a single member.
+ */
+function resolveJavaImportedReference(
+  ref: UnresolvedRef,
+  imports: ImportMapping[],
+  context: ResolutionContext
+): ResolvedRef | null {
+  if (imports.length === 0) return null;
+
+  const ext = ref.language === 'kotlin' ? '.kt' : '.java';
+
+  for (const imp of imports) {
+    const matchesBare = imp.localName === ref.referenceName;
+    const matchesQualified = ref.referenceName.startsWith(imp.localName + '.');
+    if (!matchesBare && !matchesQualified) continue;
+
+    // Convert FQN to a file-path suffix. `com.example.Foo` ->
+    // `com/example/Foo.java` (or `.kt`). The actual file may live
+    // under any source root (`src/main/java/`, `src/`, etc.), so match
+    // by suffix rather than exact path.
+    const fqnPath = imp.source.replace(/\./g, '/') + ext;
+
+    // Which symbol name to look up: the class itself, or a member.
+    const memberName = matchesBare
+      ? imp.localName
+      : ref.referenceName.substring(imp.localName.length + 1);
+
+    const candidates = context.getNodesByName(memberName);
+    for (const node of candidates) {
+      if (node.language !== ref.language) continue;
+      const fp = node.filePath.replace(/\\/g, '/');
+      if (fp.endsWith(fqnPath) || fp.endsWith('/' + fqnPath)) {
+        return {
+          original: ref,
+          targetNodeId: node.id,
+          confidence: 0.9,
+          resolvedBy: 'import',
+        };
+      }
+    }
+
+    // `import static com.example.Foo.bar;` — the FQN's tail is the
+    // member name, the part before is the owner class. Look up the
+    // member named `<imp.localName>` (e.g. `bar`) and prefer the
+    // candidate whose file matches the parent FQN's path.
+    if (matchesBare) {
+      const dot = imp.source.lastIndexOf('.');
+      if (dot > 0) {
+        const ownerFqn = imp.source.substring(0, dot);
+        const ownerPath = ownerFqn.replace(/\./g, '/') + ext;
+        for (const node of candidates) {
+          if (node.language !== ref.language) continue;
+          const fp = node.filePath.replace(/\\/g, '/');
+          if (fp.endsWith(ownerPath) || fp.endsWith('/' + ownerPath)) {
+            return {
+              original: ref,
+              targetNodeId: node.id,
+              confidence: 0.9,
+              resolvedBy: 'import',
+            };
+          }
+        }
+      }
+    }
+  }
   return null;
 }
 

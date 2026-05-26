@@ -802,6 +802,64 @@ export async function finaliseRecording(recorder: RecorderHandle) {
       expect(handleStop!.kind).toBe('method');
     });
 
+    it('Java import disambiguates same-name classes across modules (#314)', async () => {
+      // Pre-#314 the import resolver had no Java branch at all, so a
+      // multi-module Maven repo where `dao/converter/FooConverter` and
+      // `service/converter/FooConverter` both export a `convert` method
+      // resolved by file-path proximity — picking whichever class was
+      // closer to the caller, which is wrong any time the caller lives
+      // in an equidistant cross-cutting module.
+      const daoDir = path.join(tempDir, 'dao/src/main/java/com/example/dao/converter');
+      const serviceDir = path.join(tempDir, 'service/src/main/java/com/example/service/converter');
+      const webDir = path.join(tempDir, 'web/src/main/java/com/example/web');
+      fs.mkdirSync(daoDir, { recursive: true });
+      fs.mkdirSync(serviceDir, { recursive: true });
+      fs.mkdirSync(webDir, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(daoDir, 'FooConverter.java'),
+        `package com.example.dao.converter;
+public class FooConverter { public String convert(String x) { return "dao:" + x; } }
+`
+      );
+      fs.writeFileSync(
+        path.join(serviceDir, 'FooConverter.java'),
+        `package com.example.service.converter;
+public class FooConverter { public String convert(String x) { return "svc:" + x; } }
+`
+      );
+      // The caller imports the SERVICE version — even though dao is
+      // alphabetically/lexically first in the candidate list, the
+      // import must trump that order.
+      fs.writeFileSync(
+        path.join(webDir, 'Handler.java'),
+        `package com.example.web;
+
+import com.example.service.converter.FooConverter;
+
+public class Handler {
+  private FooConverter fooConverter;
+  public String use() { return fooConverter.convert("input"); }
+}
+`
+      );
+
+      cg = await CodeGraph.init(tempDir, { index: true });
+
+      const use = cg
+        .getNodesByKind('method')
+        .find((n) => n.qualifiedName === 'Handler::use');
+      expect(use).toBeDefined();
+      const calls = cg.getOutgoingEdges(use!.id).filter((e) => e.kind === 'calls');
+      expect(calls.length).toBeGreaterThanOrEqual(1);
+
+      const target = cg.getNode(calls[0]!.target);
+      expect(target?.name).toBe('convert');
+      expect(target?.filePath.replace(/\\/g, '/')).toBe(
+        'service/src/main/java/com/example/service/converter/FooConverter.java'
+      );
+    });
+
     it('C# extracts references from method/property/field types (#381)', async () => {
       // Pre-#381, every C# project produced ZERO `references` edges:
       // csharp.ts was missing returnField, and the type-leaf walker

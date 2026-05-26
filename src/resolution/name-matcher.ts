@@ -153,6 +153,15 @@ function resolveMethodOnType(
   context: ResolutionContext,
   confidence: number,
   resolvedBy: ResolvedRef['resolvedBy'],
+  /**
+   * Optional FQN that identifies WHICH class declaration `typeName`
+   * refers to in the caller's file. When multiple candidates share
+   * the same qualifiedName (`FooConverter::convert` in both
+   * `dao/converter/` and `service/converter/`), the FQN's
+   * file-path-suffix picks the right one — the disambiguation
+   * signal Java imports carry but the call site doesn't (#314).
+   */
+  preferredFqn?: string,
 ): ResolvedRef | null {
   // Look up methods by name and match by qualifiedName ending in
   // `<typeName>::<methodName>`. This works whether the method is defined
@@ -161,21 +170,40 @@ function resolveMethodOnType(
   // The previous same-file approach missed the latter — the typical C++ layout.
   const methodCandidates = context.getNodesByName(methodName);
   const want = `${typeName}::${methodName}`;
+  const matches: Node[] = [];
   for (const m of methodCandidates) {
     if (m.kind !== 'method') continue;
     if (m.language !== ref.language) continue;
     const qn = m.qualifiedName;
     if (qn === want || qn.endsWith(`::${want}`)) {
+      matches.push(m);
+    }
+  }
+  if (matches.length === 0) return null;
+
+  if (matches.length > 1 && preferredFqn) {
+    const ext = ref.language === 'kotlin' ? '.kt' : '.java';
+    const fqnPath = preferredFqn.replace(/\./g, '/') + ext;
+    const chosen = matches.find((m) => {
+      const fp = m.filePath.replace(/\\/g, '/');
+      return fp.endsWith(fqnPath) || fp.endsWith('/' + fqnPath);
+    });
+    if (chosen) {
       return {
         original: ref,
-        targetNodeId: m.id,
+        targetNodeId: chosen.id,
         confidence,
         resolvedBy,
       };
     }
   }
 
-  return null;
+  return {
+    original: ref,
+    targetNodeId: matches[0]!.id,
+    confidence,
+    resolvedBy,
+  };
 }
 
 // C++ keywords/control-flow tokens that can appear right before a receiver
@@ -365,6 +393,11 @@ export function matchMethodCall(
   if ((ref.language === 'java' || ref.language === 'kotlin') && dotMatch) {
     const inferredType = inferJavaFieldReceiverType(objectOrClass!, ref, context);
     if (inferredType) {
+      // When two classes share the same simple name, the caller file's
+      // import is the only signal that names WHICH one — pass the
+      // imported FQN so resolveMethodOnType can disambiguate (#314).
+      const imports = context.getImportMappings(ref.filePath, ref.language);
+      const importedFqn = imports.find((i) => i.localName === inferredType)?.source;
       const typedMatch = resolveMethodOnType(
         inferredType,
         methodName!,
@@ -372,6 +405,7 @@ export function matchMethodCall(
         context,
         0.9,
         'instance-method',
+        importedFqn,
       );
       if (typedMatch) {
         return typedMatch;

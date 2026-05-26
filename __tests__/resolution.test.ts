@@ -742,6 +742,59 @@ func UseAliased() {
       expect(target?.filePath.replace(/\\/g, '/')).toBe('pkgb/lib.go');
     });
 
+    it('C# extracts references from method/property/field types (#381)', async () => {
+      // Pre-#381, every C# project produced ZERO `references` edges:
+      // csharp.ts was missing returnField, and the type-leaf walker
+      // only recognized TS/Java's `type_identifier` nodes — C# uses
+      // `identifier`/`predefined_type`/`qualified_name`/`generic_name`.
+      const srcDir = path.join(tempDir, 'src');
+      fs.mkdirSync(srcDir, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(srcDir, 'Dtos.cs'),
+        `namespace MyApp;
+public class SessionInfoDto { public string Id { get; set; } = ""; }
+public class UserDto { public string Name { get; set; } = ""; }
+`
+      );
+      fs.writeFileSync(
+        path.join(srcDir, 'Service.cs'),
+        `using System.Threading.Tasks;
+namespace MyApp;
+public class DataExporter
+{
+  public SessionInfoDto Build(UserDto user, SessionInfoDto session) { return session; }
+  public Task<SessionInfoDto> BuildAsync(UserDto user) { return Task.FromResult(new SessionInfoDto()); }
+  public SessionInfoDto Latest { get; set; } = new();
+  private UserDto _cached;
+}
+`
+      );
+
+      cg = await CodeGraph.init(tempDir, { index: true });
+
+      const sessionDto = cg
+        .getNodesByKind('class')
+        .find((n) => n.name === 'SessionInfoDto');
+      const userDto = cg
+        .getNodesByKind('class')
+        .find((n) => n.name === 'UserDto');
+      expect(sessionDto).toBeDefined();
+      expect(userDto).toBeDefined();
+
+      const sessionIncoming = cg
+        .getIncomingEdges(sessionDto!.id)
+        .filter((e) => e.kind === 'references');
+      const userIncoming = cg
+        .getIncomingEdges(userDto!.id)
+        .filter((e) => e.kind === 'references');
+
+      // SessionInfoDto: Build return, Build param, BuildAsync return (inside Task<>), Latest property.
+      // UserDto: Build param, BuildAsync param, _cached field.
+      expect(sessionIncoming.length).toBeGreaterThanOrEqual(4);
+      expect(userIncoming.length).toBeGreaterThanOrEqual(3);
+    });
+
     it('Go: leaves stdlib calls (fmt.Println, etc.) external', async () => {
       fs.writeFileSync(
         path.join(tempDir, 'go.mod'),

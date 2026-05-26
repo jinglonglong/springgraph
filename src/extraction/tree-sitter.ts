@@ -940,6 +940,10 @@ export class TreeSitterExtractor {
     // decorator->target relationship for class properties too.
     if (propNode) {
       this.extractDecoratorsFor(node, propNode.id);
+      // Emit `references` edges from the property to types named in its
+      // type annotation (#381). The generic walker handles TS-style
+      // `type_annotation` children; the C# branch walks the `type` field.
+      this.extractTypeAnnotations(node, propNode.id);
     }
   }
 
@@ -1022,7 +1026,15 @@ export class TreeSitterExtractor {
         });
         // Java/Kotlin annotations / TS field decorators sit on the
         // outer field_declaration, not on the individual declarator.
-        if (fieldNode) this.extractDecoratorsFor(node, fieldNode.id);
+        if (fieldNode) {
+          this.extractDecoratorsFor(node, fieldNode.id);
+          // Same as properties: emit `references` to the field's annotated
+          // type. The outer `field_declaration` is the right scope to
+          // search from — C# carries the `type` inside `variable_declaration`
+          // and the language-aware path in `extractTypeAnnotations` descends
+          // into that wrapper (#381).
+          this.extractTypeAnnotations(node, fieldNode.id);
+        }
       }
     } else {
       // Fallback: try to find an identifier child directly
@@ -2219,6 +2231,17 @@ export class TreeSitterExtractor {
     if (!this.extractor) return;
     if (!this.TYPE_ANNOTATION_LANGUAGES.has(this.language)) return;
 
+    // C# tree-sitter doesn't produce `type_identifier` leaves — it uses
+    // `identifier`, `predefined_type`, `qualified_name`, `generic_name`,
+    // etc. — so the generic walker below emits zero references for it.
+    // Dispatch to a C#-aware path that only walks type-position subtrees
+    // (the `type` field of a parameter/method/property/field), so
+    // parameter NAMES never accidentally surface as type refs (#381).
+    if (this.language === 'csharp') {
+      this.extractCsharpTypeRefs(node, nodeId);
+      return;
+    }
+
     // Extract parameter type annotations
     const params = getChildByField(node, this.extractor.paramsField || 'parameters');
     if (params) {
@@ -2237,6 +2260,113 @@ export class TreeSitterExtractor {
     );
     if (typeAnnotation) {
       this.extractTypeRefsFromSubtree(typeAnnotation, nodeId);
+    }
+  }
+
+  /**
+   * Extract C# type references from a node that owns a type position —
+   * a method/constructor declaration, a property declaration, or a
+   * field declaration (which wraps `variable_declaration → type`).
+   *
+   * Walks ONLY into known type fields, so parameter names like
+   * `request` in `Build(UserDto request)` are never mis-emitted as
+   * type references. Once inside a type subtree, `walkCsharpTypePosition`
+   * recognizes C#'s actual type-leaf node kinds (`identifier`,
+   * `qualified_name`, `generic_name`, `array_type`, `nullable_type`,
+   * `tuple_type`, …) — none of which are `type_identifier`. Closes #381.
+   */
+  private extractCsharpTypeRefs(node: SyntaxNode, nodeId: string): void {
+    // Return type / property type — the field is named `type`.
+    const directType = getChildByField(node, 'type');
+    if (directType) this.walkCsharpTypePosition(directType, nodeId);
+
+    // Field declarations wrap declarators in a `variable_declaration`
+    // whose `type` field carries the type. The outer `field_declaration`
+    // has no `type` field of its own, so the call above is a no-op here
+    // and we descend one level.
+    const varDecl = node.namedChildren.find((c: SyntaxNode) => c.type === 'variable_declaration');
+    if (varDecl) {
+      const vdType = getChildByField(varDecl, 'type');
+      if (vdType) this.walkCsharpTypePosition(vdType, nodeId);
+    }
+
+    // Method / constructor parameters. The field name on
+    // `method_declaration` is `parameters`; it points at a
+    // `parameter_list` whose `parameter` children each have their own
+    // `type` field. Walking ONLY the type field skips parameter NAMES,
+    // which would otherwise mis-emit as type references.
+    const params = getChildByField(node, 'parameters');
+    if (params) {
+      for (let i = 0; i < params.namedChildCount; i++) {
+        const child = params.namedChild(i);
+        if (!child || child.type !== 'parameter') continue;
+        const paramType = getChildByField(child, 'type');
+        if (paramType) this.walkCsharpTypePosition(paramType, nodeId);
+      }
+    }
+  }
+
+  /**
+   * Walk a C# subtree that is KNOWN to be in a type position
+   * (return type, parameter type, property type, field type, generic
+   * argument). Identifiers here are type names, not parameter names.
+   */
+  private walkCsharpTypePosition(node: SyntaxNode, fromNodeId: string): void {
+    // `predefined_type` is int/string/bool/etc. — never a project ref.
+    if (node.type === 'predefined_type') return;
+
+    // Bare type name: `Foo` in `Foo bar`, or the `Foo` inside `List<Foo>`.
+    if (node.type === 'identifier') {
+      const name = getNodeText(node, this.source);
+      if (name && !this.BUILTIN_TYPES.has(name)) {
+        this.unresolvedReferences.push({
+          fromNodeId,
+          referenceName: name,
+          referenceKind: 'references',
+          line: node.startPosition.row + 1,
+          column: node.startPosition.column,
+        });
+      }
+      return;
+    }
+
+    // `Namespace.Foo` → the rightmost identifier is the type. Emit the
+    // full qualified name as the reference; the resolver can still match
+    // on the trailing simple name when needed.
+    if (node.type === 'qualified_name') {
+      const text = getNodeText(node, this.source);
+      const last = text.split('.').pop() ?? text;
+      if (last && !this.BUILTIN_TYPES.has(last)) {
+        this.unresolvedReferences.push({
+          fromNodeId,
+          referenceName: last,
+          referenceKind: 'references',
+          line: node.startPosition.row + 1,
+          column: node.startPosition.column,
+        });
+      }
+      return;
+    }
+
+    // `(int Code, Foo Payload)` — tuple element has BOTH a `type` and a
+    // `name` field; descending into all named children would mis-emit
+    // the element name (`Code`, `Payload`) as a type ref. Walk only the
+    // type field.
+    if (node.type === 'tuple_element') {
+      const t = getChildByField(node, 'type');
+      if (t) this.walkCsharpTypePosition(t, fromNodeId);
+      return;
+    }
+
+    // Composite type nodes — recurse into named children. Covers
+    // `generic_name` (head identifier + `type_argument_list`),
+    // `nullable_type`, `array_type`, `pointer_type`, `tuple_type`,
+    // `ref_type`, and any newer wrapping shapes the grammar adds.
+    // Identifiers reached here are all type-positional (parameter/field
+    // names are gated out before we descend).
+    for (let i = 0; i < node.namedChildCount; i++) {
+      const child = node.namedChild(i);
+      if (child) this.walkCsharpTypePosition(child, fromNodeId);
     }
   }
 

@@ -812,19 +812,6 @@ export function synthesizeCallbackEdges(queries: QueryBuilder, ctx: ResolutionCo
     seen.add(key);
     merged.push(e);
   }
-  if (merged.length > 0) {
-    // Defense-in-depth (issues #42, #455): drop edges whose source/target
-    // no longer resolves to a real node. Some channel maps cache native
-    // Node refs across a resolver lifetime (WeakMap-keyed by context), so
-    // a file rewrite between map build and synthesis can leave stale IDs
-    // here. One FK violation aborts the whole batch — better to skip the
-    // dead edges and emit the rest than lose every synthesized edge.
-    const allIds = new Set<string>();
-    for (const e of merged) { allIds.add(e.source); allIds.add(e.target); }
-    const existing = queries.getNodesByIds([...allIds]);
-    const validEdges = merged.filter((e) => existing.has(e.source) && existing.has(e.target));
-    if (validEdges.length > 0) queries.insertEdges(validEdges);
-    return validEdges.length;
-  }
-  return 0;
+  if (merged.length > 0) queries.insertEdges(merged);
+  return merged.length;
 }

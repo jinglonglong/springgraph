@@ -46,7 +46,7 @@ import {
 import { GraphTraverser, GraphQueryManager } from './graph';
 import { ContextBuilder, createContextBuilder } from './context';
 import { Mutex, FileLock } from './utils';
-import { FileWatcher, WatchOptions, PendingFile } from './sync';
+import { FileWatcher, WatchOptions, PendingFile, LockUnavailableError } from './sync';
 
 // Re-export types for consumers
 export * from './types';
@@ -75,7 +75,7 @@ export {
   defaultLogger,
 } from './errors';
 export { Mutex, FileLock, processInBatches, debounce, throttle, MemoryMonitor } from './utils';
-export { FileWatcher, WatchOptions, PendingFile } from './sync';
+export { FileWatcher, WatchOptions, PendingFile, LockUnavailableError } from './sync';
 export { MCPServer } from './mcp';
 
 /**
@@ -495,6 +495,14 @@ export class CodeGraph {
       this.projectRoot,
       async () => {
         const result = await this.sync();
+        // sync() returns this exact zero-shape iff it failed to acquire the
+        // file lock (a real empty sync always has filesChecked > 0 because
+        // scanDirectory ran). Surface that to the watcher as a typed error
+        // so it keeps pendingFiles + reschedules instead of clearing them
+        // (#449).
+        if (result.filesChecked === 0 && result.durationMs === 0) {
+          throw new LockUnavailableError();
+        }
         const filesChanged = result.filesAdded + result.filesModified + result.filesRemoved;
         return { filesChanged, durationMs: result.durationMs };
       },

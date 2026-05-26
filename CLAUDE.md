@@ -225,23 +225,28 @@ and publishes both the GitHub Release and the npm thin-installer
 Publishing manually is **wrong** now — a plain `npm publish` ships the root
 package (non-bundled), which breaks anyone on Node < 22.5.
 
-The release cut itself is:
+**Claude does NOT bump the version unless explicitly asked.** The maintainer
+typically does it themselves — often by editing `package.json` directly via
+the GitHub web UI. Don't proactively commit a version bump as part of
+unrelated work, and don't propose one when summarizing a PR.
 
-```bash
-# CHANGELOG already has entries under [Unreleased] — no manual moves needed.
-# Just bump the version:
-npm version --no-git-tag-version <X.Y.Z>      # or edit package.json manually
-git add package.json package-lock.json
-git commit -m "release: X.Y.Z"
-git push
-```
+When the maintainer DOES bump the version, the only edit strictly required is
+to `package.json` — the workflow's "Sync package-lock.json" step detects a
+mismatch between `package.json` and `package-lock.json`, runs
+`npm install --package-lock-only --ignore-scripts` to rewrite the lock file's
+version fields (top-level + `packages.""`), and auto-commits + pushes the
+result back to `main` with `[skip ci]`. So a GitHub-web-UI single-file edit to
+`package.json` is enough to kick off a clean release. (If they edit both files
+locally, that's fine too — the sync step no-ops.)
 
-Then trigger **Actions → Release → Run workflow** (on `main`). The workflow:
+Once `package.json` is at the target version on `main`, trigger
+**Actions → Release → Run workflow** (on `main`). The workflow:
 
-1. Runs `prepare-release.mjs <X.Y.Z>` → promotes `[Unreleased]` → `[X.Y.Z] - <today>` in `CHANGELOG.md`, appends the link reference, commits + pushes the move with `[skip ci]`.
-2. Builds every platform bundle on one runner, generates `SHA256SUMS`.
-3. Creates the GitHub Release with notes from the freshly-promoted `[X.Y.Z]` block.
-4. Publishes the npm shim + per-platform packages. Requires the `NPM_TOKEN` repo secret.
+1. Syncs `package-lock.json` to `package.json`'s version if they've drifted; commits + pushes that change.
+2. Runs `prepare-release.mjs <X.Y.Z>` → promotes `[Unreleased]` → `[X.Y.Z] - <today>` in `CHANGELOG.md`, appends the link reference, commits + pushes the move with `[skip ci]`.
+3. Builds every platform bundle on one runner, generates `SHA256SUMS`.
+4. Creates the GitHub Release with notes from the freshly-promoted `[X.Y.Z]` block.
+5. Publishes the npm shim + per-platform packages. Requires the `NPM_TOKEN` repo secret.
 
 **Do not run `npm publish`, `git push`, or `git tag` yourself** — these are
 publish actions on shared state. Write the files, hand the user the commands.

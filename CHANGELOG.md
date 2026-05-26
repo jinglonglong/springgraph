@@ -56,6 +56,34 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   banner stays accurate at any debounce value because it's per-file, not a
   static "wait N ms" instruction.
 
+- **Objective-C indexing — `.m`, `.mm`, and content-sniffed `.h` files now
+  parse with full structural extraction (#165).** Adds a tree-sitter-objc
+  extractor that produces `class` nodes for `@interface` / `@implementation`
+  (deduplicated into one), `protocol` nodes for `@protocol`, methods with
+  **full multi-part selectors** (`setObject:forKey:`, `tableView:didSelectRowAtIndexPath:`
+  — not just the first keyword, which would collide distinct methods),
+  `+`/`-` static distinction, `@property` declarations, `#import` for both
+  `<system>` and `"local"` forms, and `extends` / `implements` edges for
+  superclasses and `<Protocol>` conformance lists. Call edges come from
+  both C-style `call_expression` and ObjC `message_expression` (with
+  `self`/`super` skipped on qualified callee names). Header files default
+  to C unless content-sniffing finds `@interface`/`@implementation`/
+  `@protocol`/`@synthesize`, so iOS headers classify correctly without
+  breaking pure-C projects. Validated on AFNetworking (84 files, 100% file
+  coverage, 93 multi-keyword selectors), RestKit (282 files, 99.6%), and
+  Texture (926 files, 100% — including heavy `.mm` ObjC++ content).
+
+  Disclosed limitations: categories produce one extra class node per
+  category file (e.g. `ASDisplayNode+Yoga.m` creates a second `ASDisplayNode`
+  node attributed to the category file); chained/nested message sends record
+  only the innermost method; `[Class alloc]` patterns don't yet emit
+  `instantiates` edges; `@protocol Foo <Bar>` refinement lists aren't wired
+  to `implements`; heavy C++ in `.mm` files may parse incompletely under the
+  ObjC grammar. Mixed Swift/Objective-C cross-language resolution
+  (`@objc`-exposed Swift methods, bridging headers, React Native's native
+  bridge) is **not** in scope for this entry — that's a separate effort
+  tracked under the dynamic-dispatch coverage playbook.
+
 ### Fixed
 - **Git worktrees no longer silently borrow another tree's index (#155).**
   When a worktree is nested inside the main checkout — exactly what agent

@@ -36,6 +36,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - The IDE shares `GEMINI.md` with Gemini CLI, so the two targets compose naturally when both are installed; the antigravity target deliberately doesn't touch `GEMINI.md` so uninstalling Antigravity alone leaves CLI instructions intact.
 
   Both targets are tested on the same parameterized contract as the existing five agents (idempotent install, sibling preservation, install/uninstall round-trip), with extra coverage for migration-marker detection, legacy → unified entry migration, sibling `disabled` field preservation, and the cross-target case where Gemini CLI and Antigravity IDE coexist in the same `~/.gemini/`. Closes #399.
+- **Installer target for Kiro (CLI + IDE).** `codegraph install` now detects and configures Kiro out of the box on macOS, Linux, and Windows. Writes `mcpServers.codegraph` to `~/.kiro/settings/mcp.json` (global) or `./.kiro/settings/mcp.json` (local), and the codegraph usage block into a dedicated `~/.kiro/steering/codegraph.md` / `./.kiro/steering/codegraph.md` — Kiro's steering system loads every `*.md` file in `steering/` as agent context, so a dedicated file is the natural surface (no marker-based merging required). Sibling MCP servers in `mcp.json` and unrelated steering files (`product.md`, `tech.md`, etc.) are preserved across install / uninstall. Tested on the same parameterized contract as the other agent targets (idempotent install, sibling preservation, install/uninstall round-trip). Closes #385.
 
 ## [0.9.5] - 2026-05-25
 

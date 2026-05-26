@@ -1318,7 +1318,85 @@ export class TreeSitterExtractor {
       const value = getChildByField(node, 'value');
       if (value) {
         this.extractTypeRefsFromSubtree(value, typeAliasNode.id);
+        // `type X = { foo: T; bar(): T }` — make the members first-class
+        // property/method nodes under the type alias so `recorder.stop()`
+        // can attach the call edge to `RecorderHandle.stop` instead of
+        // an unrelated class method picked by path-proximity (#359).
+        if (this.language === 'typescript' || this.language === 'tsx') {
+          this.extractTsTypeAliasMembers(value, typeAliasNode);
+        }
       }
+    }
+    return false;
+  }
+
+  /**
+   * Surface the members of a TypeScript `type X = { ... }` (or intersection
+   * thereof) as `property` / `method` nodes under the type-alias node. Only
+   * walks the immediate object_type / intersection operands so anonymous
+   * nested object types inside generic arguments (`Promise<{ ok: true }>`)
+   * don't produce phantom members.
+   */
+  private extractTsTypeAliasMembers(value: SyntaxNode, typeAliasNode: Node): void {
+    const objectTypes: SyntaxNode[] = [];
+    if (value.type === 'object_type') {
+      objectTypes.push(value);
+    } else if (value.type === 'intersection_type') {
+      for (let i = 0; i < value.namedChildCount; i++) {
+        const op = value.namedChild(i);
+        if (op && op.type === 'object_type') objectTypes.push(op);
+      }
+    } else {
+      return;
+    }
+
+    this.nodeStack.push(typeAliasNode.id);
+    for (const objType of objectTypes) {
+      for (let i = 0; i < objType.namedChildCount; i++) {
+        const child = objType.namedChild(i);
+        if (!child) continue;
+        if (child.type !== 'property_signature' && child.type !== 'method_signature') continue;
+
+        const nameNode = getChildByField(child, 'name');
+        const memberName = nameNode ? getNodeText(nameNode, this.source) : '';
+        if (!memberName) continue;
+
+        // `foo: () => T` and `foo(): T` are functionally a method on the
+        // type contract. Treat the property_signature with a function-typed
+        // annotation as a method too so call sites can resolve to it.
+        const memberKind: NodeKind = child.type === 'method_signature'
+          ? 'method'
+          : this.isTsFunctionTypedProperty(child) ? 'method' : 'property';
+
+        const docstring = getPrecedingDocstring(child, this.source);
+        const signature = getNodeText(child, this.source);
+        this.createNode(memberKind, memberName, child, {
+          docstring,
+          signature,
+          qualifiedName: `${typeAliasNode.name}::${memberName}`,
+        });
+
+        // Emit `references` edges from the type alias to types named in the
+        // member's signature, matching the interface-member behavior added in
+        // #432. We attach refs to the type-alias parent (consistent with
+        // interface property_signature treatment).
+        this.extractTypeAnnotations(child, typeAliasNode.id);
+      }
+    }
+    this.nodeStack.pop();
+  }
+
+  /**
+   * `foo: () => T` → property_signature whose type_annotation contains a
+   * `function_type`. Treat that as a method-shaped contract member, since
+   * the call site `obj.foo()` has identical semantics to `bar(): T`.
+   */
+  private isTsFunctionTypedProperty(propertySignature: SyntaxNode): boolean {
+    const typeAnno = getChildByField(propertySignature, 'type');
+    if (!typeAnno) return false;
+    for (let i = 0; i < typeAnno.namedChildCount; i++) {
+      const inner = typeAnno.namedChild(i);
+      if (inner && inner.type === 'function_type') return true;
     }
     return false;
   }

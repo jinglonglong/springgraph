@@ -742,6 +742,66 @@ func UseAliased() {
       expect(target?.filePath.replace(/\\/g, '/')).toBe('pkgb/lib.go');
     });
 
+    it('TS type_alias object-shape members resolve method calls (#359)', async () => {
+      // Pre-#359, `recorder.stop()` (recorder: RecorderHandle) attached
+      // to `StdioMcpClient.stop` in a sibling directory via path-proximity
+      // because the type_alias had no `stop` node — only the unrelated
+      // class did. Now type_alias produces member nodes (property/method),
+      // so the camelCase receiver↔type word overlap pulls the call to
+      // `RecorderHandle::stop` instead of the look-alike class.
+      fs.mkdirSync(path.join(tempDir, 'voice'));
+      fs.mkdirSync(path.join(tempDir, 'codegraph'));
+
+      fs.writeFileSync(
+        path.join(tempDir, 'voice', 'recorder.ts'),
+        `export type RecorderHandle = {
+  wavPath: string;
+  stop: () => Promise<{ ok: true }>;
+};
+`
+      );
+      fs.writeFileSync(
+        path.join(tempDir, 'voice', 'controller.ts'),
+        `import type { RecorderHandle } from "./recorder";
+export async function finaliseRecording(recorder: RecorderHandle) {
+  return await recorder.stop();
+}
+`
+      );
+      fs.writeFileSync(
+        path.join(tempDir, 'codegraph', 'stdio-client.ts'),
+        `export class StdioMcpClient {
+  private stopped = false;
+  async stop(): Promise<void> { this.stopped = true; }
+}
+`
+      );
+
+      cg = await CodeGraph.init(tempDir, { index: true });
+
+      const handleStop = cg
+        .getNodesByKind('method')
+        .find((n) => n.qualifiedName === 'RecorderHandle::stop');
+      expect(handleStop).toBeDefined();
+
+      const clientStop = cg
+        .getNodesByKind('method')
+        .find((n) => n.qualifiedName === 'StdioMcpClient::stop');
+      expect(clientStop).toBeDefined();
+
+      const handleCallers = cg.getIncomingEdges(handleStop!.id).filter((e) => e.kind === 'calls');
+      const clientCallers = cg.getIncomingEdges(clientStop!.id).filter((e) => e.kind === 'calls');
+      expect(handleCallers.length).toBeGreaterThanOrEqual(1);
+      // The class method must have NO callers — voice/'s call must NOT
+      // mis-attribute. A non-empty list would mean the false-positive
+      // path is still firing.
+      expect(clientCallers).toHaveLength(0);
+
+      // Function-typed property surfaces as a `method` node, not `property`,
+      // because `stop()` semantics at the call site are method semantics.
+      expect(handleStop!.kind).toBe('method');
+    });
+
     it('C# extracts references from method/property/field types (#381)', async () => {
       // Pre-#381, every C# project produced ZERO `references` edges:
       // csharp.ts was missing returnField, and the type-leaf walker

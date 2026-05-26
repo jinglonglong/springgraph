@@ -18,11 +18,11 @@
 
 [![Claude Code](https://img.shields.io/badge/Claude_Code-supported-blueviolet.svg)](#supported-agents)
 [![Cursor](https://img.shields.io/badge/Cursor-supported-blueviolet.svg)](#supported-agents)
-[![Codex CLI](https://img.shields.io/badge/Codex_CLI-supported-blueviolet.svg)](#supported-agents)
+[![Codex](https://img.shields.io/badge/Codex_CLI-supported-blueviolet.svg)](#supported-agents)
 [![opencode](https://img.shields.io/badge/opencode-supported-blueviolet.svg)](#supported-agents)
 [![Hermes Agent](https://img.shields.io/badge/Hermes_Agent-supported-blueviolet.svg)](#supported-agents)
-[![Gemini CLI](https://img.shields.io/badge/Gemini_CLI-supported-blueviolet.svg)](#supported-agents)
-[![Antigravity IDE](https://img.shields.io/badge/Antigravity_IDE-supported-blueviolet.svg)](#supported-agents)
+[![Gemini](https://img.shields.io/badge/Gemini_CLI-supported-blueviolet.svg)](#supported-agents)
+[![Antigravity](https://img.shields.io/badge/Antigravity_IDE-supported-blueviolet.svg)](#supported-agents)
 [![Kiro](https://img.shields.io/badge/Kiro-supported-blueviolet.svg)](#supported-agents)
 
 </div>

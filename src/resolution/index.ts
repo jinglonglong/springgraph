@@ -21,6 +21,7 @@ import { resolveViaImport, extractImportMappings, extractReExports } from './imp
 import { detectFrameworks } from './frameworks';
 import { synthesizeCallbackEdges } from './callback-synthesizer';
 import { loadProjectAliases, type AliasMap } from './path-aliases';
+import { loadGoModule, type GoModule } from './go-module';
 import { logDebug } from '../errors';
 import type { ReExport } from './types';
 import { LRUCache } from './lru-cache';
@@ -157,6 +158,8 @@ export class ReferenceResolver {
   // `null` = computed and absent. Treated as immutable for the
   // resolver's lifetime; callers re-create the resolver if config changes.
   private projectAliases: AliasMap | null | undefined = undefined;
+  // go.mod module path. Same lazy/immutable convention as projectAliases.
+  private goModule: GoModule | null | undefined = undefined;
 
   constructor(projectRoot: string, queries: QueryBuilder) {
     this.projectRoot = projectRoot;
@@ -368,6 +371,13 @@ export class ReferenceResolver {
           this.projectAliases = loadProjectAliases(this.projectRoot);
         }
         return this.projectAliases;
+      },
+
+      getGoModule: () => {
+        if (this.goModule === undefined) {
+          this.goModule = loadGoModule(this.projectRoot);
+        }
+        return this.goModule;
       },
 
       getReExports: (filePath: string, language) => {

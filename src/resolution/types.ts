@@ -92,6 +92,14 @@ export interface ResolutionContext {
    */
   getProjectAliases?(): import('./path-aliases').AliasMap | null;
   /**
+   * Go module info from `go.mod` at the project root. Returns `null`
+   * when the project has no `go.mod` (non-Go projects, pre-modules
+   * Go code, or projects whose modules live in subdirectories). Used
+   * by the Go branch of import resolution to distinguish in-module
+   * cross-package imports from third-party packages.
+   */
+  getGoModule?(): import('./go-module').GoModule | null;
+  /**
    * Re-exports declared by a file (`export { x } from './other'`,
    * `export * from './other'`). Empty array when the file has none.
    * Optional so older callers compile; the import resolver follows

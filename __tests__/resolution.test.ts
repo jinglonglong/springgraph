@@ -645,6 +645,127 @@ def bootstrap():
       );
       expect(callsToUserService).toHaveLength(0);
     });
+
+    it('resolves Go cross-package qualified calls via go.mod module path (#388)', async () => {
+      // Pre-#388, every `pkga.FuncX(...)` call in a Go monorepo was flagged
+      // external (isExternalImport returned true for any non-`/internal/`
+      // import without `.`-prefix) and resolution fell through to name-match
+      // with path proximity — recall on cross-package callers was ~<1%.
+      fs.writeFileSync(
+        path.join(tempDir, 'go.mod'),
+        'module github.com/example/myproject\n\ngo 1.21\n'
+      );
+
+      const pkgaDir = path.join(tempDir, 'pkga');
+      const pkgbDir = path.join(tempDir, 'pkgb');
+      const pkgcDir = path.join(tempDir, 'pkgc');
+      fs.mkdirSync(pkgaDir);
+      fs.mkdirSync(pkgbDir);
+      fs.mkdirSync(pkgcDir);
+
+      // Same-name exported function in two packages — only the imported one
+      // should resolve. Exercises disambiguation, not just connectivity.
+      fs.writeFileSync(
+        path.join(pkgaDir, 'conv.go'),
+        'package pkga\nfunc Convert(x int) int { return x * 2 }\n'
+      );
+      fs.writeFileSync(
+        path.join(pkgbDir, 'conv.go'),
+        'package pkgb\nfunc Convert(x int) int { return x + 1 }\n'
+      );
+      fs.writeFileSync(
+        path.join(pkgcDir, 'use.go'),
+        `package pkgc
+
+import "github.com/example/myproject/pkga"
+
+func UsePkga() {
+  pkga.Convert(5)
+}
+`
+      );
+
+      cg = await CodeGraph.init(tempDir, { index: true });
+
+      const usePkga = cg.getNodesByKind('function').filter((n) => n.name ==='UsePkga')[0];
+      expect(usePkga).toBeDefined();
+
+      const outgoing = cg.getOutgoingEdges(usePkga!.id);
+      const callEdges = outgoing.filter((e) => e.kind === 'calls');
+      expect(callEdges).toHaveLength(1);
+
+      const target = cg.getNode(callEdges[0]!.target);
+      expect(target?.name).toBe('Convert');
+      // Critical: the resolver must pick the imported pkga's Convert,
+      // not pkgb's. With the broken (pre-fix) resolver this lands on
+      // whichever Convert happens to be cheaper under path proximity.
+      expect(target?.filePath.replace(/\\/g, '/')).toBe('pkga/conv.go');
+    });
+
+    it('resolves Go aliased imports across packages (#388)', async () => {
+      fs.writeFileSync(
+        path.join(tempDir, 'go.mod'),
+        'module github.com/example/myproject\n\ngo 1.21\n'
+      );
+      fs.mkdirSync(path.join(tempDir, 'pkgb'));
+      fs.mkdirSync(path.join(tempDir, 'pkgd'));
+
+      fs.writeFileSync(
+        path.join(tempDir, 'pkgb', 'lib.go'),
+        'package pkgb\nfunc Compute(x int) int { return x }\n'
+      );
+      fs.writeFileSync(
+        path.join(tempDir, 'pkgd', 'use.go'),
+        `package pkgd
+
+import (
+  "fmt"
+  alias "github.com/example/myproject/pkgb"
+)
+
+func UseAliased() {
+  fmt.Println("hi")
+  alias.Compute(3)
+}
+`
+      );
+
+      cg = await CodeGraph.init(tempDir, { index: true });
+
+      const useAliased = cg.getNodesByKind('function').filter((n) => n.name ==='UseAliased')[0];
+      expect(useAliased).toBeDefined();
+      const calls = cg.getOutgoingEdges(useAliased!.id).filter((e) => e.kind === 'calls');
+      // fmt.Println is stdlib — must stay external. alias.Compute must resolve.
+      expect(calls).toHaveLength(1);
+      const target = cg.getNode(calls[0]!.target);
+      expect(target?.name).toBe('Compute');
+      expect(target?.filePath.replace(/\\/g, '/')).toBe('pkgb/lib.go');
+    });
+
+    it('Go: leaves stdlib calls (fmt.Println, etc.) external', async () => {
+      fs.writeFileSync(
+        path.join(tempDir, 'go.mod'),
+        'module github.com/example/myproject\n\ngo 1.21\n'
+      );
+      fs.writeFileSync(
+        path.join(tempDir, 'main.go'),
+        `package main
+
+import "fmt"
+
+func main() {
+  fmt.Println("hi")
+}
+`
+      );
+
+      cg = await CodeGraph.init(tempDir, { index: true });
+
+      const mainFn = cg.getNodesByKind('function').filter((n) => n.name ==='main')[0];
+      const calls = cg.getOutgoingEdges(mainFn!.id).filter((e) => e.kind === 'calls');
+      // No spurious in-project edge — fmt.* must stay unresolved/external.
+      expect(calls).toHaveLength(0);
+    });
   });
 
   describe('Name Matcher: kind bias for new ref kinds', () => {

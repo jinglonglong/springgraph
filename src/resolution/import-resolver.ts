@@ -103,10 +103,24 @@ function isExternalImport(
   }
 
   if (language === 'go') {
-    // Standard library or external packages
-    if (!importPath.startsWith('.') && !importPath.includes('/internal/')) {
-      return true;
+    // Relative imports (rare in idiomatic Go but the grammar allows them).
+    if (importPath.startsWith('.')) {
+      return false;
     }
+    // In-module imports look like `<module-path>/sub/pkg` — local to
+    // this project. Without the module-path check we'd flag every
+    // cross-package call in a Go monorepo as external (issue #388).
+    const mod = context?.getGoModule?.();
+    if (mod && (importPath === mod.modulePath || importPath.startsWith(mod.modulePath + '/'))) {
+      return false;
+    }
+    // `internal/` packages stay local even when go.mod is missing —
+    // preserves the pre-#388 escape hatch for repos without a parsed module path.
+    if (importPath.includes('/internal/')) {
+      return false;
+    }
+    // Anything else is the Go standard library or a third-party module.
+    return true;
   }
 
   return false;
@@ -596,6 +610,15 @@ export function resolveViaImport(
     return null;
   }
 
+  // Go cross-package calls: `pkga.FuncX(...)` extracts to referenceName
+  // `pkga.FuncX` and the import `github.com/example/myproject/pkga`
+  // maps to a *package directory* containing one or more .go files.
+  // The generic file-based lookup below can't follow that — issue #388.
+  if (ref.language === 'go') {
+    const goResult = resolveGoCrossPackageReference(ref, imports, context);
+    if (goResult) return goResult;
+  }
+
   // Check if the reference name matches any import
   for (const imp of imports) {
     if (imp.localName === ref.referenceName || ref.referenceName.startsWith(imp.localName + '.')) {
@@ -633,6 +656,64 @@ export function resolveViaImport(
     }
   }
 
+  return null;
+}
+
+/**
+ * Resolve a Go cross-package qualified reference (`pkga.FuncX`) by matching
+ * the package alias against an in-module import, stripping the module prefix
+ * to a project-relative directory, and locating the exported symbol in any
+ * `.go` file under that directory. Returns `null` for stdlib / third-party
+ * imports (no `go.mod`-relative match) so the rest of `resolveViaImport`
+ * can still try the file-based path.
+ */
+function resolveGoCrossPackageReference(
+  ref: UnresolvedRef,
+  imports: ImportMapping[],
+  context: ResolutionContext
+): ResolvedRef | null {
+  const mod = context.getGoModule?.();
+  if (!mod) return null;
+
+  // Qualified call: receiver before `.`, member after. A bare reference
+  // (no dot) is a same-file/in-package call — handled elsewhere.
+  const dotIdx = ref.referenceName.indexOf('.');
+  if (dotIdx <= 0) return null;
+  const receiver = ref.referenceName.substring(0, dotIdx);
+  const memberName = ref.referenceName.substring(dotIdx + 1);
+  if (!memberName) return null;
+
+  for (const imp of imports) {
+    if (imp.localName !== receiver) continue;
+    // Only in-module imports map to a known directory.
+    if (imp.source !== mod.modulePath && !imp.source.startsWith(mod.modulePath + '/')) {
+      continue;
+    }
+    const pkgDir = imp.source === mod.modulePath
+      ? ''
+      : imp.source.substring(mod.modulePath.length + 1);
+
+    // Look up the member by name and pick the candidate whose file lives
+    // directly in the package directory. Match the immediate parent dir
+    // exactly so a call to `pkga.FuncX` doesn't accidentally land on a
+    // `FuncX` declared in `pkga/subpkg/`.
+    const candidates = context.getNodesByName(memberName);
+    for (const node of candidates) {
+      if (node.language !== 'go') continue;
+      if (!node.isExported) continue;
+      const fp = node.filePath.replace(/\\/g, '/');
+      const lastSlash = fp.lastIndexOf('/');
+      const fileDir = lastSlash >= 0 ? fp.substring(0, lastSlash) : '';
+      if (fileDir === pkgDir) {
+        return {
+          original: ref,
+          targetNodeId: node.id,
+          confidence: 0.9,
+          resolvedBy: 'import',
+        };
+      }
+    }
+  }
   return null;
 }
 

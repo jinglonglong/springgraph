@@ -2,7 +2,7 @@
 
 # CodeGraph
 
-### Supercharge Claude Code, Cursor, Codex, OpenCode, Hermes Agent, Gemini CLI, Antigravity IDE, and Kiro with Semantic Code Intelligence
+### Supercharge Claude Code, Cursor, Codex, OpenCode, Hermes Agent, Gemini, Antigravity, and Kiro with Semantic Code Intelligence
 
 **~35% cheaper · ~70% fewer tool calls · 100% local**
 

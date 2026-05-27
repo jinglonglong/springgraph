@@ -9,6 +9,9 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+
+## [0.9.6] - 2026-05-27
+
 - **C/C++ `#include` resolution — bare-basename includes now connect to the
   actual header file, not a phantom import node (#453).** Path-prefixed
   includes (`#include "common/args.h"`) already resolved via file-path
@@ -920,3 +923,4 @@ Thank you.
   ```
 
 [0.7.6]: https://github.com/colbymchenry/codegraph/releases/tag/v0.7.6
+[0.9.6]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.6

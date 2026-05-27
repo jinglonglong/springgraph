@@ -1446,6 +1446,19 @@ export class QueryBuilder {
   // ===========================================================================
 
   /**
+   * Lightweight (nodes, edges) count snapshot. Used around an index/sync
+   * run to compute true additions across extraction + resolution +
+   * synthesis — the per-phase counter in the orchestrator only sees
+   * extraction's contribution, which is why the CLI summary under-reported
+   * the edge count (resolution + synthesizer edges were invisible).
+   */
+  getNodeAndEdgeCount(): { nodes: number; edges: number } {
+    return this.db
+      .prepare('SELECT (SELECT COUNT(*) FROM nodes) AS nodes, (SELECT COUNT(*) FROM edges) AS edges')
+      .get() as { nodes: number; edges: number };
+  }
+
+  /**
    * Get graph statistics
    */
   getStats(): GraphStats {

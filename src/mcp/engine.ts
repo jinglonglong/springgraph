@@ -222,12 +222,17 @@ export class MCPEngine {
   /**
    * Reconcile the index with the current filesystem once, right after open —
    * catches edits, adds, deletes, and `git pull`/`checkout` changes made while
-   * no watcher was running. Background, never awaited.
+   * no watcher was running. Runs in the background, but the returned promise
+   * is pushed into the ToolHandler as a one-shot gate so the *first* tool
+   * call awaits completion before serving (without this, a tool call that
+   * races past sync returns rows for files that no longer exist on disk —
+   * and the per-file staleness banner can't help because `getPendingFiles()`
+   * is populated by the watcher, not by catch-up).
    */
   private catchUpSync(): void {
     const cg = this.cg;
     if (!cg) return;
-    void cg
+    const p = cg
       .sync()
       .then((result) => {
         const changed = result.filesAdded + result.filesModified + result.filesRemoved;
@@ -239,6 +244,7 @@ export class MCPEngine {
         const msg = err instanceof Error ? err.message : String(err);
         process.stderr.write(`[CodeGraph MCP] Catch-up sync failed: ${msg}\n`);
       });
+    this.toolHandler.setCatchUpGate(p);
   }
 }
 

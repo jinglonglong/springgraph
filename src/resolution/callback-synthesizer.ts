@@ -24,6 +24,7 @@
 import type { Edge, Node } from '../types';
 import type { QueryBuilder } from '../db/queries';
 import type { ResolutionContext } from './types';
+import { isGeneratedFile } from '../extraction/generated-detection';
 
 const REGISTRAR_NAME = /^(on[A-Z]\w*|subscribe|addListener|addEventListener|register|watch|listen|addCallback)$/;
 const DISPATCHER_NAME = /(emit|trigger|notify|dispatch|fire|publish|flush)/i;
@@ -337,7 +338,16 @@ function cppOverrideEdges(queries: QueryBuilder): Edge[] {
  * trace/callees reach the implementation. Over-approximation accepted
  * (reachability-correct); capped per class, gated to JVM languages.
  */
-const IFACE_OVERRIDE_LANGS = new Set(['java', 'kotlin']);
+// Languages whose static `implements`/`extends` edges should bridge an
+// interface (or abstract base) method to the matching concrete-class method.
+// The set is "languages with explicit nominal subtyping and a single class
+// kind that holds methods" — i.e. the shape this loop expects. Swift and
+// Scala fit shape-wise (Swift `protocol`/`class`, Scala `trait`/`class`)
+// and are added below; their concrete-side nodes can be a `struct` (Swift)
+// or an `object` (Scala) so the loop also iterates those kinds.
+const IFACE_OVERRIDE_LANGS = new Set([
+  'java', 'kotlin', 'csharp', 'typescript', 'javascript', 'swift', 'scala',
+]);
 function interfaceOverrideEdges(queries: QueryBuilder): Edge[] {
   const edges: Edge[] = [];
   const seen = new Set<string>();
@@ -346,7 +356,12 @@ function interfaceOverrideEdges(queries: QueryBuilder): Edge[] {
       .getOutgoingEdges(classId, ['contains'])
       .map((e) => queries.getNodeById(e.target))
       .filter((n): n is Node => !!n && n.kind === 'method');
-  for (const cls of queries.getNodesByKind('class')) {
+  // Concrete-side kinds vary by language: `class` covers Java / Kotlin /
+  // C# / TS / Swift-classes / Scala-classes; `struct` covers Swift value
+  // types that conform to protocols. Iterate both.
+  const concreteKinds = ['class', 'struct'] as const;
+  for (const kind of concreteKinds) {
+  for (const cls of queries.getNodesByKind(kind)) {
     const implMethods = methodsOf(cls.id).filter((n) => IFACE_OVERRIDE_LANGS.has(n.language));
     if (implMethods.length === 0) continue;
     for (const sup of queries.getOutgoingEdges(cls.id, ['implements', 'extends'])) {
@@ -377,6 +392,116 @@ function interfaceOverrideEdges(queries: QueryBuilder): Edge[] {
             line: bm.startLine,
             provenance: 'heuristic',
             metadata: { synthesizedBy: 'interface-impl', via: m.name, registeredAt: `${m.filePath}:${m.startLine}` },
+          });
+          added++;
+        }
+      }
+    }
+  }
+  }
+  return edges;
+}
+
+/**
+ * Go gRPC stub → impl bridge. The protoc-gen-go-grpc codegen emits an
+ * `UnimplementedXxxServer` struct in `*_grpc.pb.go` carrying one method
+ * per service RPC; the real handler is a hand-written struct in another
+ * file (`x/bank/keeper/msg_server.go::msgServer.Send` in cosmos-sdk).
+ * Go's structural typing means no `implements` edge exists for our
+ * resolver to follow, so `trace("Send","SendCoins")` lands on the
+ * empty stub and reports "no path" (validated empirically — the cosmos
+ * Q1 r1 trace failure that drove this work).
+ *
+ * Bridge: for each `UnimplementedXxxServer` whose RPC-method names are
+ * a SUBSET of some other Go struct's method names, emit `calls` edges
+ * `stub.method → impl.method` (paired by name). Excludes the gRPC
+ * internal markers `mustEmbedUnimplementedXxxServer` and
+ * `testEmbeddedByValue`, and skips candidate impls that themselves
+ * live in a generated file (their `xxxClient` / sibling stubs would
+ * otherwise look like impls).
+ *
+ * Multiple candidates is allowed and capped at MAX_CALLBACKS_PER_CHANNEL —
+ * a service often has both a production impl and one or more test
+ * mocks; linking to all preserves trace utility without false-favoring.
+ *
+ * Provenance: `heuristic`, `synthesizedBy: 'go-grpc-stub-impl'`. The
+ * stub's source line is the wiring site shown in the trace trail.
+ */
+function goGrpcStubImplEdges(queries: QueryBuilder): Edge[] {
+  const edges: Edge[] = [];
+  const seen = new Set<string>();
+
+  const STUB_RE = /^Unimplemented.*Server$/;
+  // gRPC internal-helper methods that appear on every Unimplemented*Server;
+  // not part of the service contract, so exclude when computing the RPC-method
+  // signature used to match impls.
+  const isInternalMarker = (n: string) => n.startsWith('mustEmbed') || n === 'testEmbeddedByValue';
+
+  // Methods directly contained by each Go struct, name-only. Built once.
+  const methodNamesByStruct = new Map<string, Set<string>>();
+  const methodNodesByStruct = new Map<string, Node[]>();
+  const goStructs: Node[] = [];
+  for (const s of queries.getNodesByKind('struct')) {
+    if (s.language !== 'go') continue;
+    goStructs.push(s);
+    const ms = queries
+      .getOutgoingEdges(s.id, ['contains'])
+      .map((e) => queries.getNodeById(e.target))
+      .filter((n): n is Node => !!n && n.kind === 'method');
+    methodNodesByStruct.set(s.id, ms);
+    methodNamesByStruct.set(s.id, new Set(ms.map((m) => m.name)));
+  }
+
+  for (const stub of goStructs) {
+    if (!STUB_RE.test(stub.name)) continue;
+    // The stub MUST live in a generated file — that's what tells us this is
+    // a protoc-emitted scaffold rather than someone naming a struct
+    // `UnimplementedXxxServer` by hand. Without this gate we'd also bridge
+    // such hand-written structs and create misleading edges.
+    if (!isGeneratedFile(stub.filePath)) continue;
+
+    const stubMethods = (methodNodesByStruct.get(stub.id) ?? []).filter(
+      (m) => !isInternalMarker(m.name),
+    );
+    if (stubMethods.length === 0) continue;
+    const stubMethodNames = stubMethods.map((m) => m.name);
+
+    for (const cand of goStructs) {
+      if (cand.id === stub.id) continue;
+      // Skip generated-file candidates — they're siblings (msgClient,
+      // UnsafeMsgServer, …) whose method sets coincidentally match.
+      if (isGeneratedFile(cand.filePath)) continue;
+
+      const candNames = methodNamesByStruct.get(cand.id);
+      if (!candNames) continue;
+      // Subset: every RPC method must exist on the candidate by name.
+      // Signature-level match would tighten this further, but name-match
+      // alone already gives one-to-one pairing in real codebases because
+      // gRPC method-name sets are highly distinctive (Send + MultiSend +
+      // UpdateParams + SetSendEnabled is unique to bank's MsgServer).
+      if (!stubMethodNames.every((n) => candNames.has(n))) continue;
+
+      const candMethods = methodNodesByStruct.get(cand.id) ?? [];
+      let added = 0;
+      for (const sm of stubMethods) {
+        if (added >= MAX_CALLBACKS_PER_CHANNEL) break;
+        for (const cm of candMethods) {
+          if (added >= MAX_CALLBACKS_PER_CHANNEL) break;
+          if (cm.name !== sm.name) continue;
+          const key = `${sm.id}>${cm.id}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          edges.push({
+            source: sm.id,
+            target: cm.id,
+            kind: 'calls',
+            line: sm.startLine,
+            provenance: 'heuristic',
+            metadata: {
+              synthesizedBy: 'go-grpc-stub-impl',
+              via: cm.name,
+              registeredAt: `${cm.filePath}:${cm.startLine}`,
+            },
           });
           added++;
         }
@@ -856,6 +981,7 @@ export function synthesizeCallbackEdges(queries: QueryBuilder, ctx: ResolutionCo
   const flutterEdges = flutterBuildEdges(queries, ctx);
   const cppEdges = cppOverrideEdges(queries);
   const ifaceEdges = interfaceOverrideEdges(queries);
+  const goGrpcEdges = goGrpcStubImplEdges(queries);
   const rnEventEdgesList = rnEventEdges(ctx);
   const fabricNativeEdges = fabricNativeImplEdges(ctx);
   const mybatisEdges = mybatisJavaXmlEdges(queries);
@@ -871,6 +997,7 @@ export function synthesizeCallbackEdges(queries: QueryBuilder, ctx: ResolutionCo
     ...flutterEdges,
     ...cppEdges,
     ...ifaceEdges,
+    ...goGrpcEdges,
     ...rnEventEdgesList,
     ...fabricNativeEdges,
     ...mybatisEdges,

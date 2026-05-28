@@ -683,6 +683,33 @@ export class CodeGraph {
     return this.queries.searchNodes(query, options);
   }
 
+  /**
+   * Find the project's "primary route file" — the file with the densest
+   * concentration of framework-emitted `route` nodes (≥3 routes, ≥30%
+   * of all non-test routes). Used to inline the routing config in
+   * `codegraph_context` responses on small realworld template repos
+   * (rails-realworld, laravel-realworld, drupal-admintoolbar, …) where
+   * Glob+Read of `routes.rb`/`urls.py`/etc. otherwise beats codegraph.
+   */
+  getTopRouteFile(): { filePath: string; routeCount: number; totalRoutes: number } | null {
+    return this.queries.getTopRouteFile();
+  }
+
+  /**
+   * Build a URL → handler routing manifest from the index. Each entry
+   * pairs a route node (URL + method) with its handler function/method
+   * via the `references` edge that framework resolvers emit. Returns
+   * null when fewer than 3 valid (non-test) routes exist.
+   */
+  getRoutingManifest(limit?: number): {
+    entries: Array<{ url: string; handler: string; handlerFile: string; handlerLine: number; handlerKind: string }>;
+    topHandlerFile: string | null;
+    topHandlerFileCount: number;
+    totalRoutes: number;
+  } | null {
+    return this.queries.getRoutingManifest(limit);
+  }
+
   // ===========================================================================
   // Edge Operations
   // ===========================================================================

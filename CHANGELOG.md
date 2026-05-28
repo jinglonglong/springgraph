@@ -9,6 +9,9 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+
+## [0.9.7] - 2026-05-28
+
 ### Added
 - **Generated-file down-ranking across search, trace, and explore.** A new
   filename-based classifier (`src/extraction/generated-detection.ts`) flags
@@ -1121,3 +1124,4 @@ Thank you.
 
 [0.7.6]: https://github.com/colbymchenry/codegraph/releases/tag/v0.7.6
 [0.9.6]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.6
+[0.9.7]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.7

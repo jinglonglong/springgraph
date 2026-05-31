@@ -31,7 +31,9 @@ import * as os from 'os';
 import { ToolHandler } from '../src/mcp/tools';
 import CodeGraph from '../src/index';
 
-const SKELETON_MARK = '· skeleton (signatures only; Read for a full body)';
+// Stable marker — assert the `· skeleton` tag, not its exact trailing wording
+// (the steer-to-explore phrasing changed when the Read invitation was removed).
+const SKELETON_MARK = '· skeleton (signatures only';
 
 /** Return the `#### <path> ...` section for a file basename, header through the
  *  line before the next `###`/`####` header (or end of output). */

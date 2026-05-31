@@ -47,6 +47,19 @@ const VUE_HANDLER_RE = /(?:@|v-on:)([a-zA-Z][\w-]*)(?:\.[\w]+)*\s*=\s*"([^"]+)"/
 // Captures the destructure body + the called composable; only `use*` calls qualify.
 const VUE_DESTRUCTURE_RE = /(?:const|let|var)\s*\{([^}]+)\}\s*=\s*(\w+)\s*\(/g;
 
+// Closure-collection dynamic dispatch (language-agnostic, Swift-first). A method
+// appends a closure to a collection property; another method iterates that
+// property *invoking each element* (`coll.forEach { $0() }` / `{ it() }`). The
+// element-invoke (`$0(` / `it(`) PROVES the collection holds closures, so pairing
+// a dispatcher to same-named registrars (`.append`/`.add`/`.push`/`.insert`,
+// incl. Swift `prop.write { $0.append }`) is high-precision. Cross-file/class by
+// design: Alamofire appends in `DataRequest.validate` but iterates in the base
+// `Request.didCompleteTask` — neither same-file nor same-class pairing reaches it.
+const CC_DISPATCH_RE = /(\w+)\.forEach\s*\{\s*(?:\$0|it)\s*\(/g;
+const CC_APPEND_WRITE_RE = /(\w+)\.write\s*\{\s*\$0(?:\.(\w+))?\.(?:append|add|push|insert)\s*\(/g;
+const CC_APPEND_DIRECT_RE = /(\w+)\.(?:append|add|push|insert)\s*\(/g;
+const CC_FANOUT_CAP = 8; // skip a field name with more dispatchers/registrars than this (too generic to pair confidently)
+
 function kebabToPascal(s: string): string {
   return s.split('-').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('');
 }
@@ -138,6 +151,81 @@ function fieldChannelEdges(queries: QueryBuilder, ctx: ResolutionContext): Edge[
         });
         added++;
       }
+    }
+  }
+  return edges;
+}
+
+/**
+ * Closure-collection dispatch: dispatcher iterates a closure-collection property
+ * invoking each element; registrar appends a closure to the same-named property.
+ * Emits dispatcher → registrar so a flow reaches the registration site (where the
+ * appended closure's body — and its callers — live). High-precision: the
+ * dispatcher's element-invoke is the gate (a `.forEach` that does NOT invoke its
+ * element is ignored), so a repo with no closure-collection dispatch yields zero
+ * edges regardless of how many `.append`/`.push` sites it has.
+ *
+ * Pairs globally by field name (cross-file/class is required — see Alamofire's
+ * base-class `Request.didCompleteTask` iterating `validators` appended by the
+ * subclass `DataRequest.validate`), bounded by a fan-out cap so a generic field
+ * name shared across unrelated classes can't fan out into noise.
+ */
+function closureCollectionEdges(queries: QueryBuilder, ctx: ResolutionContext): Edge[] {
+  const candidates = [...queries.getNodesByKind('method'), ...queries.getNodesByKind('function')];
+  const dispatchers = new Map<string, Array<{ node: Node; line: number }>>(); // field → dispatcher methods + forEach line
+  const registrars = new Map<string, Array<{ node: Node; line: number }>>();   // field → registrar methods + append line
+
+  const addReg = (field: string | undefined, node: Node, absLine: number) => {
+    if (!field || /^\d+$/.test(field)) return; // `$0.append` mis-captures the `0`; the write-RE owns that field
+    const arr = registrars.get(field) ?? [];
+    if (!arr.some((r) => r.node.id === node.id)) arr.push({ node, line: absLine });
+    registrars.set(field, arr);
+  };
+
+  for (const m of candidates) {
+    const content = ctx.readFile(m.filePath);
+    const src = content && sliceLines(content, m.startLine, m.endLine);
+    if (!src) continue;
+    const hasForEach = src.includes('.forEach');
+    const hasAppend = src.includes('.append(') || src.includes('.add(') || src.includes('.push(') || src.includes('.insert(');
+    if (!hasForEach && !hasAppend) continue;
+    const lineAt = (idx: number) => (m.startLine ?? 1) + src.slice(0, idx).split('\n').length - 1;
+
+    if (hasForEach) {
+      CC_DISPATCH_RE.lastIndex = 0;
+      let d: RegExpExecArray | null;
+      while ((d = CC_DISPATCH_RE.exec(src))) {
+        const arr = dispatchers.get(d[1]!) ?? [];
+        if (!arr.some((n) => n.node.id === m.id)) arr.push({ node: m, line: lineAt(d.index) });
+        dispatchers.set(d[1]!, arr);
+      }
+    }
+    if (hasAppend) {
+      CC_APPEND_WRITE_RE.lastIndex = 0;
+      let w: RegExpExecArray | null;
+      while ((w = CC_APPEND_WRITE_RE.exec(src))) addReg(w[2] || w[1], m, lineAt(w.index)); // nested `$0.streams` else the `.write` receiver
+      CC_APPEND_DIRECT_RE.lastIndex = 0;
+      let a: RegExpExecArray | null;
+      while ((a = CC_APPEND_DIRECT_RE.exec(src))) addReg(a[1], m, lineAt(a.index));
+    }
+  }
+
+  const edges: Edge[] = [];
+  const seen = new Set<string>();
+  for (const [field, disps] of dispatchers) {
+    const regs = registrars.get(field);
+    if (!regs || regs.length === 0) continue;
+    if (disps.length > CC_FANOUT_CAP || regs.length > CC_FANOUT_CAP) continue; // generic field — can't pair confidently
+    for (const disp of disps) for (const reg of regs) {
+      if (disp.node.id === reg.node.id) continue;
+      const key = `${disp.node.id}>${reg.node.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      edges.push({
+        source: disp.node.id, target: reg.node.id, kind: 'calls', line: disp.line,
+        provenance: 'heuristic',
+        metadata: { synthesizedBy: 'closure-collection', field, registeredAt: `${reg.node.filePath}:${reg.line}` },
+      });
     }
   }
   return edges;
@@ -1093,6 +1181,7 @@ function ginMiddlewareChainEdges(queries: QueryBuilder, ctx: ResolutionContext):
  */
 export function synthesizeCallbackEdges(queries: QueryBuilder, ctx: ResolutionContext): number {
   const fieldEdges = fieldChannelEdges(queries, ctx);
+  const closureCollEdges = closureCollectionEdges(queries, ctx);
   const emitterEdges = eventEmitterEdges(ctx);
   const renderEdges = reactRenderEdges(queries, ctx);
   const jsxEdges = reactJsxChildEdges(ctx);
@@ -1110,6 +1199,7 @@ export function synthesizeCallbackEdges(queries: QueryBuilder, ctx: ResolutionCo
   const seen = new Set<string>();
   for (const e of [
     ...fieldEdges,
+    ...closureCollEdges,
     ...emitterEdges,
     ...renderEdges,
     ...jsxEdges,

@@ -10,9 +10,19 @@
  *   inotify watch set — that's the entire point of issue #411.
  */
 
-import CodeGraph, { findNearestCodeGraphRoot } from '../index';
+import type CodeGraph from '../index';
+import { findNearestCodeGraphRoot } from '../directory';
 import { watchDisabledReason } from '../sync';
 import { ToolHandler } from './tools';
+
+// Lazy-load the heavy CodeGraph chain (sqlite + query/graph/context layers) OFF
+// the MCP startup path. It's only needed once a tool actually opens a project —
+// not to answer initialize/tools-list — so deferring it lets `serve --mcp` (and
+// the daemon it spawns) bind + register tools in ~Node-startup time instead of
+// ~800ms, closing the "No such tool available" cold-start race that made headless
+// agents flounder. require() is sync + cached on the CommonJS build.
+const loadCodeGraph = (): typeof import('../index').default =>
+  (require('../index') as typeof import('../index')).default;
 
 export interface MCPEngineOptions {
   /**
@@ -118,7 +128,7 @@ export class MCPEngine {
         try { this.cg.close(); } catch { /* ignore */ }
         this.cg = null;
       }
-      this.cg = CodeGraph.openSync(resolvedRoot);
+      this.cg = loadCodeGraph().openSync(resolvedRoot);
       this.projectPath = resolvedRoot;
       this.toolHandler.setDefaultCodeGraph(this.cg);
       this.startWatching();
@@ -154,7 +164,7 @@ export class MCPEngine {
 
     this.projectPath = resolvedRoot;
     try {
-      this.cg = await CodeGraph.open(resolvedRoot);
+      this.cg = await loadCodeGraph().open(resolvedRoot);
       this.toolHandler.setDefaultCodeGraph(this.cg);
       this.startWatching();
       this.catchUpSync();

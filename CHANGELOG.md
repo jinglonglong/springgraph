@@ -9,6 +9,9 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+
+## [0.9.9] - 2026-06-02
+
 ### New Features
 
 - `codegraph_explore` is now the primary tool, and one call is usually all an agent needs: it returns the verbatim source of the symbols relevant to your question (a plain question works as the query — you no longer need exact symbol names), grouped by file and Read-equivalent, so the agent answers without falling back to read/grep. The narrower `codegraph_context` and `codegraph_trace` tools were removed in favor of it — explore already surfaces the call flow among the symbols you name (the job trace did), so there's one obvious tool to reach for instead of three.
@@ -264,3 +267,4 @@ Thanks @andreinknv for the substantive draft this release was based on.
 [0.7.7]: https://github.com/colbymchenry/codegraph/releases/tag/v0.7.7
 [0.7.6]: https://github.com/colbymchenry/codegraph/releases/tag/v0.7.6
 [0.9.8]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.8
+[0.9.9]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.9

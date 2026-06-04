@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="44" viewBox="0 0 192 44" role="img" aria-label="Join the waitlist">
+  <rect x="0.5" y="0.5" width="191" height="43" fill="#7a201a" stroke="#5e1812"/>
+  <text x="96" y="27.5" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif"
+        font-size="16" font-weight="600" fill="#f7f6f2">Join the waitlist<tspan dx="8">&#8594;</tspan></text>
+</svg>

@@ -26,7 +26,7 @@ import {
   existsSync,
   readFileSync,
 } from 'fs';
-import { clamp, validatePathWithinRoot, validateProjectPath, isConfigLeafNode } from '../utils';
+import { clamp, validatePathWithinRoot, validateProjectPath, isConfigLeafNode, CONFIG_LEAF_LANGUAGES } from '../utils';
 import { isGeneratedFile } from '../extraction/generated-detection';
 import { resolve as resolvePath } from 'path';
 
@@ -463,26 +463,39 @@ export const tools: ToolDefinition[] = [
   },
   {
     name: 'codegraph_node',
-    description: 'SECONDARY (after codegraph_explore): the Read upgrade for ONE symbol you can name. Returns its location, signature, the verbatim CURRENT on-disk source (includeCode=true — the same bytes Read would give you, safe to base an Edit on), AND its caller/callee trail in a single call — so before changing a symbol you already see what calls it and what your edit would break, for fewer tokens than reading the file. Prefer it over Read whenever you know the symbol name. Or pass `file` ALONE (no symbol) to get that whole source file\'s symbol map + what depends on it — a Read replacement for a file. When the name is AMBIGUOUS (an overloaded method, or the same name on different types) it returns EVERY matching definition\'s full body in one call — so you never Read a file to find the right overload; pass `file` (and/or `line`) to pin one. Use codegraph_explore for several related symbols or the full flow.',
+    description: 'Two modes. (1) READ A FILE — use INSTEAD of the Read tool: pass `file` (a path or basename) with no `symbol` and it returns that file\'s current on-disk source with line numbers, exactly the shape Read gives you (`<n>\\t<line>`, safe to Edit from), narrowable with `offset`/`limit` just like Read — PLUS a one-line note of which files depend on it. Same bytes as Read, faster (served from the index), with the blast radius attached. Use it whenever you would Read a source file. (2) ONE SYMBOL you can name — its location, signature, verbatim source (includeCode=true) and caller/callee trail in one call, so before changing it you see what calls it and what your edit would break. For an AMBIGUOUS name it returns EVERY matching definition\'s body in one call (so you never Read a file to find the right overload); pass `file`/`line` to pin one. Use codegraph_explore for several related symbols or the full flow.',
     inputSchema: {
       type: 'object',
       properties: {
         symbol: {
           type: 'string',
-          description: 'Name of the symbol to get details for. Omit it and pass `file` alone to get the whole file\'s symbols + dependents (a Read replacement).',
+          description: 'Name of the symbol to read (symbol mode). Omit it and pass `file` alone to read a whole file like Read.',
         },
         includeCode: {
           type: 'boolean',
-          description: 'Include full source bodies (default: false to minimize context). In file mode, returns every symbol\'s body up to a size budget.',
+          description: 'Symbol mode: include the symbol\'s full body (default: false). Ignored in file mode, which always returns source unless `symbolsOnly` is set.',
           default: false,
         },
         file: {
           type: 'string',
-          description: 'A file path or basename (e.g. "harness.rs", "src/auth/session.ts"). Pass it ALONE (no symbol) to get that whole file\'s symbol map + dependents — a Read replacement. Or pass it WITH a symbol to disambiguate an overloaded name to the definition in this file.',
+          description: 'A file path or basename (e.g. "harness.rs", "src/auth/session.ts"). Pass it ALONE (no symbol) to READ the file like the Read tool — its full source with line numbers + which files depend on it. Or pass it WITH a symbol to disambiguate an overloaded name to the definition in this file.',
+        },
+        offset: {
+          type: 'number',
+          description: 'File mode: 1-based line to start reading from, exactly like Read\'s offset. Defaults to the start of the file.',
+        },
+        limit: {
+          type: 'number',
+          description: 'File mode: maximum number of lines to return, exactly like Read\'s limit. Defaults to the whole file (capped at 2000 lines, like Read).',
+        },
+        symbolsOnly: {
+          type: 'boolean',
+          description: 'File mode: return just the file\'s symbol map + dependents (a cheap structural overview) instead of its source.',
+          default: false,
         },
         line: {
           type: 'number',
-          description: 'Optional: disambiguate to the definition at/around this line (use with the file:line a trail showed you).',
+          description: 'Symbol mode only: disambiguate to the definition at/around this line (use with the file:line a trail showed you).',
         },
         projectPath: projectPathProperty,
       },
@@ -2527,14 +2540,18 @@ export class ToolHandler {
     const includeCode = args.includeCode === true;
     const fileHint = typeof args.file === 'string' && args.file.trim() ? args.file.trim() : undefined;
     const lineHint = typeof args.line === 'number' && args.line > 0 ? args.line : undefined;
+    const offset = typeof args.offset === 'number' && args.offset > 0 ? Math.floor(args.offset) : undefined;
+    const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.floor(args.limit) : undefined;
+    const symbolsOnly = args.symbolsOnly === true;
     const symbolRaw = typeof args.symbol === 'string' ? args.symbol.trim() : '';
 
-    // FILE-VIEW MODE: a bare `file` with no `symbol` returns that file's symbol
-    // map + graph role (which files depend on it) — and, with includeCode, the
-    // bodies. A Read replacement for "show me file X" that also surfaces the
-    // blast radius, so an edit is made with impact in view.
+    // FILE READ MODE: a `file` with no `symbol` reads that file like the Read
+    // tool — its current on-disk source with line numbers, narrowable with
+    // `offset`/`limit` exactly as Read does — PLUS a one-line blast-radius
+    // header (which files depend on it). `symbolsOnly` returns just the
+    // structural map instead. Backed by the index: same bytes Read gives you.
     if (!symbolRaw && fileHint) {
-      return this.handleFileView(cg, fileHint, includeCode);
+      return this.handleFileView(cg, fileHint, { offset, limit, symbolsOnly });
     }
 
     const symbol = this.validateString(args.symbol, 'symbol');
@@ -2634,11 +2651,23 @@ export class ToolHandler {
   }
 
   /**
-   * FILE-VIEW: resolve `fileArg` (path or basename) to an indexed file and
-   * return its symbol map + graph role (which files depend on it), plus bodies
-   * when `includeCode`. A Read replacement that also surfaces the blast radius.
+   * FILE READ MODE: resolve `fileArg` (path or basename) to an indexed file and
+   * read it like the Read tool — its current on-disk source with line numbers,
+   * narrowable with `offset`/`limit` exactly as Read's are — preceded by a
+   * one-line blast-radius header (which files depend on it). `symbolsOnly`
+   * returns just the structural map (symbols + dependents) instead of source.
+   *
+   * Parity goal: the numbered source block is byte-for-byte the shape Read
+   * returns (`<n>\t<line>`, no padding), so the agent treats it as a Read — only
+   * faster (served from the index) and with the blast radius attached. Security:
+   * yaml/properties files are summarized by key, never dumped (#383); reads go
+   * through validatePathWithinRoot (#527).
    */
-  private async handleFileView(cg: CodeGraph, fileArg: string, includeCode: boolean): Promise<ToolResult> {
+  private async handleFileView(
+    cg: CodeGraph,
+    fileArg: string,
+    opts: { offset?: number; limit?: number; symbolsOnly?: boolean } = {},
+  ): Promise<ToolResult> {
     const normalize = (p: string) => p.replace(/\\/g, '/').replace(/^(?:\.?\/+)+/, '').replace(/\/+$/, '');
     const wantLower = normalize(fileArg).toLowerCase();
     const allFiles = cg.getFiles();
@@ -2672,62 +2701,96 @@ export class ToolHandler {
       .sort((a, b) => a.startLine - b.startLine);
     const dependents = cg.getFileDependents(filePath);
 
-    const out: string[] = [`**${filePath}** — ${nodes.length} symbol${nodes.length === 1 ? '' : 's'}`];
-    if (dependents.length) {
-      out.push(
-        `Depended on by ${dependents.length} file${dependents.length === 1 ? '' : 's'}` +
-          `${dependents.length > 8 ? ' (first 8)' : ''}: ${dependents.slice(0, 8).join(', ')}${dependents.length > 8 ? ', …' : ''}`,
-        '> Editing a symbol here can affect those files — run codegraph_impact on the specific symbol for its exact blast radius.',
-      );
-    } else {
-      out.push('No other indexed file depends on this one.');
-    }
-    out.push('');
+    // Compact, one-line blast radius (codegraph's value-add over a plain Read).
+    const depSummary = dependents.length
+      ? `used by ${dependents.length} file${dependents.length === 1 ? '' : 's'}: ${dependents.slice(0, 8).join(', ')}${dependents.length > 8 ? `, +${dependents.length - 8} more` : ''}`
+      : 'no other indexed file depends on it';
 
-    if (nodes.length === 0) {
-      out.push('_No indexed symbols in this file (codegraph may track it but not parse it for symbols)._');
-      return this.textResult(this.truncateOutput(out.join('\n')));
-    }
-
-    if (!includeCode) {
-      out.push('### Symbols');
-      for (const n of nodes) {
+    // Symbol-map renderer — for symbolsOnly, the config fallback, and read errors.
+    const symbolMap = (heading: string, limit = 200): string[] => {
+      const lines: string[] = [heading];
+      for (const n of nodes.slice(0, limit)) {
         const sig = n.signature ? ` ${n.signature.replace(/\s+/g, ' ').trim()}` : '';
-        out.push(`- \`${n.name}\` (${n.kind})${sig} — :${n.startLine}`);
+        lines.push(`- \`${n.name}\` (${n.kind})${sig} — :${n.startLine}`);
       }
-      out.push('', '> Call again with `includeCode:true` for the bodies, or `codegraph_node <name>` for one symbol in full.');
+      if (nodes.length > limit) lines.push(`- … +${nodes.length - limit} more`);
+      return lines;
+    };
+
+    // symbolsOnly → the cheap structural overview, no source.
+    if (opts.symbolsOnly) {
+      const out = [`**${filePath}** — ${nodes.length} symbol${nodes.length === 1 ? '' : 's'}, ${depSummary}`, ''];
+      if (nodes.length) out.push(...symbolMap('### Symbols'));
+      else out.push('_No indexed symbols in this file._');
+      out.push('', '> Drop `symbolsOnly` (or pass `offset`/`limit`) to read the source, like Read.');
       return this.textResult(this.truncateOutput(out.join('\n')));
     }
 
-    // Render each OUTERMOST symbol's verbatim body (a container's body already
-    // includes its members, so skip anything covered) — no duplication, and no
-    // "read the file" container outline. Budget-capped.
-    out.push('### Source (verbatim — treat as already Read)');
-    const BODY_BUDGET = 14000;
-    const outermost = [...nodes].sort((a, b) =>
-      a.startLine - b.startLine || (b.endLine ?? b.startLine) - (a.endLine ?? a.startLine));
-    const covered: Array<[number, number]> = [];
-    let used = out.join('\n').length;
-    const listed: Node[] = [];
-    for (const n of outermost) {
-      const end = n.endLine ?? n.startLine;
-      if (covered.some(([s, e]) => s <= n.startLine && e >= end)) continue;
-      const code = await cg.getCode(n.id);
-      if (!code) continue;
-      const section = `#### \`${n.name}\` (${n.kind}) — :${n.startLine}\n\`\`\`\n${code}\n\`\`\``;
-      if (used + section.length <= BODY_BUDGET || used < 1500) {
-        out.push('', section);
-        used += section.length;
-        covered.push([n.startLine, end]);
-      } else {
-        listed.push(n);
-      }
+    // SECURITY (#383): never dump a raw config/data file — a yaml/properties
+    // line is `key: <secret>`. Summarize by key and point to a real Read.
+    if (CONFIG_LEAF_LANGUAGES.has(resolved.language)) {
+      const out = [`**${filePath}** — configuration/data file, ${depSummary}`, ''];
+      if (nodes.length) out.push(...symbolMap('### Keys (values withheld for safety)'));
+      out.push('', '> Values may be secrets, so codegraph indexes keys only. Read the file directly if you need a value.');
+      return this.textResult(this.truncateOutput(out.join('\n')));
     }
-    if (listed.length) {
-      out.push('', `### ${listed.length} more symbol${listed.length === 1 ? '' : 's'} (over the size budget — fetch with codegraph_node <name>)`,
-        ...listed.slice(0, 30).map((n) => `- \`${n.name}\` (${n.kind}) — :${n.startLine}`));
+
+    // Read the current bytes from disk through the security chokepoint
+    // (validatePathWithinRoot: blocks `../` traversal and symlink escapes, #527).
+    const abs = validatePathWithinRoot(cg.getProjectRoot(), filePath);
+    let content: string | null = null;
+    if (abs) {
+      try { content = readFileSync(abs, 'utf-8'); } catch { content = null; }
     }
-    return this.textResult(this.truncateOutput(out.join('\n')));
+    if (content === null) {
+      const out = [`**${filePath}** — could not read from disk (it may have moved since indexing). ${depSummary}`, ''];
+      if (nodes.length) out.push(...symbolMap('### Symbols'));
+      out.push('', `> Read \`${filePath}\` directly for its current content.`);
+      return this.textResult(this.truncateOutput(out.join('\n')));
+    }
+
+    // Split exactly as Read does — keep the trailing empty line a final newline
+    // produces (Read numbers it too), so line numbers line up byte-for-byte.
+    const fileLines = content.split('\n');
+    const total = fileLines.length;
+
+    // Read-parity windowing: `offset`/`limit` mean exactly what they do on Read
+    // (1-based start line; max line count). Default: the whole file, capped like
+    // Read at 2000 lines and bounded by a char budget that tracks explore's
+    // proven-safe ~38k response ceiling. Overflow is stated explicitly (Read
+    // paginates too) — never the silent 15k truncateOutput chop.
+    const CHAR_BUDGET = 38000;
+    const DEFAULT_LIMIT = 2000;
+    const offset = Math.max(1, opts.offset ?? 1);
+    if (offset > total) {
+      return this.textResult(`**${filePath}** has ${total} line${total === 1 ? '' : 's'} — offset ${offset} is past the end. ${depSummary}`);
+    }
+    const maxLines = Math.max(1, opts.limit ?? DEFAULT_LIMIT);
+    const start = offset - 1; // 0-based
+    const header = `**${filePath}** — ${total} lines, ${nodes.length} symbol${nodes.length === 1 ? '' : 's'} · ${depSummary}`;
+
+    // Numbered lines, byte-for-byte Read's shape: `<n>\t<line>`, no left-pad.
+    const numbered: string[] = [];
+    let used = header.length + 8;
+    let i = start;
+    for (; i < total && numbered.length < maxLines; i++) {
+      const ln = `${i + 1}\t${fileLines[i]}`;
+      if (used + ln.length + 1 > CHAR_BUDGET && numbered.length > 0) break;
+      numbered.push(ln);
+      used += ln.length + 1;
+    }
+    const shownEnd = start + numbered.length;
+    const complete = offset === 1 && shownEnd >= total;
+
+    const out: string[] = [header, '', ...numbered];
+    if (!complete) {
+      out.push(
+        '',
+        `(lines ${offset}–${shownEnd} of ${total} — pass \`offset\`/\`limit\` for another range, or \`codegraph_node <symbol>\` for one symbol in full)`,
+      );
+    }
+    // Self-bounded to CHAR_BUDGET — do NOT route through truncateOutput (15k).
+    return this.textResult(out.join('\n'));
   }
 
   /** Render one symbol: details + (optional) body/outline + its caller/callee trail. */

@@ -606,10 +606,36 @@ export const tools: ToolDefinition[] = [
  */
 export function getStaticTools(): ToolDefinition[] {
   const raw = process.env.CODEGRAPH_MCP_TOOLS;
-  if (!raw || !raw.trim()) return tools;
+  if (!raw || !raw.trim()) {
+    return tools.filter(t => DEFAULT_MCP_TOOLS.has(t.name.replace(/^codegraph_/, '')));
+  }
   const allow = new Set(raw.split(',').map(s => s.trim().replace(/^codegraph_/, '')).filter(Boolean));
   return allow.size ? tools.filter(t => allow.has(t.name.replace(/^codegraph_/, ''))) : tools;
 }
+
+/**
+ * The MCP tools served by DEFAULT (short names). The other defined tools
+ * (callees, impact, files, status) remain fully functional — handlers stay,
+ * the library API and CLI are untouched, and `CODEGRAPH_MCP_TOOLS` re-enables
+ * any of them — they just aren't LISTED to agents anymore.
+ *
+ * Evidence for the cut (the "adapt the tool to the agent" principle —
+ * fewer tools = fewer mis-picks, and presence itself steers):
+ * - `codegraph_impact` appears in ZERO recorded eval runs ever — its
+ *   blast-radius info already arrives inline on explore (the "Blast radius"
+ *   section) and node (the dependents note), so agents never need the
+ *   standalone tool.
+ * - `codegraph_callees` is redundant by construction: a symbol's body (which
+ *   node returns) IS its callee list, plus the caller/callee trail.
+ * - `codegraph_files` / `codegraph_status`: the tiny-repo audit (see
+ *   getTools) found they "reduce to one grep"; staleness banners already
+ *   inline the pending-sync info on every read tool, and the CLI covers
+ *   diagnostics.
+ * - `codegraph_callers` stays: exhaustive call-site enumeration (every
+ *   caller with file:line, callback registrations labeled, one section per
+ *   same-named definition) is the one job explore/node don't replicate.
+ */
+const DEFAULT_MCP_TOOLS = new Set(['explore', 'node', 'search', 'callers']);
 
 /**
  * Tool handler that executes tools against a CodeGraph instance
@@ -703,9 +729,12 @@ export class ToolHandler {
    */
   getTools(): ToolDefinition[] {
     const allow = this.toolAllowlist();
+    // No explicit allowlist → the default 4-tool surface (see
+    // DEFAULT_MCP_TOOLS for the evidence). An allowlist replaces the
+    // default entirely, so any defined tool can be re-enabled.
     let visible = allow
       ? tools.filter(t => allow.has(t.name.replace(/^codegraph_/, '')))
-      : tools;
+      : tools.filter(t => DEFAULT_MCP_TOOLS.has(t.name.replace(/^codegraph_/, '')));
     if (!this.cg) return visible;
 
     try {
@@ -713,9 +742,10 @@ export class ToolHandler {
       const budget = getExploreBudget(stats.fileCount);
 
       // Tiny-repo tool gating: on projects under TINY_REPO_FILE_THRESHOLD
-      // files, only expose the 5 core tools (search, context, node,
-      // explore, trace). The 5 omitted tools (callers, callees, impact,
-      // status, files) reduce to one grep at this scale.
+      // files, only expose the core trio (search, node, explore) — one
+      // below even the 4-tool default: at this scale callers, too, reduces
+      // to one grep. (Historical note: the audit below ran when context and
+      // trace still existed; its "5 core tools" are today's trio.)
       //
       // n=2 audits ruled out cutting below 5 tools:
       // - 3-tool gate (search + context + trace): cost regressed on

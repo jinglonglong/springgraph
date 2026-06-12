@@ -41,6 +41,7 @@ import {
   atomicWriteFileSync,
   jsonDeepEqual,
   removeMarkedSection,
+  upsertInstructionsEntry,
 } from './shared';
 import {
   CODEGRAPH_SECTION_END,
@@ -127,11 +128,10 @@ class OpencodeTarget implements AgentTarget {
     const files: WriteResult['files'] = [];
     files.push(writeMcpEntry(loc));
 
-    // AGENTS.md is no longer written — the codegraph usage guidance
-    // ships in the MCP server's `initialize` response (issue #529).
-    // Strip a block a previous install left so an upgrade self-heals.
-    const instrCleanup = removeInstructionsEntry(loc);
-    if (instrCleanup.action === 'removed') files.push(instrCleanup);
+    // AGENTS.md gets the short marker-fenced CodeGraph block (#704):
+    // subagents and non-MCP harnesses read AGENTS.md but never the MCP
+    // initialize instructions. Upsert self-heals a stale pre-#529 block.
+    files.push(upsertInstructionsEntry(instructionsPath(loc)));
 
     return { files };
   }

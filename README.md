@@ -326,7 +326,7 @@ The installer will:
 - Ask which agent(s) to configure — auto-detects installed ones from: **Claude Code**, **Cursor**, **Codex CLI**, **opencode**, **Hermes Agent**, **Gemini CLI**, **Antigravity IDE**, **Kiro**
 - Prompt to install `codegraph` on your PATH (so agents can launch the MCP server)
 - Ask whether configs apply to all your projects or just this one
-- Write each chosen agent's MCP server config (the codegraph usage guide is delivered by the MCP server itself, so no instructions file is added to `CLAUDE.md` / `AGENTS.md` / etc.)
+- Write each chosen agent's MCP server config, plus a small marker-fenced CodeGraph section in the agent's instructions file (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`) — that's how subagents and non-MCP agents learn the `codegraph explore` / `codegraph node` commands, since the MCP server's own guidance only reaches the main agent. Removed cleanly by `codegraph uninstall`.
 - Set up auto-allow permissions when Claude Code is one of the targets
 - Initialize your current project (local installs only)
 
@@ -406,14 +406,14 @@ npm install -g @colbymchenry/codegraph
 <details>
 <summary><strong>Agent Tool Guidance</strong></summary>
 
-CodeGraph's MCP server delivers its usage guidance to your agent **automatically**, in the MCP `initialize` response — there's no instructions file to manage and nothing is added to your `CLAUDE.md` / `AGENTS.md` / `GEMINI.md`. In short, it tells the agent to:
+CodeGraph's MCP server delivers its usage guidance to your agent **automatically**, in the MCP `initialize` response. In short, it tells the agent to:
 
 - **Answer structural questions directly with CodeGraph** — it *is* the pre-built index, so a grep/read loop just repeats work it already did. Treat the returned source as already read.
-- **Pick the tool by intent:** `codegraph_explore` for almost anything — "how does X work", a flow/"how does X reach Y", or surveying an area (one call returns the relevant symbols' source grouped by file); `codegraph_search` to just locate a symbol; `codegraph_callers`/`codegraph_callees` to walk call flow; `codegraph_impact` before editing; `codegraph_node` for one specific symbol's full source (it returns every overload for an ambiguous name).
+- **Pick the tool by intent:** `codegraph_explore` for almost anything — "how does X work", a flow/"how does X reach Y", or surveying an area (one call returns the relevant symbols' source grouped by file); `codegraph_search` to just locate a symbol; `codegraph_callers` for every call site (including callback registrations); `codegraph_node` for one symbol's full source + callers, or to read a file like the Read tool.
 - **Trust the results — don't re-verify with grep**, and check the staleness banner after edits.
-- If `.codegraph/` doesn't exist yet, offer to run `codegraph init -i`.
+- In a workspace with no index, CodeGraph announces itself inactive and serves no tools — indexing stays your decision.
 
-The exact text is `src/mcp/server-instructions.ts` — the single source of truth.
+The exact text is `src/mcp/server-instructions.ts` — the single source of truth for the main agent. Because subagents and non-MCP harnesses never see the MCP guidance, the installer also writes a four-line marker-fenced section into the agent's instructions file pointing at the `codegraph explore` / `codegraph node` CLI equivalents.
 
 </details>
 
@@ -464,6 +464,8 @@ codegraph index [path]            # Full index (--force to re-index, --quiet for
 codegraph sync [path]             # Incremental update
 codegraph status [path]           # Show statistics
 codegraph query <search>          # Search symbols (--kind, --limit, --json)
+codegraph explore <query>         # Relevant symbols' source + call paths in one shot (same output as the codegraph_explore MCP tool)
+codegraph node <symbol|file>      # One symbol's source + callers, or read a file with line numbers (same output as codegraph_node)
 codegraph files [path]            # Show file structure (--format, --filter, --max-depth, --json)
 codegraph callers <symbol>        # Find what calls a function/method (--limit, --json)
 codegraph callees <symbol>        # Find what a function/method calls (--limit, --json)

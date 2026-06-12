@@ -897,6 +897,103 @@ program
   });
 
 /**
+ * codegraph explore <query...>
+ *
+ * The CLI face of the MCP codegraph_explore tool — same handler, same
+ * output (source of the relevant symbols grouped by file + the call path
+ * among them). Exists so agents WITHOUT the MCP tools — Task-tool
+ * subagents (which don't inherit MCP tools, #704) and non-MCP harnesses —
+ * can reach the graph through a plain shell command.
+ */
+program
+  .command('explore <query...>')
+  .description('Explore an area: relevant symbols\' source + call paths in one shot (same output as the codegraph_explore MCP tool)')
+  .option('-p, --path <path>', 'Project path')
+  .option('--max-files <number>', 'Maximum number of files to include source from')
+  .action(async (queryParts: string[], options: { path?: string; maxFiles?: string }) => {
+    const projectPath = resolveProjectPath(options.path);
+
+    try {
+      if (!isInitialized(projectPath)) {
+        error(`CodeGraph not initialized in ${projectPath} — run 'codegraph init' first.`);
+        process.exit(1);
+      }
+
+      const { default: CodeGraph } = await loadCodeGraph();
+      const cg = await CodeGraph.open(projectPath);
+      const { ToolHandler } = await import('../mcp/tools');
+      const handler = new ToolHandler(cg);
+
+      const args: Record<string, unknown> = { query: queryParts.join(' ') };
+      if (options.maxFiles) args.maxFiles = parseInt(options.maxFiles, 10);
+      const result = await handler.execute('codegraph_explore', args);
+
+      console.log(result.content[0]?.text ?? '');
+      cg.destroy();
+      if (result.isError) process.exit(1);
+    } catch (err) {
+      error(`Explore failed: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+  });
+
+/**
+ * codegraph node <name>
+ *
+ * The CLI face of the MCP codegraph_node tool: one symbol's source +
+ * caller/callee trail, or a whole file with line numbers + dependents
+ * (Read-parity). Same subagent/non-MCP rationale as `explore`.
+ */
+program
+  .command('node <name>')
+  .description('One symbol\'s source + caller/callee trail, or read a file with line numbers + dependents (same output as the codegraph_node MCP tool)')
+  .option('-p, --path <path>', 'Project path')
+  .option('-f, --file <file>', 'Treat as file mode (or disambiguate a symbol to this file)')
+  .option('--offset <number>', 'File mode: 1-based start line')
+  .option('--limit <number>', 'File mode: maximum lines')
+  .option('--symbols-only', 'File mode: just the symbol map + dependents')
+  .action(async (name: string, options: { path?: string; file?: string; offset?: string; limit?: string; symbolsOnly?: boolean }) => {
+    const projectPath = resolveProjectPath(options.path);
+
+    try {
+      if (!isInitialized(projectPath)) {
+        error(`CodeGraph not initialized in ${projectPath} — run 'codegraph init' first.`);
+        process.exit(1);
+      }
+
+      const { default: CodeGraph } = await loadCodeGraph();
+      const cg = await CodeGraph.open(projectPath);
+      const { ToolHandler } = await import('../mcp/tools');
+      const handler = new ToolHandler(cg);
+
+      // A name with a path separator is a file read; otherwise a symbol
+      // (use --file for basename-only file reads or to pin an overload).
+      const args: Record<string, unknown> = {};
+      if (options.file) {
+        args.file = options.file;
+        if (name && name !== options.file) args.symbol = name;
+      } else if (name.includes('/')) {
+        args.file = name;
+      } else {
+        args.symbol = name;
+        args.includeCode = true;
+      }
+      if (options.offset) args.offset = parseInt(options.offset, 10);
+      if (options.limit) args.limit = parseInt(options.limit, 10);
+      if (options.symbolsOnly) args.symbolsOnly = true;
+
+      const result = await handler.execute('codegraph_node', args);
+
+      console.log(result.content[0]?.text ?? '');
+      cg.destroy();
+      if (result.isError) process.exit(1);
+    } catch (err) {
+      error(`Node lookup failed: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+  });
+
+/**
  * codegraph files [path]
  */
 program

@@ -9,6 +9,9 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+
+## [1.0.0] - 2026-06-12
+
 ### Security
 
 - Closed a path-traversal hole where a symbolic link inside an indexed project that pointed *outside* the project root could make CodeGraph serve that out-of-root file's contents (for example a file under your home directory) to the AI agent. CodeGraph now resolves symlinks when validating file access and refuses to read anything whose real location is outside the project, while still allowing symlinks that stay within it. Thanks @sulthonzh. (#527)
@@ -389,3 +392,4 @@ Thanks @andreinknv for the substantive draft this release was based on.
 [0.7.6]: https://github.com/colbymchenry/codegraph/releases/tag/v0.7.6
 [0.9.8]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.8
 [0.9.9]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.9
+[1.0.0]: https://github.com/colbymchenry/codegraph/releases/tag/v1.0.0

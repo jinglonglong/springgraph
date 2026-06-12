@@ -71,8 +71,29 @@ typically one to a few calls; a grep/read exploration is dozens.
 
 ## Limitations
 
-- If a tool reports the project isn't initialized, \`.codegraph/\` doesn't exist yet — offer to run \`codegraph init -i\` to build the index.
+- If a tool reports a project isn't indexed (no \`.codegraph/\`), stop calling codegraph tools for that project for the rest of the session and use your built-in tools there instead. Indexing is the user's decision — mention they can run \`codegraph init\` if it comes up, but don't run it yourself.
 - Index lags file writes by ~1 second.
 - Cross-file resolution is best-effort name matching; ambiguous calls may return multiple candidates.
 - No live correctness validation — that's still the TypeScript compiler / test suite / linter's job. Codegraph supplements those with structural context they don't have.
+`;
+
+/**
+ * Instructions variant sent when the workspace has NO codegraph index.
+ *
+ * Sending the full playbook ("lean on codegraph for everything") into a
+ * session where every call would fail wastes the agent's calls and — worse —
+ * the failures teach it codegraph is broken. The unindexed variant is a
+ * short, unambiguous "inactive this session" note; `tools/list` is gated to
+ * empty in the same state, so the agent has nothing to mis-call. Indexing is
+ * deliberately left to the user: the agent is told NOT to run init itself.
+ */
+export const SERVER_INSTRUCTIONS_UNINDEXED = `# Codegraph — inactive (workspace not indexed)
+
+This workspace has no codegraph index (no \`.codegraph/\` directory), so no
+codegraph tools are available this session. Work with your built-in tools as
+usual.
+
+Indexing is the user's decision — do not run it yourself. If the user asks
+about codegraph, they can enable it by running \`codegraph init\` in the
+project root and starting a new session.
 `;

@@ -28,6 +28,25 @@ import {
 } from 'fs';
 import { clamp, validatePathWithinRoot, validateProjectPath, isConfigLeafNode, CONFIG_LEAF_LANGUAGES } from '../utils';
 import { isGeneratedFile } from '../extraction/generated-detection';
+
+/**
+ * An expected, recoverable "codegraph can't serve this" condition — most
+ * importantly a project with no index. The dispatch catch converts these to
+ * SUCCESS-shaped responses (guidance text, NO isError): an `isError: true`
+ * early in a session teaches the agent the toolset is broken and it stops
+ * calling codegraph entirely (observed repeatedly), which is exactly wrong
+ * for conditions the agent can simply work around (use built-in tools for
+ * that codebase / pass projectPath). isError is reserved for "stop trying"
+ * cases: security refusals ({@link PathRefusalError}) and genuine
+ * malfunctions.
+ */
+export class NotIndexedError extends Error {}
+
+/**
+ * A security refusal (sensitive system path). Stays `isError: true` WITHOUT
+ * retry guidance — abandoning this path is the desired agent reaction.
+ */
+export class PathRefusalError extends Error {}
 import { resolve as resolvePath } from 'path';
 
 /** Maximum output length to prevent context bloat (characters) */
@@ -522,7 +541,7 @@ export const tools: ToolDefinition[] = [
       properties: {
         query: {
           type: 'string',
-          description: 'Symbol names, file names, or short code terms to explore (e.g., "AuthService loginUser session-manager", "GraphTraverser BFS impact traversal.ts"). Use codegraph_search first to find relevant names.',
+          description: 'Symbol names, file names, or short code terms to explore (e.g., "AuthService loginUser session-manager", "GraphTraverser BFS impact traversal.ts"). For a flow question, name the symbols spanning the flow (e.g. "mutateElement renderScene"). A natural-language question works too — no prior codegraph_search needed.',
         },
         maxFiles: {
           type: 'number',
@@ -752,14 +771,16 @@ export class ToolHandler {
     if (!projectPath) {
       if (!this.cg) {
         const searched = this.defaultProjectHint ?? process.cwd();
-        throw new Error(
+        throw new NotIndexedError(
           'No CodeGraph project is loaded for this session.\n' +
           `Searched for a .codegraph/ directory starting from: ${searched}\n` +
-          'The index is likely fine — this is a working-directory detection issue: ' +
+          'If this project IS indexed, this is a working-directory detection issue: ' +
           "the MCP client launched the server outside your project and didn't report the " +
           'workspace root. Fix it either way:\n' +
           '  • Pass projectPath to the tool call, e.g. projectPath: "/absolute/path/to/your/project"\n' +
-          '  • Or add --path to the server\'s MCP config args: ["serve", "--mcp", "--path", "/absolute/path/to/your/project"]'
+          '  • Or add --path to the server\'s MCP config args: ["serve", "--mcp", "--path", "/absolute/path/to/your/project"]\n' +
+          'If the project simply has no index, continue with your built-in tools (Read/Grep/Glob) ' +
+          "and don't call codegraph again this session — the user can run 'codegraph init' to enable it."
         );
       }
       return this.cg;
@@ -778,7 +799,7 @@ export class ToolHandler {
     if (existsSync(projectPath)) {
       const pathError = validateProjectPath(projectPath);
       if (pathError) {
-        throw new Error(pathError);
+        throw new PathRefusalError(pathError);
       }
     }
 
@@ -786,7 +807,12 @@ export class ToolHandler {
     const resolvedRoot = findNearestCodeGraphRoot(projectPath);
 
     if (!resolvedRoot) {
-      throw new Error(`CodeGraph not initialized in ${projectPath}. Run 'codegraph init' in that project first.`);
+      throw new NotIndexedError(
+        `The project at ${projectPath} isn't indexed with codegraph (no .codegraph/ directory found ` +
+        'walking up from it), so codegraph cannot query it. Use your built-in tools (Read/Grep/Glob) ' +
+        "for that codebase instead, and don't call codegraph for it again this session. " +
+        "Indexing is the user's decision — they can run 'codegraph init' in that project to enable it."
+      );
     }
 
     // If the path resolves to the default project, reuse the already-open
@@ -1069,7 +1095,21 @@ export class ToolHandler {
       const withWorktree = this.withWorktreeNotice(result, args.projectPath as string | undefined);
       return this.withStalenessNotice(withWorktree, args.projectPath as string | undefined);
     } catch (err) {
-      return this.errorResult(`Tool execution failed: ${err instanceof Error ? err.message : String(err)}`);
+      // Expected condition, not a malfunction: answer as a SUCCESS so the
+      // agent keeps trusting the toolset for projects that ARE indexed.
+      // (An isError here teaches session-long abandonment — see NotIndexedError.)
+      if (err instanceof NotIndexedError) {
+        return this.textResult(err.message);
+      }
+      // Security refusal: a clean error, no retry encouragement.
+      if (err instanceof PathRefusalError) {
+        return this.errorResult(err.message);
+      }
+      return this.errorResult(
+        `Tool execution failed: ${err instanceof Error ? err.message : String(err)}. ` +
+        'This is an internal codegraph error — retry the call once; if it persists, ' +
+        'continue without codegraph for this task.'
+      );
     }
   }
 
@@ -1081,7 +1121,11 @@ export class ToolHandler {
     if (typeof query !== 'string') return query;
 
     const cg = this.getCodeGraph(args.projectPath as string | undefined);
-    const kind = args.kind as string | undefined;
+    const rawKind = args.kind as string | undefined;
+    // The schema enum says 'type' (what agents naturally reach for); the
+    // NodeKind is 'type_alias'. Without the mapping, kind: "type" silently
+    // matched nothing — a filter value we advertise must work.
+    const kind = rawKind === 'type' ? 'type_alias' : rawKind;
     const rawLimit = Number(args.limit) || 10;
     const limit = clamp(rawLimit, 1, 100);
 

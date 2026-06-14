@@ -221,6 +221,13 @@ export class TreeSitterExtractor {
   private nodes: Node[] = [];
   private edges: Edge[] = [];
   private unresolvedReferences: UnresolvedReference[] = [];
+  // Value-reference edges (flag-gated, default off; see flushValueRefs). Same-file reads of
+  // file-scope const/var symbols → `references` edges so impact analysis catches const consumers.
+  private static readonly VALUE_REF_LANGS = new Set<string>(['typescript', 'javascript', 'tsx']);
+  private static readonly MAX_VALUE_REF_NODES = 20_000;
+  private readonly valueRefsEnabled = process.env.CODEGRAPH_VALUE_REFS === '1';
+  private fileScopeValues = new Map<string, string>();
+  private valueRefScopes: Array<{ id: string; node: SyntaxNode }> = [];
   private errors: ExtractionError[] = [];
   private extractor: LanguageExtractor | null = null;
   private nodeStack: string[] = []; // Stack of parent node IDs
@@ -326,6 +333,7 @@ export class TreeSitterExtractor {
       // Gate + flush function-as-value candidates (#756) while the file's
       // nodes and import refs are complete and the file node is still pushed.
       this.flushFnRefCandidates();
+      this.flushValueRefs();
 
       if (packageNodeId) this.nodeStack.pop();
       this.nodeStack.pop();
@@ -513,6 +521,64 @@ export class TreeSitterExtractor {
         line: c.line,
         column: c.column,
       });
+    }
+  }
+
+  /**
+   * Record value-reference bookkeeping as nodes are created: file-scope const/var symbols with
+   * distinctive names become reference targets; function/method/const/var symbols become reader
+   * scopes whose bodies flushValueRefs scans.
+   */
+  private captureValueRefScope(kind: NodeKind, name: string, id: string, node: SyntaxNode): void {
+    if ((kind === 'constant' || kind === 'variable') && name.length >= 3 && /[A-Z_]/.test(name)) {
+      const parentId = this.nodeStack[this.nodeStack.length - 1];
+      if (parentId?.startsWith('file:')) this.fileScopeValues.set(name, id);
+    }
+    if (kind === 'function' || kind === 'method' || kind === 'constant' || kind === 'variable') {
+      this.valueRefScopes.push({ id, node });
+    }
+  }
+
+  /**
+   * Emit same-file `references` edges from a symbol to the file-scope const/var it reads (TS/JS).
+   * The engine doesn't edge const→consumer, so impact analysis misses "change this table, affect
+   * its readers" (the ReScript-PR false positive). Same-file only (resolution is unambiguous),
+   * distinctive target names only (dodges the local-shadowing precision trap documented on
+   * function_ref), deduped per (reader, target). Flag-gated (CODEGRAPH_VALUE_REFS) + additive —
+   * pending the agent A/B before it goes default-on.
+   */
+  private flushValueRefs(): void {
+    const scopes = this.valueRefScopes;
+    const targets = this.fileScopeValues;
+    this.valueRefScopes = [];
+    this.fileScopeValues = new Map();
+    if (!this.valueRefsEnabled || !TreeSitterExtractor.VALUE_REF_LANGS.has(this.language)) return;
+    if (targets.size === 0 || scopes.length === 0 || isGeneratedFile(this.filePath)) return;
+
+    for (const scope of scopes) {
+      const seen = new Set<string>();
+      const stack: SyntaxNode[] = [scope.node];
+      let visited = 0;
+      while (stack.length > 0 && visited < TreeSitterExtractor.MAX_VALUE_REF_NODES) {
+        const n = stack.pop()!;
+        visited++;
+        if (n.type === 'identifier') {
+          const targetId = targets.get(getNodeText(n, this.source));
+          if (targetId && targetId !== scope.id && !seen.has(targetId)) {
+            seen.add(targetId);
+            this.edges.push({
+              source: scope.id,
+              target: targetId,
+              kind: 'references',
+              metadata: { valueRef: true },
+            });
+          }
+        }
+        for (let i = 0; i < n.namedChildCount; i++) {
+          const c = n.namedChild(i);
+          if (c) stack.push(c);
+        }
+      }
     }
   }
 
@@ -859,6 +925,8 @@ export class TreeSitterExtractor {
         });
       }
     }
+
+    if (this.valueRefsEnabled) this.captureValueRefScope(kind, name, id, node);
 
     return newNode;
   }

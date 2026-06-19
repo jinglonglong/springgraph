@@ -1,0 +1,16 @@
+{
+  "name": "@codegraph-springcloud/springkg-semantic",
+  "version": "0.1.0",
+  "description": "Spring/Kubernetes semantic layer — policy, resolvers, and semantic types for the springkg knowledge graph",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.30",
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9"
+  }
+}

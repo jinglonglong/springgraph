@@ -2,15 +2,18 @@ package com.example.user;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import java.util.List;
 
 @Mapper
 public interface UserMapper {
 
-    String selectById(@Param("id") Long id);
+  @Select("SELECT id, name, email FROM users WHERE id = #{id}")
+  UserEntity selectById(@Param("id") Long id);
 
-    String selectAll();
+  List<UserEntity> findAll();
 
-    int insertUser(@Param("user") UserEntity user);
+  int insertUser(UserEntity user);
 
-    int updateUser(@Param("user") UserEntity user);
+  int updateUser(UserEntity user);
 }

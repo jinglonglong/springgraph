@@ -197,3 +197,19 @@ Learned: Added `tests/integration/sprint1-e2e.test.ts` with a Vitest stdio JSON-
 - `docs/schema.md` (new) -- All 8 tables documented with exact column names/types/constraints from `packages/springkg-core/src/db/schema.sql`, Mermaid ER diagram, and cross-database SQL join example.
 - `docs/validation.md` (new) -- Sprint 1 MVP 10-item validation report with real verification commands and expected outputs.
 - `CHANGELOG.md` -- Added `### New Features (springkg)` section under `[Unreleased]` with 6 bullet points covering the 8-table schema, 4 MCP tools, Team B/C/D resolvers, and the `SpringKg` orchestrator.
+
+---
+
+## Task T35 -- Sprint 2 MyBatis Extension
+
+### Key findings
+
+**The `@Select` annotation was missing from UserMapper.java.** The existing UserMapper interface had only method signatures without any MyBatis annotations. The `AnnotationSqlExtractor` resolver (Team C, Sprint 2) is responsible for extracting `@Select`/`@Insert` annotated SQL from mapper interfaces, so adding this annotation prepares the demo for that resolver's validation.
+
+**UserEntity.java already had all required annotations.** `@TableName("users")`, `@TableId`, and `@TableField` were already present from the T22 demo creation.
+
+**UserMapper.xml already had 3 statements.** The XML already contained `findAll`, `insertUser`, and `updateUser` -- no changes needed there.
+
+### What was modified
+
+- `examples/springcloud-demo/src/main/java/com/example/user/UserMapper.java` -- Added `selectById` method with `@Select("SELECT id, name, email FROM users WHERE id = #{id}")` annotation and `@Param("id")` parameter. Added imports for `org.apache.ibatis.annotations.Select` and `org.apache.ibatis.annotations.Param`.

@@ -298,7 +298,7 @@ Team G 是 7 团队并行模式中的 1 个，负责**验证 + 示例 + 文档**
 
 ### Phase G1: Sprint 1 demo + e2e + docs (Tasks 22, 23, 24)
 
-- [ ] 7. [G] T22 — examples/springcloud-demo 项目
+- [x] 7. [G] T22 — examples/springcloud-demo 项目
 
   **What to do**:
   - 创建 `examples/springcloud-demo/`

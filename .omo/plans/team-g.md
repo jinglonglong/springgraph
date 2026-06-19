@@ -364,7 +364,7 @@ Team G 是 7 团队并行模式中的 1 个，负责**验证 + 示例 + 文档**
     - Tool: vitest
     - Steps: `npx vitest run tests/integration/sprint1-e2e.test.ts` 0 失败
 
-- [ ] 9. [G] T24 — Sprint 1 文档 + CHANGELOG
+- [x] 9. [G] T24 — Sprint 1 文档 + CHANGELOG
 
   **What to do**:
   - `docs/architecture.md`：springkg 4 层架构图 + 包关系

@@ -926,205 +926,192 @@ cg.watch({
 
 The `isWatcherDegraded()` and `getWatcherDegradedReason()` methods (line 595) let callers detect when live watching has been permanently disabled so the UI can alert the user.
 
-
 ---
 
-## 4. MCP Architecture
+## 6. Validation Report — Sprint 0
 
-### 4.1 Tool Registration: `tools[]` Array (line 415)
+### 6.1 Setup
 
-All CodeGraph MCP tools are defined in a single exported array at `src/mcp/tools.ts` line 415:
+A small Spring Boot + MyBatis demo project was created in a temp directory:
 
-```typescript
-export const tools: ToolDefinition[] = [
-  { name: 'codegraph_search',   ... },
-  { name: 'codegraph_callers',  ... },
-  { name: 'codegraph_callees',  ... },
-  { name: 'codegraph_impact',   ... },
-  { name: 'codegraph_node',     ... },
-  { name: 'codegraph_explore',  ... },
-  { name: 'codegraph_status',   ... },
-  { name: 'codegraph_files',    ... },
-];
+```
+C:\Users\LONG\AppData\Local\Temp\opencode\cg-demo\
+  src/main/java/com/example/demo/
+    DemoApplication.java       — @SpringBootApplication entry point
+    UserController.java         — @RestController with @GetMapping routes
+    mapper/UserMapper.java      — MyBatis @Mapper interface
+  src/main/resources/mapper/
+    UserMapper.xml             — MyBatis XML with <select> statements
 ```
 
-There are exactly **8 tools** in total. Each entry is a `ToolDefinition` object with `name`, `description`, and `inputSchema`. The array is the **only** registration point for MCP tools — there is no plugin, hook, or extension mechanism anywhere in the codebase.
+### 6.2 Init + Index
 
----
+```bash
+$ node dist/bin/codegraph.js init "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo" --index
 
-### 4.2 The `CODEGRAPH_MCP_TOOLS` Environment Variable
+  Initializing CodeGraph
+  Initialized in C:\Users\LONG\AppData\Local\Temp\opencode\cg-demo
 
-By default, CodeGraph exposes only **4 tools** to agents:
+  Scanning files - 4 found
+  Parsing code -------------------------  0%
+  Parsing code - done
+  Resolving refs ################  100%
+  Resolving refs - done
 
-```typescript
-const DEFAULT_MCP_TOOLS = new Set(['explore', 'node', 'search', 'callers']);
+  Indexed 4 files
+  27 nodes, 35 edges in 304ms
+  Done
 ```
 
-The other 4 tools (`callees`, `impact`, `files`, `status`) are fully implemented and functional — their handlers exist and the library API and CLI are untouched — but they are **not listed** in `tools/list` responses sent to agents.
+**Result: PASS** — `init --index` completed successfully, parsing all 4 source files.
 
-The environment variable `CODEGRAPH_MCP_TOOLS` acts as a **tool allowlist** at startup:
+### 6.3 Index Statistics
 
-| Value | Effect |
-|-------|--------|
-| unset or empty | Only the 4 default tools are listed |
-| comma-separated short names (e.g. `explore,node,search,callers,impact`) | Only the named tools are listed; matching is on the short form (`node` or `codegraph_node` both work) |
-| empty string `""` | All 8 tools are listed |
+```bash
+$ node dist/bin/codegraph.js status "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo"
 
-The allowlist is applied in three places:
+CodeGraph Status
+  Project: C:\Users\LONG\AppData\Local\Temp\opencode\cg-demo
 
-1. **`getStaticTools()`** (line 625) — filters the static surface the proxy returns in `tools/list` before any project is opened. This is a defensive gate: even if a client has a cached tool list from a previous session, the server will not acknowledge a tool that is no longer allowed.
+Index Statistics:
+  Files:     4
+  Nodes:     27
+  Edges:     35
+  DB Size:   0.15 MB
+  Backend:   node:sqlite - built-in (full WAL)
+  Journal:   wal
 
-2. **`ToolHandler.getTools()`** (line 748) — applies the same allowlist at the handler level, and additionally scales `codegraph_explore`'s budget description based on the number of indexed files (tiny repos under 500 files see only 3 tools: `explore`, `search`, `node`).
+Nodes by Kind:
+  import          7
+  method          7
+  file            4
+  namespace       3
+  class           2
+  route           2       ← Spring @GetMapping routes emitted
+  field           1
+  interface       1
 
-3. **`ToolHandler.execute()`** (line 1117) — a second enforcement point that returns an error result if a disallowed tool is called, guarding against clients that ignore the allowlist in `tools/list`.
-
-```typescript
-// Honor the optional tool allowlist (CODEGRAPH_MCP_TOOLS): a trimmed
-// surface rejects ablated tools defensively even if a client cached them.
-if (!this.isToolAllowed(toolName)) {
-  return this.errorResult(`Tool ${toolName} is disabled via CODEGRAPH_MCP_TOOLS`);
-}
+Files by Language:
+  java            3
+  xml             1       ← MyBatis XML mapper indexed
 ```
 
-The `CODEGRAPH_MCP_TOOLS` mechanism lets operators or A/B evaluation harnesses trim the tool surface without rebuilding the client configuration. It does not affect the CLI (`codegraph callees`, `codegraph impact`, etc.) or the programmatic library API.
+### 6.4 Validation: Java Class/Method
 
----
+```bash
+$ node dist/bin/codegraph.js query "listUsers" --path "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo"
 
-### 4.3 The `ToolHandler` Pattern
-
-`ToolHandler` (line 664, `src/mcp/tools.ts`) is the single class responsible for all MCP tool execution.
-
-#### Class responsibilities
-
-```typescript
-export class ToolHandler {
-  // Cross-project CodeGraph instance cache
-  private projectCache: Map<string, CodeGraph> = new Map();
-  // The default CodeGraph instance (set after lazy initialization)
-  private cg: CodeGraph | null = null;
-  // Git worktree mismatch cache (fixed per (cwd → .codegraph/) pair)
-  private worktreeMismatchCache: Map<string, WorktreeIndexMismatch | null> = new Map();
-  // Post-open reconcile gate (first tool call blocks on this)
-  private catchUpGate: Promise<void> | null = null;
-
-  constructor(cg: CodeGraph | null) {}
-  setDefaultCodeGraph(cg: CodeGraph): void { ... }
-  setCatchUpGate(p: Promise<void> | null): void { ... }
-  setDefaultProjectHint(searchedPath: string): void { ... }
-  hasDefaultCodeGraph(): boolean { ... }
-  getTools(): ToolDefinition[] { ... }
-  async execute(toolName: string, args: Record<string, unknown>): Promise<ToolResult> { ... }
-}
+Search Results for "listUsers":
+  method      listUsers  (8112%)
+    src/main/java/com/example/demo/UserController.java:14
+    String ()
 ```
 
-#### Dispatch pattern
+**Result: PASS** — `listUsers` method found at line 14 of `UserController.java` with correct `String ()` return type.
 
-`execute()` is a large `try` block that:
+### 6.5 Validation: @GetMapping Route
 
-1. **Awaits the catch-up gate** (line 1110) — the first tool call blocks on the engine's post-open filesystem reconcile so it never serves rows for files deleted while the MCP server was not running.
+```bash
+$ node dist/bin/codegraph.js query "users" --path "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo"
 
-2. **Checks the allowlist** (line 1117) — rejects disallowed tools defensively.
-
-3. **Validates path inputs** (line 1124) — bounds `projectPath`, `path`, and `pattern` lengths centrally to prevent abuse.
-
-4. **Dispatches** through a `switch` on `toolName` to the corresponding `handle*` private method:
-   - `handleSearch` → `codegraph_search`
-   - `handleCallers` → `codegraph_callers`
-   - `handleCallees` → `codegraph_callees`
-   - `handleImpact` → `codegraph_impact`
-   - `handleExplore` → `codegraph_explore`
-   - `handleNode` → `codegraph_node`
-   - `handleStatus` → `codegraph_status` (short-circuits the staleness wrapper to avoid duplication)
-   - `handleFiles` → `codegraph_files`
-
-5. **Wraps results** with worktree and staleness notices (line 1169).
-
-6. **Catches errors** and classifies them:
-   - `NotIndexedError` → `textResult()` (SUCCESS-shaped, no `isError`) — an agent must **not** abandon the toolset for indexed projects because of a per-project not-indexed condition.
-   - `PathRefusalError` → `errorResult()` with `isError: true` and **no retry note** — abandoning this path is the correct agent reaction.
-   - All other errors → `errorResult()` with retry encouragement, logged as internal errors.
-
-#### Cross-project queries
-
-`getCodeGraph(projectPath?)` (line 818) walks up from the provided path (or `process.cwd()`) to find the nearest `.codegraph/` directory, using `findNearestCodeGraphRoot`. Resolved instances are cached in `projectCache`. If the path resolves to the default project, the already-open default `CodeGraph` instance is reused to avoid opening a second DB connection.
-
-#### Project size scaling
-
-`getTools()` (line 748) adjusts the tool surface based on project size:
-- **Under 500 files**: only `explore`, `search`, `node` are listed (3 tools — `callers` collapses to one grep at this scale).
-- **500+ files**: the full 4-default or allowlisted set is shown.
-- `codegraph_explore` description is augmented with a per-project budget recommendation: `make at most N calls for this project (M files indexed)`.
-
----
-
-### 4.4 `serve --mcp` Bootstrap
-
-`serve --mcp` in `src/bin/codegraph.ts` (line 1375) is the entry point for the MCP server. It is never run by hand — AI agents launch it themselves over stdio.
-
-```typescript
-if (options.mcp) {
-  // Guard: if stdin is a TTY, this was typed by a human, not an agent.
-  // Explain instead of hanging on JSON-RPC input.
-  if (process.stdin.isTTY && !process.env.CODEGRAPH_DAEMON_INTERNAL) {
-    console.error(chalk.bold('\nCodeGraph MCP server\n'));
-    console.error("This is the MCP server your AI agent (Claude Code, Cursor, Codex, opencode, ...)");
-    console.error("starts automatically -- you don't run it yourself.");
-    // ... usage instructions
-    return;
-  }
-  // Start MCP server -- initialization is lazy based on rootUri from client
-  const { MCPServer } = await import('../mcp/index');
-  const server = new MCPServer(projectPath);
-  await server.start();
-  // Server runs until terminated
-}
+Search Results for "users":
+  route       GET /users      (740%)
+    src/main/java/com/example/demo/UserController.java:14
+  route       GET /users/count (738%)
+    src/main/java/com/example/demo/UserController.java:19
 ```
 
-**Bootstrap chain:**
+**Result: PASS** — Both `@GetMapping` routes (`GET /users` and `GET /users/count`) are emitted as `route` nodes and are searchable by their path string.
 
-1. `new MCPServer(projectPath)` — `src/mcp/index.ts` line 216. Stores the project path; all other state is initialized lazily.
-2. `server.start()` — decides the server mode:
-   - `CODEGRAPH_NO_DAEMON=1` → **direct mode**: one MCP session in the same process.
-   - `CODEGRAPH_DAEMON_INTERNAL=1` → **daemon mode**: the process **is** the detached daemon; listens on a Unix socket.
-   - No `.codegraph/` reachable → **direct mode** (fresh checkout case).
-   - Otherwise → **proxy mode**: answers the MCP handshake locally (instant, no waiting for daemon startup) and proxies tool **calls** to the shared daemon over a socket. The daemon is connected in the background; if it never comes up, the proxy falls back to an in-process engine.
+### 6.6 Validation: MyBatis XML Statement
 
-The **proxy mode with local handshake** is the default for an initialized project: it avoids the ~600 ms daemon spawn+bind cost on the cold path while still sharing one DB connection across sessions.
+```bash
+$ node dist/bin/codegraph.js query "findAll" --path "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo"
 
----
+Search Results for "findAll":
+  method      findAll  (9485%)
+    src/main/resources/mapper/UserMapper.xml:5
+    SELECT result=java.lang.String
+  method      findAll  (7993%)
+    src/main/java/com/example/demo/mapper/UserMapper.java:7
+    String ()
+```
 
-### 4.5 No Plugin Mechanism — Independent MCP Server Recommended
+**Result: PASS** — The `<select id="findAll">` SQL statement in the MyBatis XML is indexed as a `method` node with `qualifiedName = com.example.demo.mapper.UserMapper::findAll`. The Java mapper interface method is indexed separately with its own node. Both are distinguishable by file location.
 
-CodeGraph has **no plugin, hook, or extension mechanism** that allows other modules (such as springkg) to register additional MCP tools from outside the `tools[]` array. The tool registry is a static array in `src/mcp/tools.ts` compiled into the binary. There is no API anywhere in the codebase for a third-party package to contribute tools to a running CodeGraph server.
+### 6.7 Validation: Full Flow with `explore`
 
-**Consequence for springkg integration:**
+```bash
+$ node dist/bin/codegraph.js explore "listUsers GET /users findAll" \
+    --path "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo"
+```
 
-springkg cannot register its own `springkg_*` tools through CodeGraph. There is no `codegraph.registerTool()` API, no MCP tool hook, and no second-stage loader. The 8 tools defined in `tools[]` are the complete and only set.
+**Output (truncated to key sections):**
 
-**Recommended integration pattern: independent MCP server**
+```
+## Flow (call path among the symbols you queried)
 
-The correct way to add Spring/Kubernetes knowledge graph tools alongside CodeGraph is to run a **separate MCP server process** for springkg and wire it into the agent's MCP configuration independently:
+1. listUsers (src/main/java/com/example/demo/UserController.java:14)
+   ↓ calls
+2. findAll (src/main/java/com/example/demo/mapper/UserMapper.java:7)
+   ↓ calls
+3. findAll (src/main/resources/mapper/UserMapper.xml:5)
 
-```json
-{
-  "mcpServers": {
-    "codegraph": {
-      "type": "stdio",
-      "command": "codegraph",
-      "args": ["serve", "--mcp"]
-    },
-    "springkg": {
-      "type": "stdio",
-      "command": "springkg",
-      "args": ["serve", "--mcp"]
+## Exploration: listUsers GET /users findAll
+
+Found 13 symbols across 3 files.
+
+### Source Code
+
+#### src/main/java/com/example/demo/UserController.java
+    @GetMapping("/users")
+    public String listUsers() {
+        return userMapper.findAll();
     }
-  }
+
+#### src/main/java/com/example/demo/mapper/UserMapper.java
+@Mapper
+public interface UserMapper {
+    String findAll();
+    int count();
 }
+
+#### src/main/resources/mapper/UserMapper.xml
+<mapper namespace="com.example.demo.mapper.UserMapper">
+    <select id="findAll" resultType="java.lang.String">
+        SELECT name FROM users
+    </select>
 ```
 
-This pattern:
+**Result: PASS** — `explore` traces the full end-to-end flow: `listUsers` (Java controller) → `findAll` (Java mapper interface) → `findAll` (MyBatis XML statement). All three symbols return their verbatim source in one call.
 
-- Keeps the two tool registries fully independent — springkg is responsible only for its own `springkg_*` tools and their schemas.
-- Both servers appear in the agent's `tools/list` and the agent selects the right one per call.
-- springkg can use the same `codegraph_node_id` linking strategy described in §1.4 to reference CodeGraph nodes without any coupling to CodeGraph's internal tool registration.
-- No changes to CodeGraph source are required; springkg ships its own MCP server as a separate process and npm package.
+### 6.8 Summary
+
+| Check | Command | Outcome |
+|---|---|---|
+| Java class/method search | `query "listUsers"` | ✅ Found with kind=method, signature `String ()` |
+| `@GetMapping` route search | `query "users"` | ✅ Found `GET /users` and `GET /users/count` as kind=route |
+| MyBatis XML statement search | `query "findAll"` | ✅ Found in `UserMapper.xml` as kind=method |
+| End-to-end flow trace | `explore "listUsers GET /users findAll"` | ✅ Full flow: controller → mapper interface → XML SQL |
+| `init` + `index` | `codegraph init --index` | ✅ 4 files, 27 nodes, 35 edges in 304ms |
+| `status` | `codegraph status` | ✅ Backend `node:sqlite`, journal `wal` |
+
+All three validation targets (Java class/method, `@GetMapping` route, MyBatis XML statement) are correctly indexed and queryable. The `explore` tool successfully connects a Spring MVC route → controller method → MyBatis mapper interface → XML SQL statement across language boundaries, confirming that the extraction and resolution pipeline works end-to-end for a minimal Spring Boot + MyBatis project.
+
+### 6.9 Notes on the MyBatis Flow Gap
+
+As documented in §3, the Java mapper interface method and the MyBatis XML statement are both in the graph but have different `qualifiedName` formats:
+
+- Java interface: `com.example.demo.mapper.UserMapper.findAll`
+- XML statement: `com.example.demo.mapper.UserMapper::findAll`
+
+The `explore` output above shows they appear as two distinct `method` nodes in the flow chain. The `explore` tool was able to connect them because both symbols were included in the same query bag — the flow was:
+
+```
+listUsers (Java method)
+  → findAll (Java mapper interface method)   [via calls edge from tree-sitter]
+  → findAll (MyBatis XML statement method)  [heuristic link via qualified name suffix match]
+```
+
+The heuristic XML link exists because the XML node's `qualifiedName` (`com.example.demo.mapper.UserMapper::findAll`) was matched to the Java interface method's `findAll` name as part of the flow reconstruction in `explore`. The missing `mybatis.ts` synthesizer (noted in §3.4) means this link is not yet a first-class resolved edge — it is surfaced as a heuristic hop in `explore` output when both symbols appear in the same query.
+

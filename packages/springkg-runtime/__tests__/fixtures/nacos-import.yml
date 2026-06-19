@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: test-service
+  config:
+    import: nacos:order-dev.yaml?group=DEFAULT_GROUP&namespace=dev&refreshEnabled=false

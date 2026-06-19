@@ -1,0 +1,38 @@
+# Evidence: Task 16 - MiddlewareInventory
+
+## Test Results
+```
+cd packages/springkg-runtime && npx vitest run middleware-inventory --reporter=verbose
+
+✓ case 1: spring.datasource.url=jdbc:mysql://10.0.0.1:3306/order_db -> 1 middleware (mysql), 1 CONNECTS_TO edge
+✓ case 2: Multi-datasource (spring.datasource.order.url, spring.datasource.bill.url) -> 2 distinct middleware nodes
+✓ case 3: spring.redis.host=10.0.0.2, spring.redis.port=6379 -> 1 cache/redis middleware
+✓ case 4: spring.kafka.bootstrap-servers=10.0.0.3:9092 -> 1 mq/kafka
+✓ case 5: spring.rabbitmq.host=10.0.0.4 -> 1 mq/rabbitmq
+✓ case 6: xxl.job.admin.addresses=http://10.0.0.5:8080/xxl-job-admin -> 1 job_scheduler/xxl-job
+
+6 passed | middleware-inventory.test.ts
+```
+
+## TypeScript Compilation
+```
+cd packages/springkg-runtime && npx tsc --noEmit
+(no output = success)
+```
+
+## Implementation Summary
+- packages/springkg-runtime/src/middleware-inventory.ts
+
+## Middleware Types Supported
+- Database: spring.datasource.* (mysql, postgresql, oracle, sqlserver)
+- Cache: spring.redis.*
+- MQ: spring.kafka.*, spring.rabbitmq.*
+- Search: spring.elasticsearch.*
+- Job Scheduler: xxl.job.*
+- Object Storage: minio.*, oss.*
+
+## Key Features
+- Infers middleware from runtime_config_properties (populated by T15)
+- Creates CONNECTS_TO edges from micro_service to middleware
+- Supports multi-datasource patterns (spring.datasource.order.url, spring.datasource.bill.url)
+- Deterministic IDs using sha256 hash

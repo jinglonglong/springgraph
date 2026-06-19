@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: test-service
+  cloud:
+    nacos:
+      config:
+        shared-configs:
+          - data-id: shared-common.yaml
+            group: SHARED_GROUP
+            file-extension: yaml
+          - data-id: shared-datasource.yaml
+            group: SHARED_GROUP
+        ext-config:
+          - data-id: order.yaml
+            group: ORDER_GROUP
+            file-extension: yaml
+            refresh-enabled: true

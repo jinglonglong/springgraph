@@ -135,7 +135,7 @@ function classifyNode(node: CodegraphNodeLike): SpringEntity | null {
 
 function buildSpringNode(entity: ClassifiedEntity, timestamp: number): SpringKgNode {
   return {
-    id: hashId(entity.kind, [entity.kind, entity.codegraphNodeId, entity.sourceNode.filePath, entity.sourceNode.qualifiedName]),
+    id: hashId(entity.kind, [entity.kind, entity.codegraphNodeId, entity.sourceNode.filePath, entity.sourceNode.qualifiedName ?? '']),
     kind: entity.kind,
     codegraphNodeId: entity.codegraphNodeId,
     name: entity.sourceNode.name,

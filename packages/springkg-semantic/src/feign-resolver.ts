@@ -270,7 +270,7 @@ function extractMethodResolutions(
 
 function buildFeignClientNode(sourceNode: CodegraphNodeLike, spec: FeignClientSpec, timestamp: number): SpringKgNode {
   return {
-    id: hashId('feign_client', ['feign_client', sourceNode.id, sourceNode.filePath, sourceNode.qualifiedName]),
+    id: hashId('feign_client', ['feign_client', sourceNode.id, sourceNode.filePath, sourceNode.qualifiedName ?? '']),
     kind: 'feign_client',
     codegraphNodeId: sourceNode.id,
     name: sourceNode.name,

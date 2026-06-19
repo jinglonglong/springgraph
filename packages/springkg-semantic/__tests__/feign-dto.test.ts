@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { FeignRequestResponseType } from '../src/feign-dto';
 import type { CodegraphEdgeLike, CodegraphNodeLike, SpringKgEdge, SpringKgNode } from '../src/shared-types';
+import { makeCodegraphStub } from '../src/shared-types';
 
 function makeInterfaceNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
   const id = overrides.id ?? 'feign-client-1';
@@ -80,7 +81,7 @@ function makeParameterNode(overrides: Partial<CodegraphNodeLike> = {}): Codegrap
 
 async function enhance(nodes: CodegraphNodeLike[], edges: CodegraphEdgeLike[] = []) {
   const resolver = new FeignRequestResponseType();
-  return resolver.enhance({ codegraphNodes: nodes, codegraphEdges: edges });
+  return resolver.enhance({ codegraphNodes: nodes, codegraphEdges: edges, changedFiles: [], cg: makeCodegraphStub() });
 }
 
 function findDtoNodes(nodes: readonly SpringKgNode[]): SpringKgNode[] {

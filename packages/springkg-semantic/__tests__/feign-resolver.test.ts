@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { FeignResolver } from '../src/feign-resolver';
 import type { CodegraphEdgeLike, CodegraphNodeLike, SpringKgNode } from '../src/shared-types';
+import { makeCodegraphStub } from '../src/shared-types';
 
 function makeInterfaceNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
   const id = overrides.id ?? 'feign-client-1';
@@ -80,7 +81,7 @@ function makeParameterNode(overrides: Partial<CodegraphNodeLike> = {}): Codegrap
 
 async function enhance(nodes: CodegraphNodeLike[], edges: CodegraphEdgeLike[] = []) {
   const resolver = new FeignResolver();
-  return resolver.enhance({ codegraphNodes: nodes, codegraphEdges: edges });
+  return resolver.enhance({ codegraphNodes: nodes, codegraphEdges: edges, changedFiles: [], cg: makeCodegraphStub() });
 }
 
 function findNode(nodes: SpringKgNode[], kind: SpringKgNode['kind']): SpringKgNode {

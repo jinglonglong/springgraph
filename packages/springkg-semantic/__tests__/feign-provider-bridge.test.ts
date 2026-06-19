@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { FeignProviderBridge } from '../src/feign-provider-bridge';
 import type { CodegraphNodeLike } from '../src/shared-types';
+import { makeCodegraphStub } from '../src/shared-types';
 
 function makeNode(overrides: Partial<CodegraphNodeLike> & Pick<CodegraphNodeLike, 'id' | 'kind' | 'name'>): CodegraphNodeLike {
   return {
@@ -27,7 +28,7 @@ function makeNode(overrides: Partial<CodegraphNodeLike> & Pick<CodegraphNodeLike
 
 async function enhance(nodes: CodegraphNodeLike[]) {
   const resolver = new FeignProviderBridge();
-  return resolver.enhance({ codegraphNodes: nodes, codegraphEdges: [] });
+  return resolver.enhance({ codegraphNodes: nodes, codegraphEdges: [], changedFiles: [], cg: makeCodegraphStub() });
 }
 
 describe('FeignProviderBridge', () => {

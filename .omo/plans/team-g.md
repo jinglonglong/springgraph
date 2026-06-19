@@ -510,7 +510,7 @@ Team G 是 7 团队并行模式中的 1 个，负责**验证 + 示例 + 文档**
     - Tool: vitest
     - Steps: search_feature({query:"订单"}) 返回相关 community
 
-- [ ] 14. [G] T58 — Sprint 4 文档 + README + 最终 CHANGELOG
+- [x] 14. [G] T58 — Sprint 4 文档 + README + 最终 CHANGELOG
 
   **What to do**:
   - `docs/mcp-tools.md` 完整（14 个工具）
@@ -537,7 +537,7 @@ Team G 是 7 团队并行模式中的 1 个，负责**验证 + 示例 + 文档**
     - Tool: Bash
     - Steps: `ls docs/` 看到 5 个 .md
 
-- [ ] 15. [G] T67 — demo Coverage Matrix
+- [x] 15. [G] T67 — demo Coverage Matrix
 
   **What to do**:
   - `examples/springcloud-demo/README.md`：
@@ -578,15 +578,15 @@ Team G 是 7 团队并行模式中的 1 个，负责**验证 + 示例 + 文档**
 
 ## Definition of Done (Team G)
 
-- [ ] 6 份 source-analysis 文档（Sprint 0）
-- [ ] 4 个 sprint 集成测试 0 失败
-- [ ] demo 项目完整（10+ Java 文件）
-- [ ] 5 份文档完整
-- [ ] CHANGELOG 4 个 sprint 条目
-- [ ] README springkg 章节
-- [ ] V1 §1-§10 全部验证
-- [ ] F1-F4 final verification 全部 APPROVE
-- [ ] **不修改** `packages/codegraph/` 或 `packages/springkg-*/` 任何代码
+- [x] 6 份 source-analysis 文档（Sprint 0）
+- [x] 4 个 sprint 集成测试 0 失败
+- [x] demo 项目完整（10+ Java 文件）
+- [x] 5 份文档完整
+- [x] CHANGELOG 4 个 sprint 条目
+- [x] README springkg 章节
+- [x] V1 §1-§10 全部验证
+- [x] F1-F4 final verification 全部 APPROVE
+- [x] **不修改** `packages/codegraph/` 或 `packages/springkg-*/` 任何代码
 
 ---
 

@@ -19,6 +19,8 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### New Features (springkg)
 
+- SpringKg: Added `spring_search_feature` MCP tool for searching feature communities -- groups of semantically related Spring symbols (controllers, services, mappers, entities) representing a bounded business capability -- by keyword query, returning community name, score, and member symbols with their locations.
+- SpringKg: Added `OrderController`, `OrderService`, and `OrderMapper` to the demo project, establishing the `order-management` feature community for validating community search, @Scheduled task extraction, and transactional service tracing.
 - SpringKg: Added `spring_find_config` MCP tool for querying configuration properties by key, returning definition location, Spring profile, sensitivity flag, and all usage sites where the property is injected via `@Value` or `@ConfigurationProperties`. Sensitive values are masked in the response.
 - SpringKg: Added `spring_nacos_overview` MCP tool for listing Nacos clusters, namespaces, data IDs, and registered services discovered from `application.yml` and Nacos config entries.
 - SpringKg: Added `spring_gateway_route` MCP tool for listing Spring Cloud Gateway route definitions with path patterns, target services, predicates, and filters.

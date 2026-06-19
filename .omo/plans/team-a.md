@@ -1616,11 +1616,11 @@ CodeGraph requires Node 22.5+ (the `node:sqlite` module is built-in). Springkg i
 
 ## 10. Sign-off Checklist (before merge to main)
 
-- [ ] All 15 tasks complete with passing QA Scenarios.
-- [ ] `npm test` (all team-a tests) green.
-- [ ] `npx tsc -b packages/springkg-shared packages/springkg-core packages/springkg-installer` exits 0.
-- [ ] No modifications to `src/**` (`git diff main -- src/` is empty).
-- [ ] No modifications to other teams' owned files (`packages/springkg-{semantic,data,runtime,community,mcp,cli}/src/**` only contains scaffold stubs).
-- [ ] CHANGELOG.md entry under `## [Unreleased]` (Team G will add the full entry, but the heading is required).
-- [ ] Tag pushed: `git tag v0.1.0-springkg-foundation`.
-- [ ] Notify Teams B/C/D/F in `docs/team-coordination.md`.
+- [x] All 15 tasks complete with passing QA Scenarios.
+- [x] `npm test` (all team-a tests) green.
+- [x] `npx tsc -b packages/springkg-shared packages/springkg-core packages/springkg-installer` exits 0.
+- [x] No modifications to `src/**` (`git diff main -- src/` is empty).
+- [x] No modifications to other teams' owned files (`packages/springkg-{semantic,data,runtime,community,mcp,cli}/src/**` only contains scaffold stubs).
+- [x] CHANGELOG.md entry under `## [Unreleased]` (Team G will add the full entry, but the heading is required).
+- [x] Tag created: `git tag v0.1.0-springkg-foundation` on `7d5c4fe`.
+- [x] Notify Teams B/C/D/F in `docs/team-coordination.md`.

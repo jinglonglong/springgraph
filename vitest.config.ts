@@ -4,6 +4,11 @@ export default defineConfig({
   resolve: {
     external: ['node:sqlite'],
   },
+  server: {
+    deps: {
+      external: ['node:sqlite'],
+    },
+  },
   test: {
     globals: true,
     environment: 'node',

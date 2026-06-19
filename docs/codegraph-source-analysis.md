@@ -338,6 +338,117 @@ The QueryBuilder uses prepared statements for all hot paths and an LRU node cach
 
 ---
 
+## 4. MCP Architecture
+
+### 4.1 Server Entry Point (`codegraph serve --mcp`)
+
+`src/bin/codegraph.ts` exposes `codegraph serve` (hidden from `--help` — it is the stdio entry point an AI agent launches for itself, not a human command). The `--mcp` flag triggers MCP server mode:
+
+```typescript
+.command('serve', { hidden: true })
+.option('--mcp', 'Run as MCP server (stdio transport)')
+.option('-p, --path <path>', 'Project path')
+.option('--no-watch', 'Disable the file watcher')
+```
+
+The `MCPServer` class is imported lazily (`await import('../mcp/index')`) so the heavy extraction/grammar chain never loads on the critical path of an agent startup that only needs to answer `tools/list`.
+
+### 4.2 MCPServer (`src/mcp/index.ts`)
+
+`MCPServer` is the top-level server class. It has three runtime modes decided at `start()`:
+
+| Mode | Trigger | Description |
+|---|---|---|
+| `direct` | `CODEGRAPH_NO_DAEMON=1`, or no `.codegraph/` reachable | Single-process stdio session. Pre-#411 behavior. |
+| `proxy` | Default when `.codegraph/` is reachable | Local handshake + forwards calls to a shared daemon over a Unix socket / named pipe. Handshake is instant; daemon connects in background. |
+| `daemon` | Spawned by proxy when no daemon is running | Detached background process holding the shared SQLite + watcher. Survives session ends; reaped by idle timeout or refcount. |
+
+The proxy mode answers the MCP handshake (tool schemas) instantly from the local process while forwarding actual tool calls to the background daemon, eliminating the ~600ms cold-start penalty that previously raced with the agent's first query.
+
+The daemon is spawned via `spawnDetachedDaemon()` which re-invokes the CLI with `CODEGRAPH_DAEMON_INTERNAL=1`, ensuring the same binary (bundled or npm) serves as both CLI and daemon.
+
+### 4.3 Tool Registration (`tools[]` at `src/mcp/tools.ts` line 415)
+
+All tool definitions live in the `tools` array (line 415), a `ToolDefinition[]` exported from `src/mcp/tools.ts`. Each entry has `name`, `description`, and `inputSchema`.
+
+**Default 4-tool surface** (what agents see by default):
+
+| Tool | Name | Purpose |
+|---|---|---|
+| `codegraph_explore` | PRIMARY | Any question / flow / "how does X work" — one call returns verbatim source of relevant symbols plus the call path |
+| `codegraph_node` | SECONDARY | One symbol's full source + caller/callee trail, or read a whole file with line numbers (drop-in replacement for Read) |
+| `codegraph_search` | Lookup | Find symbols by name across the codebase |
+| `codegraph_callers` | Enumeration | Every call site of a function, including callback registrations and multiple same-named definitions |
+
+**Four unlisted tools** (`callees`, `impact`, `files`, `status`) remain fully functional via CLI and library API but are not shown to agents. The evidence for cutting them: `impact` appears in zero recorded eval runs (its blast-radius info already arrives inline on explore/node), `callees` is redundant by construction (a symbol's body IS its callee list), and `files`/`status` reduce to one grep.
+
+**Tool allowlist — `CODEGRAPH_MCP_TOOLS` env var:**
+
+```typescript
+// src/mcp/tools.ts line 625-631
+export function getStaticTools(): ToolDefinition[] {
+  const raw = process.env.CODEGRAPH_MCP_TOOLS;
+  if (!raw || !raw.trim()) {
+    return tools.filter(t => DEFAULT_MCP_TOOLS.has(t.name.replace(/^codegraph_/, '')));
+  }
+  const allow = new Set(raw.split(',').map(s => s.trim().replace(/^codegraph_/, '')).filter(Boolean));
+  return allow.size ? tools.filter(t => allow.has(t.name.replace(/^codegraph_/, ''))) : tools;
+}
+```
+
+Set `CODEGRAPH_MCP_TOOLS=explore,node,search,callers,impact` to re-enable unlisted tools. The allowlist is checked at both `tools/list` (so disallowed tools are genuinely absent from the schema) and at `execute()` (so a client that cached the old list gets a clear error).
+
+### 4.4 No Plugin Mechanism
+
+CodeGraph has **no plugin mechanism**. Adding a new tool requires modifying `src/mcp/tools.ts` directly — adding an entry to the `tools[]` array and implementing its handler in `ToolHandler`. There is no plugin API, hook system, or external loader.
+
+**Recommended integration pattern for custom tools:** run a **separate MCP server** alongside CodeGraph rather than extending it. The agent's MCP config can list multiple servers:
+
+```json
+{
+  "mcpServers": {
+    "codegraph": {
+      "command": "codegraph",
+      "args": ["serve", "--mcp"]
+    },
+    "my-custom-server": {
+      "command": "node",
+      "args": ["path/to/my-mcp-server/dist/index.js"]
+    }
+  }
+}
+```
+
+### 4.5 ToolHandler and Execution Flow
+
+`ToolHandler` (line 664) wraps a `CodeGraph` instance and implements all tool handlers. Key design points:
+
+- **Lazy CodeGraph loading:** `loadCodeGraph()` uses `require()` (cached, synchronous) to pull in the SQLite/grammar chain only when a tool actually runs, not on server startup. This keeps `tools/list` fast.
+- **Cross-project queries:** `getCodeGraph(projectPath?)` walks up directories to find `.codegraph/`, caches by resolved root, and refuses sensitive system paths via `validateProjectPath`.
+- **Input validation:** `validateString()` and `validateOptionalPath()` enforce `MAX_INPUT_LENGTH` (10,000 chars) and `MAX_PATH_LENGTH` (4,096 chars) centrally, before any tool-specific logic runs.
+- **Error handling:** `NotIndexedError` returns a SUCCESS-shaped response with guidance (not `isError: true`) so one unindexed workspace never teaches the agent to abandon the whole toolset. `PathRefusalError` is the one `isError: true` case — a genuine security refusal.
+- **Staleness banners:** `withStalenessNotice()` prepends a per-file warning when the response references files that the watcher has not yet synced. A footer lists pending files elsewhere in the project.
+
+The `execute()` switch (line 1146) routes to `handleSearch`, `handleCallers`, `handleCallees`, `handleImpact`, `handleExplore`, `handleNode`, `handleStatus`, `handleFiles`.
+
+### 4.6 Dynamic Tool Surface and Explore Budget
+
+`getTools()` (line 748) is the dynamic variant used after a project is open. It adapts the tool surface to project size:
+
+- **Under 500 files:** only `explore`, `search`, `node` are exposed (not even `callers` — at this scale it reduces to one grep). Empirical floor: cutting below 5 tools caused regressions on single-file-framework repos.
+- **500+ files:** the full default 4-tool surface.
+- **`codegraph_explore` description** is augmented with a per-project budget recommendation: "make at most N calls for this project (X files indexed)" — scaled by `getExploreBudget(fileCount)` which returns 1-5 based on file count tiers.
+
+### 4.7 Server Instructions (`src/mcp/server-instructions.ts`)
+
+This file exports `SERVER_INSTRUCTIONS` (the full playbook) and `SERVER_INSTRUCTIONS_UNINDEXED` (a short "inactive" note). Both are sent in the MCP `initialize` response and surface directly in the agent's system prompt.
+
+`SERVER_INSTRUCTIONS_UNINDEXED` is the single source of truth for agent-facing tool guidance. The installer no longer writes a duplicate instructions block into agent config files (the previous cause of issue #529 — the two copies would diverge).
+
+The indexed instructions cover: tool selection by intent, common chains (flow = one `explore`, refactor = `callers` then `node`), anti-patterns (don't grep when search is faster, don't chain search+node when one explore suffices), and limitations (index lags ~1s, cross-file resolution is best-effort, no live correctness validation).
+
+---
+
 ## 2. Java Extractor
 
 The Java extractor is defined in `src/extraction/languages/java.ts` and wired into the general `TreeSitterExtractor` in `src/extraction/tree-sitter.ts`. It handles all JVM source files (`.java`; Kotlin uses the same resolver but has its own extractor).

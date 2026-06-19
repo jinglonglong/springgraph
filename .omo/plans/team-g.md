@@ -394,7 +394,7 @@ Team G 是 7 团队并行模式中的 1 个，负责**验证 + 示例 + 文档**
 
 ### Phase G2: Sprint 2-3 demo 扩展 + e2e (Tasks 35, 36, 46)
 
-- [ ] 10. [G] T35 — demo MyBatis 扩展
+- [x] 10. [G] T35 — demo MyBatis 扩展
 
   **What to do**:
   - 在 `examples/springcloud-demo/` 中：

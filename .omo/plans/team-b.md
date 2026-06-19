@@ -122,12 +122,12 @@ All six tasks share this fixture convention. From a CodeGraph `Node` (kind=`clas
 
 ---
 
-- [ ] 1. [B] AnnotationSemanticEngine in `packages/springkg-semantic/src/annotation-engine.ts` — classify Spring stereotypes, REUSE for CodeGraph-known, ADD for unknown
-- [ ] 2. [B] EndpointResolver in `packages/springkg-semantic/src/endpoint-resolver.ts` — merge class+method `@RequestMapping`, fan out multi-path, extract request/response DTOs
-- [ ] 3. [B] FeignResolver in `packages/springkg-semantic/src/feign-resolver.ts` — detect `@FeignClient` interfaces, parse attributes, emit feign_method nodes
-- [ ] 4. [B] FeignProviderBridge in `packages/springkg-semantic/src/feign-provider-bridge.ts` — match feign_method to provider endpoint (same-monorepo exact, cross-service by name)
-- [ ] 5. [B] FeignRequestResponseType in `packages/springkg-semantic/src/feign-dto.ts` — extract request/response DTOs from Feign method signatures
-- [ ] 6. [B] Add vs Reuse policy in `packages/springkg-semantic/src/policy.ts` — enforce REUSE/ADD lists, implement dedup, document hand-offs to Team C/D
+- [x] 1. [B] AnnotationSemanticEngine in `packages/springkg-semantic/src/annotation-engine.ts` — classify Spring stereotypes, REUSE for CodeGraph-known, ADD for unknown
+- [x] 2. [B] EndpointResolver in `packages/springkg-semantic/src/endpoint-resolver.ts` — merge class+method `@RequestMapping`, fan out multi-path, extract request/response DTOs
+- [x] 3. [B] FeignResolver in `packages/springkg-semantic/src/feign-resolver.ts` — detect `@FeignClient` interfaces, parse attributes, emit feign_method nodes
+- [x] 4. [B] FeignProviderBridge in `packages/springkg-semantic/src/feign-provider-bridge.ts` — match feign_method to provider endpoint (same-monorepo exact, cross-service by name)
+- [x] 5. [B] FeignRequestResponseType in `packages/springkg-semantic/src/feign-dto.ts` — extract request/response DTOs from Feign method signatures
+- [x] 6. [B] Add vs Reuse policy in `packages/springkg-semantic/src/policy.ts` — enforce REUSE/ADD lists, implement dedup, document hand-offs to Team C/D
 
 ---
 

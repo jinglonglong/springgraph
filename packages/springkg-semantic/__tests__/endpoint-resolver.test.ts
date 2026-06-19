@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { EndpointResolver } from '../src/endpoint-resolver';
 import type { CodegraphEdgeLike, CodegraphNodeLike, SpringKgEdge, SpringKgNode } from '../src/shared-types';
+import { makeCodegraphStub } from '../src/shared-types';
 
 function makeClassNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
   const id = overrides.id ?? 'controller-1';
@@ -80,7 +81,7 @@ function makeParameterNode(overrides: Partial<CodegraphNodeLike> = {}): Codegrap
 
 async function enhance(nodes: CodegraphNodeLike[], edges: CodegraphEdgeLike[] = []) {
   const resolver = new EndpointResolver();
-  return resolver.enhance({ codegraphNodes: nodes, codegraphEdges: edges });
+  return resolver.enhance({ codegraphNodes: nodes, codegraphEdges: edges, changedFiles: [], cg: makeCodegraphStub() });
 }
 
 function findHandledBy(edges: readonly SpringKgEdge[]) {

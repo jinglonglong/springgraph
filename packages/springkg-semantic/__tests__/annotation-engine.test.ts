@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { AnnotationSemanticEngine } from '../src/annotation-engine';
 import type { CodegraphEdgeLike, CodegraphNodeLike, SpringKgNodeKind } from '../src/shared-types';
+import { makeCodegraphStub } from '../src/shared-types';
 
 function makeClassNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
   const id = overrides.id ?? 'class-1';
@@ -62,7 +63,7 @@ function makeChildNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNod
 
 async function enhance(nodes: CodegraphNodeLike[], edges: CodegraphEdgeLike[] = []) {
   const engine = new AnnotationSemanticEngine();
-  return engine.enhance({ codegraphNodes: nodes, codegraphEdges: edges });
+  return engine.enhance({ codegraphNodes: nodes, codegraphEdges: edges, changedFiles: [], cg: makeCodegraphStub() });
 }
 
 describe('AnnotationSemanticEngine', () => {

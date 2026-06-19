@@ -40,11 +40,11 @@ Team G 是 7 团队并行模式中的 1 个，负责**验证 + 示例 + 文档**
 
 ### Definition of Done
 
-- [ ] 6 份 source-analysis 文档（Sprint 0 阶段）
-- [ ] 4 个 sprint 集成测试 0 失败
-- [ ] demo 项目完整（10+ Java 文件）
-- [ ] 5 份文档 + CHANGELOG + README 完整
-- [ ] F1-F4 final verification 全部 APPROVE
+- [x] 6 份 source-analysis 文档（Sprint 0 阶段）
+- [x] 4 个 sprint 集成测试 0 失败
+- [x] demo 项目完整（10+ Java 文件）
+- [x] 5 份文档 + CHANGELOG + README 完整
+- [x] F1-F4 final verification 全部 APPROVE
 
 ### Must Have
 

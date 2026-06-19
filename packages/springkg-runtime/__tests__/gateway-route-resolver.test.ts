@@ -1,85 +1,151 @@
-import { describe, expect, it, beforeEach } from 'vitest';
-
-import { GatewayRouteResolver } from '../src/gateway-route-resolver';
+import { describe, it, expect, beforeEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { GatewayRouteResolver } from '../src/gateway-route-resolver.js';
 
 function createMockKg() {
-  const symbols: any[] = [];
-  const edges: any[] = [];
-
   return {
-    symbols,
-    edges,
-    async upsertSymbol(node: any) {
-      const idx = symbols.findIndex((s) => s.id === node.id);
-      if (idx >= 0) symbols[idx] = node;
-      else symbols.push(node);
+    symbols: [] as any[],
+    edges: [] as any[],
+    upsertSymbol: async function(this: any, symbol: any) {
+      const existing = this.symbols.findIndex((s: any) => s.id === symbol.id);
+      if (existing >= 0) {
+        this.symbols[existing] = symbol;
+      } else {
+        this.symbols.push(symbol);
+      }
     },
-    async upsertEdge(edge: any) {
-      const idx = edges.findIndex((e) => e.id === edge.id);
-      if (idx >= 0) edges[idx] = edge;
-      else edges.push(edge);
-    },
+    upsertEdge: async function(this: any, edge: any) {
+      const existing = this.edges.findIndex((e: any) => e.id === edge.id);
+      if (existing >= 0) {
+        this.edges[existing] = edge;
+      } else {
+        this.edges.push(edge);
+      }
+    }
   };
+}
+
+function createFixtureDir(): string {
+  return mkdtempSync(path.join(tmpdir(), 'springkg-gateway-test-'));
+}
+
+function createGatewayRoutesYml(dir: string, content: string) {
+  const resourcesDir = path.join(dir, 'src', 'main', 'resources');
+  fs.mkdirSync(resourcesDir, { recursive: true });
+  fs.writeFileSync(path.join(resourcesDir, 'application.yml'), content);
 }
 
 describe('GatewayRouteResolver', () => {
   let resolver: GatewayRouteResolver;
-  let kg: ReturnType<typeof createMockKg>;
 
   beforeEach(() => {
     resolver = new GatewayRouteResolver();
-    kg = createMockKg();
   });
 
-  it('extracts route with uri and id', () => {
-    resolver.addRoute({
-      id: 'user-route',
-      uri: 'http://user-service:8080',
-      sourceFile: 'gateway.yml',
-    });
+  it('case 1: Single route id=order_route, uri=lb://order-service, predicates=[Path=/api/order/**] -> 1 gateway_route, 1 ROUTES_TO, 1 MATCHES_PATH', async () => {
+    const dir = createFixtureDir();
+    createGatewayRoutesYml(dir, `
+spring:
+  application:
+    name: gateway-service
+  cloud:
+    gateway:
+      routes:
+        - id: order_route
+          uri: lb://order-service
+          predicates:
+            - Path=/api/order/**
+`);
 
-    const result = resolver.resolve();
-    expect(result.symbols).toHaveLength(1);
-    expect(result.symbols[0].kind).toBe('gateway_route');
-    expect(result.symbols[0].name).toBe('user-route');
-    expect(result.symbols[0].qualifiedName).toBe('http://user-service:8080');
+    const kg = createMockKg();
+    const result = await resolver.enhance({ projectPath: dir, kg });
+
+    expect(result.routesCount).toBe(1);
+    expect(result.routesToEdges).toBe(1);
+    expect(result.matchesPathEdges).toBe(1);
+
+    const route = kg.symbols.find(s => s.kind === 'gateway_route');
+    expect(route).toBeDefined();
+    expect(route.metadata.uri).toBe('lb://order-service');
   });
 
-  it('captures predicates and filters in metadata', () => {
-    resolver.addRoute({
-      id: 'api-route',
-      uri: 'lb://api-service',
-      predicates: ['Path=/api/**'],
-      filters: ['StripPrefix=1'],
-      sourceFile: 'gateway.yml',
-    });
+  it('case 2: Three routes, two lb://, one https://api.example.com -> 3 gateway_routes, 2 ROUTES_TO (micro_service), 1 ROUTES_TO (external)', async () => {
+    const dir = createFixtureDir();
+    createGatewayRoutesYml(dir, `
+spring:
+  application:
+    name: gateway-service
+  cloud:
+    gateway:
+      routes:
+        - id: order_route
+          uri: lb://order-service
+          predicates:
+            - Path=/api/order/**
+        - id: payment_route
+          uri: lb://payment-service
+          predicates:
+            - Path=/api/pay/**
+        - id: external_route
+          uri: https://api.example.com
+          predicates:
+            - Path=/external/**
+`);
 
-    const result = resolver.resolve();
-    expect(result.symbols[0].metadata?.predicates).toEqual(['Path=/api/**']);
-    expect(result.symbols[0].metadata?.filters).toEqual(['StripPrefix=1']);
+    const kg = createMockKg();
+    const result = await resolver.enhance({ projectPath: dir, kg });
+
+    expect(result.routesCount).toBe(3);
+    expect(result.routesToEdges).toBe(3);
+
+    const routesToEdges = kg.edges.filter(e => e.kind === 'ROUTES_TO');
+    expect(routesToEdges.length).toBe(3);
   });
 
-  it('handles multiple routes', () => {
-    resolver.addRoute({ id: 'route-a', uri: 'http://a.com' });
-    resolver.addRoute({ id: 'route-b', uri: 'http://b.com' });
-    resolver.addRoute({ id: 'route-c', uri: 'http://c.com' });
+  it('case 3: Multi-predicate predicates=[Path=/api/order/**, Method=GET,POST] -> 1 MATCHES_PATH, Method in metadata', async () => {
+    const dir = createFixtureDir();
+    createGatewayRoutesYml(dir, `
+spring:
+  application:
+    name: gateway-service
+  cloud:
+    gateway:
+      routes:
+        - id: order_route
+          uri: lb://order-service
+          predicates:
+            - Path=/api/order/**
+            - Method=GET,POST
+`);
 
-    const result = resolver.resolve();
-    expect(result.symbols).toHaveLength(3);
+    const kg = createMockKg();
+    await resolver.enhance({ projectPath: dir, kg });
+
+    const route = kg.symbols.find(s => s.kind === 'gateway_route');
+    expect(route).toBeDefined();
+    expect(route.metadata.predicates).toContain('Path=/api/order/**');
+    expect(route.metadata.predicates).toContain('Method=GET,POST');
   });
 
-  it('updates existing route when added again with same id', () => {
-    resolver.addRoute({
-      id: 'dynamic-route',
-      uri: 'http://old.com',
-    });
-    resolver.addRoute({
-      id: 'dynamic-route',
-      uri: 'http://new.com',
-    });
+  it('case 4: Empty routes: [] -> 0 gateway_routes (no errors)', async () => {
+    const dir = createFixtureDir();
+    createGatewayRoutesYml(dir, `
+spring:
+  application:
+    name: gateway-service
+  cloud:
+    gateway:
+      routes: []
+`);
 
-    const result = resolver.resolve();
-    expect(result.symbols).toHaveLength(1);
-    expect(result.symbols[0].qualifiedName).toBe('http://new.com');
+    const kg = createMockKg();
+    const result = await resolver.enhance({ projectPath: dir, kg });
+
+    expect(result.routesCount).toBe(0);
+    expect(result.routesToEdges).toBe(0);
+    expect(result.matchesPathEdges).toBe(0);
   });
 });

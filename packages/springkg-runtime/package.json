@@ -1,17 +1,28 @@
 {
-  "name": "@colbymchenry/springkg-runtime",
+  "name": "@springkg/runtime",
   "version": "0.1.0",
+  "description": "SpringCloud runtime asset extraction - config properties, middleware, Nacos, Gateway routes",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./sync-nacos": "./dist/sync-nacos.js"
+  },
   "scripts": {
-    "build": "tsc && npm run copy-assets",
-    "copy-assets": "node -e \"const fs=require('fs'),path=require('path');fs.mkdirSync('dist/db',{recursive:true});fs.copyFileSync('src/db/schema.sql','dist/db/springkg-schema.sql')\""
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@colbymchenry/springkg-shared": "0.1.0"
+    "js-yaml": "^4.1.0"
   },
-  "peerDependencies": {
-    "@colbymchenry/codegraph": ">=0.9.0 <1.0.0"
-  }
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  },
+  "peerDependencies": {}
 }

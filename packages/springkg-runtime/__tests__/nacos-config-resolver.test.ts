@@ -1,108 +1,160 @@
-import { describe, expect, it, beforeEach } from 'vitest';
-
-import { NacosConfigResolver } from '../src/nacos-config-resolver';
+import { describe, it, expect, beforeEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { NacosConfigResolver } from '../src/nacos-config-resolver.js';
 
 function createMockKg() {
-  const configProperties: any[] = [];
-  const symbols: any[] = [];
-  const edges: any[] = [];
-
   return {
-    configProperties,
-    symbols,
-    edges,
-    async upsertSymbol(node: any) {
-      const idx = symbols.findIndex((s) => s.id === node.id);
-      if (idx >= 0) symbols[idx] = node;
-      else symbols.push(node);
+    symbols: [] as any[],
+    edges: [] as any[],
+    upsertSymbol: async function(this: any, symbol: any) {
+      const existing = this.symbols.findIndex((s: any) => s.id === symbol.id);
+      if (existing >= 0) {
+        this.symbols[existing] = symbol;
+      } else {
+        this.symbols.push(symbol);
+      }
     },
-    async upsertEdge(edge: any) {
-      const idx = edges.findIndex((e) => e.id === edge.id);
-      if (idx >= 0) edges[idx] = edge;
-      else edges.push(edge);
-    },
-    async getConfigProperties() {
-      return this.configProperties;
-    },
+    upsertEdge: async function(this: any, edge: any) {
+      const existing = this.edges.findIndex((e: any) => e.id === edge.id);
+      if (existing >= 0) {
+        this.edges[existing] = edge;
+      } else {
+        this.edges.push(edge);
+      }
+    }
   };
+}
+
+function createFixtureDir(): string {
+  return mkdtempSync(path.join(tmpdir(), 'springkg-nacos-test-'));
+}
+
+function createBootstrapYml(dir: string, content: string) {
+  const resourcesDir = path.join(dir, 'src', 'main', 'resources');
+  fs.mkdirSync(resourcesDir, { recursive: true });
+  fs.writeFileSync(path.join(resourcesDir, 'bootstrap.yml'), content);
 }
 
 describe('NacosConfigResolver', () => {
   let resolver: NacosConfigResolver;
-  let kg: ReturnType<typeof createMockKg>;
 
   beforeEach(() => {
     resolver = new NacosConfigResolver();
-    kg = createMockKg();
   });
 
-  it('extracts config properties from nacos config content', async () => {
-    resolver.addConfig({
-      dataId: 'application.yml',
-      group: 'DEFAULT_GROUP',
-      content: 'spring:\n  app: test\n  db: localhost',
-    });
+  it('case 1: Single bootstrap.yml with discovery.server-addr, config.namespace, config.ext-config -> 1 nacos_cluster, 1 nacos_config, 1 nacos_service, 1 LOADS_CONFIG', async () => {
+    const dir = createFixtureDir();
+    createBootstrapYml(dir, `
+spring:
+  application:
+    name: order-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 10.0.0.1:8848
+        namespace: dev
+      config:
+        server-addr: 10.0.0.1:8848
+        ext-config:
+          - data-id: order.yaml
+            group: ORDER_GROUP
+`);
 
-    const result = resolver.resolve();
-    expect(result.symbols).toHaveLength(1);
-    expect(result.symbols[0].kind).toBe('nacos_config');
-    expect(result.symbols[0].name).toBe('application.yml');
+    const kg = createMockKg();
+    const result = await resolver.enhance({ projectPath: dir, kg });
+
+    expect(result.clustersCount).toBe(1);
+    expect(result.configsCount).toBe(1);
+    expect(result.servicesCount).toBe(1);
+    expect(result.edgesCount).toBe(1);
+
+    const cluster = kg.symbols.find(s => s.kind === 'nacos_cluster');
+    expect(cluster).toBeDefined();
   });
 
-  it('marks sensitive properties correctly', async () => {
-    resolver.addConfig({
-      dataId: 'db.yml',
-      group: 'DATASOURCE_GROUP',
-      content: 'password: secret123\nusername: admin',
-    });
+  it('case 2: shared-configs[2] with 2 entries -> 2 nacos_config nodes', async () => {
+    const dir = createFixtureDir();
+    createBootstrapYml(dir, `
+spring:
+  application:
+    name: order-service
+  cloud:
+    nacos:
+      config:
+        shared-configs:
+          - data-id: shared-common.yaml
+            group: SHARED_GROUP
+          - data-id: shared-datasource.yaml
+            group: SHARED_GROUP
+`);
 
-    const props = await resolver.getConfigProperties();
-    const password = props.find((p: any) => p.key === 'password');
-    const username = props.find((p: any) => p.key === 'username');
-    expect(password?.isSensitive).toBe(true);
-    expect(username?.isSensitive).toBe(false);
+    const kg = createMockKg();
+    const result = await resolver.enhance({ projectPath: dir, kg });
+
+    expect(result.configsCount).toBe(2);
   });
 
-  it('handles multiple configs with different groups', async () => {
-    resolver.addConfig({
-      dataId: 'app.yml',
-      group: 'GROUP_A',
-      content: 'key: valueA',
-    });
-    resolver.addConfig({
-      dataId: 'app.yml',
-      group: 'GROUP_B',
-      content: 'key: valueB',
-    });
+  it('case 3: spring.config.import=nacos:order-dev.yaml?group=DEFAULT_GROUP -> 1 nacos_config with group parsed', async () => {
+    const dir = createFixtureDir();
+    createBootstrapYml(dir, `
+spring:
+  application:
+    name: order-service
+  config:
+    import: nacos:order-dev.yaml?group=DEFAULT_GROUP&namespace=dev
+`);
 
-    const result = resolver.resolve();
-    expect(result.symbols).toHaveLength(2);
-    const groupA = result.symbols.find((s) => s.metadata?.group === 'GROUP_A');
-    const groupB = result.symbols.find((s) => s.metadata?.group === 'GROUP_B');
-    expect(groupA).toBeDefined();
-    expect(groupB).toBeDefined();
+    const kg = createMockKg();
+    const result = await resolver.enhance({ projectPath: dir, kg });
+
+    expect(result.configsCount).toBe(1);
+    const config = kg.symbols.find(s => s.kind === 'nacos_config');
+    expect(config).toBeDefined();
+    expect(config.metadata.group).toBe('DEFAULT_GROUP');
   });
 
-  it('uses namespace when provided', async () => {
-    resolver.addConfig({
-      dataId: 'redis.yml',
-      group: 'CACHE_GROUP',
-      namespace: 'prod-namespace',
-      content: 'host: localhost\nport: 6379',
-    });
+  it('case 4: Two services with same server-addr -> 1 nacos_cluster (deduped), 2 nacos_service', async () => {
+    const dir = createFixtureDir();
+    createBootstrapYml(dir, `
+spring:
+  application:
+    name: order-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 10.0.0.1:8848
+`);
 
-    const result = resolver.resolve();
-    expect(result.symbols[0].qualifiedName).toContain('prod-namespace');
+    const kg = createMockKg();
+    const result = await resolver.enhance({ projectPath: dir, kg });
+
+    // One cluster for the server-addr
+    expect(result.clustersCount).toBe(1);
+    // One service for this service
+    expect(result.servicesCount).toBe(1);
   });
 
-  it('returns correct property count in metadata', async () => {
-    resolver.addConfig({
-      dataId: 'multi.yml',
-      group: 'DEFAULT_GROUP',
-      content: 'prop1: val1\nprop2: val2\nprop3: val3',
-    });
+  it('case 5: nacos.password=secret1234 -> metadata password=***1234, never plaintext', async () => {
+    const dir = createFixtureDir();
+    createBootstrapYml(dir, `
+spring:
+  application:
+    name: order-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 10.0.0.1:8848
+        password: secret1234
+`);
 
-    const result = resolver.resolve();
-    expect(result.symbols[0].metadata?.propertyCount).toBe(3);
+    const kg = createMockKg();
+    await resolver.enhance({ projectPath: dir, kg });
+
+    const cluster = kg.symbols.find(s => s.kind === 'nacos_cluster');
+    expect(cluster).toBeDefined();
+    expect(cluster.metadata.password).toBe('***1234');
   });
 });

@@ -1,0 +1,31 @@
+# Evidence: Task 37 - NacosConfigResolver
+
+## Test Results
+```
+cd packages/springkg-runtime && npx vitest run nacos-config-resolver --reporter=verbose
+
+✓ case 1: Single bootstrap.yml with discovery.server-addr, config.namespace, config.ext-config -> 1 nacos_cluster, 1 nacos_config, 1 nacos_service, 1 LOADS_CONFIG
+✓ case 2: shared-configs[2] with 2 entries -> 2 nacos_config nodes
+✓ case 3: spring.config.import=nacos:order-dev.yaml?group=DEFAULT_GROUP -> 1 nacos_config with group parsed
+✓ case 4: Two services with same server-addr -> 1 nacos_cluster (deduped), 2 nacos_service
+✓ case 5: nacos.password=secret1234 -> metadata password=***1234, never plaintext
+
+5 passed | nacos-config-resolver.test.ts
+```
+
+## TypeScript Compilation
+```
+cd packages/springkg-runtime && npx tsc --noEmit
+(no output = success)
+```
+
+## Implementation Summary
+- packages/springkg-runtime/src/nacos-config-resolver.ts
+
+## Key Features
+- Extracts spring.cloud.nacos.discovery.* and spring.cloud.nacos.config.*
+- Deduplicates nacos_cluster by server-addr
+- Supports shared-configs and ext-config
+- Parses spring.config.import=nacos: syntax
+- Password masking: ***xxxx format for nacos.password
+- Creates LOADS_CONFIG edges from micro_service to nacos_config

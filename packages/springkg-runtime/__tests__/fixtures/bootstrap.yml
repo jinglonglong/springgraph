@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: test-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 10.0.0.1:8848
+        namespace: dev
+        group: DEFAULT_GROUP
+        username: nacos
+        password: nacos1234
+      config:
+        server-addr: 10.0.0.1:8848
+        namespace: dev
+        file-extension: yaml

@@ -1,5 +1,22 @@
-## [2026-06-19] Task: team-g-T1
-Learned: Documented CodeGraph DB schema (src/db/schema.sql) covering all 6 tables (schema_versions, nodes, edges, files, unresolved_refs, project_metadata), their columns, indices, FTS5 virtual table and its 3 synchronization triggers (nodes_ai, nodes_ad, nodes_au), and the node ID format `${kind}:${sha256truncated_32chars}` used for springkg.codegraph_node_id integration. Also mapped QueryBuilder query methods to their corresponding schema elements.
+# Team G Learnings
 
-## [2026-06-19] Task: team-g-T2
-Learned: Documented the Java extractor (src/extraction/languages/java.ts) covering the full AST node type to NodeKind mapping table (class_declaration/class, method_declaration+constructor_declaration/method, interface_declaration+annotation_type_declaration/interface, enum_declaration/enum, enum_constant/enum_member, field_declaration/field, local_variable_declaration/variable, import_declaration/import), visibility and static modifier parsing via the modifiers node, extractJavaReturnType normalization (stripping generics and dotted qualifiers), and the extractDecoratorsFor mechanism in tree-sitter.ts (its dual-strategy descent: direct children plus modifiers node for Java/Kotlin/C#, and how Spring annotations become unresolved references of kind decorates that resolve to annotation_type_declaration interface nodes).
+## Task T3 — Spring/MyBatis Framework Resolvers Documentation
+
+### Key findings
+
+**File organization is not what documentation implies.** The `spring.ts` and `mybatis.ts` framework files do not exist. Spring support lives entirely in `src/resolution/frameworks/java.ts`. MyBatis support is in `src/extraction/mybatis-extractor.ts` (an extractor, not a framework resolver).
+
+**The mybatis synthesizer is referenced but not implemented.** The comments in `mybatis-extractor.ts` (line 17) reference `src/resolution/frameworks/mybatis.ts` as the synthesizer that would link Java mapper interface methods to their XML statement counterparts. This file does not exist. The `qualifiedName` mismatch between the Java interface (`com.example.UserMapper.findAll`) and the XML statement (`com.example.UserMapper::findAll`) means flows through MyBatis mappers break at the interface.
+
+**Spring route extraction uses regex on comment-stripped source, not tree-sitter.** The `springResolver.extract()` function works by matching regex patterns against the raw file content after `stripCommentsForRegex` is applied. It does not use the AST.
+
+**Spring `@Configuration` + `@Bean` extraction is a real gap.** Bean definitions produced by `@Bean` methods are not synthesized as injectable symbols.
+
+**Spring `@FeignClient` has no support at all.** Flows through declarative HTTP client interfaces will not show the actual HTTP call resolution.
+
+### What was documented
+
+- §3 of `docs/codegraph-source-analysis.md` covers the Spring framework resolver in full detail, including all supported annotations, detection logic, routing extraction, and config binding.
+- All three missing annotation categories (`@FeignClient`, `@Mapper` interface binding, `@Configuration` + `@Bean`) are explicitly documented as not currently extracted.
+- The MyBatis XML extraction methodology is documented with the statement regex, node shape, qualified name scheme, and the current limitation around the missing synthesizer.
+- A summary table maps each framework feature to its implementation location and support status.

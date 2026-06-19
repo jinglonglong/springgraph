@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: gateway-service
+  cloud:
+    gateway:
+      routes:
+        - id: order_route
+          uri: lb://order-service
+          predicates:
+            - Path=/api/order/**
+        - id: payment_route
+          uri: lb://payment-service
+          predicates:
+            - Path=/api/pay/**
+        - id: external_route
+          uri: https://api.external.com
+          predicates:
+            - Path=/external/**

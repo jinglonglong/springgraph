@@ -541,4 +541,169 @@ When a class-level `@RequestMapping` is found, its path argument is saved as `cl
 
 ---
 
+## 3. Framework Resolvers
+
+### 3.1 Important Note on File Organization
+
+**`spring.ts` and `mybatis.ts` do not exist as separate framework files.**
+
+All Spring framework support lives in a single file:
+
+- `src/resolution/frameworks/java.ts` — contains the `springResolver` for Spring Boot routing and config binding, plus general Java DI patterns.
+
+MyBatis support is handled by an extractor, not a framework resolver:
+
+- `src/extraction/mybatis-extractor.ts` — a standalone `MyBatisExtractor` class that parses mapper XML files.
+
+There is no `src/resolution/frameworks/mybatis.ts`. The mybatis synthesizer referenced in comments inside `mybatis-extractor.ts` (`src/resolution/frameworks/mybatis.ts`) does not currently exist in the codebase, so the Java interface method → XML statement link is emitted by the extractor but not yet synthesized into a resolved edge.
+
+---
+
+### 3.2 Spring Framework Resolver (`springResolver` in `java.ts`)
+
+The `springResolver` object is exported from `src/resolution/frameworks/java.ts` and implements the `FrameworkResolver` interface with `name: 'spring'` and `languages: ['java', 'kotlin', 'yaml', 'properties']`.
+
+#### Framework Detection
+
+`springResolver.detect()` checks three signals:
+
+1. `pom.xml` contains `spring-boot` or `springframework`
+2. `build.gradle` or `build.gradle.kts` contains `spring-boot` or `springframework`
+3. Any `.java` file contains `@SpringBootApplication`, `@RestController`, `@Service`, or `@Repository`
+
+#### Reference Resolution (`resolve`)
+
+`springResolver.resolve()` handles five naming-convention patterns by suffix-matching against indexed nodes, preferring candidates in framework-conventional directories:
+
+| Pattern | Suffix | Kinds | Preferred directories | Confidence |
+|---|---|---|---|---|
+| Service | `Service` | class, interface | `/service/`, `/services/` | 0.85 |
+| Repository | `Repository` | class, interface | `/repository/`, `/repositories/` | 0.85 |
+| Controller | `Controller` | class | `/controller/`, `/controllers/` | 0.85 |
+| Entity/Model | UpperCamel word | class | `/entity/`, `/entities/`, `/model/`, `/models/`, `/domain/` | 0.70 |
+| Component/Config | `Component` or `Config` | class | `/component/`, `/components/`, `/config/` | 0.80 |
+
+It also resolves Spring config-key references from `@Value("${k}")` and `@ConfigurationProperties(prefix="X")` against `constant` nodes emitted from `application.yml` / `application.properties` files, using Spring's relaxed binding (kebab/camel/snake/canonical lowercase all map to the same key).
+
+#### Route Extraction (`extract`)
+
+`springResolver.extract()` runs on every `.java` and `.kt` file. It uses regex on comment-stripped source to emit `route` nodes:
+
+**Supported annotations — method-level HTTP verb mappings:**
+
+| Annotation | HTTP verb |
+|---|---|
+| `@GetMapping` | `GET` |
+| `@PostMapping` | `POST` |
+| `@PutMapping` | `PUT` |
+| `@PatchMapping` | `PATCH` |
+| `@DeleteMapping` | `DELETE` |
+
+The regex (line 219) matches each annotation optionally with a path argument:
+```regex
+@(GetMapping|PostMapping|PutMapping|PatchMapping|DeleteMapping)\b\s*(\([^)]*\))?
+```
+
+For each match:
+- The path is parsed by `parseMappingPath` (extracts the first quoted string, strips `value=`/`path=` prefixes)
+- A `route` node is emitted with `kind='route'`, `name='VERB /path'`, and `qualifiedName='...::route:/path'`
+- A `references` edge is emitted from the route node to the decorated method (found by scanning the next 600 characters for a method signature, matching both Kotlin `fun name(` and Java `public X name(`)
+
+**Supported annotations — class-level prefix:**
+
+- `@RequestMapping` on a class is parsed as a path prefix (line 212 regex). Its path is prepended to all method-level paths via `joinPath`.
+
+**Supported annotations — method-level `@RequestMapping`:**
+
+- Older style `@RequestMapping(value="/x", method=RequestMethod.GET)` is handled at line 261. The annotation is skipped when it appears before the `class` keyword (to avoid double-counting the class-level prefix).
+
+**Spring configuration binding:**
+
+- `@Value("${key}")` — `extractSpringValueBindings` (line 416) emits a `constant` node and a `references` edge for each binding, targeting the corresponding YAML/properties leaf key.
+- `@ConfigurationProperties(prefix="...")` — emits a `constant` node with a `:prefix` suffix on the reference name, which `springResolver.resolve()` expands into a subtree match against config keys.
+
+#### Supported Spring Annotations (fully extracted)
+
+| Annotation | Where extracted | What is emitted |
+|---|---|---|
+| `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping` | `extract()` method-level regex | `route` node |
+| `@RequestMapping` (method-level) | `extract()` method-level regex | `route` node |
+| `@RequestMapping` (class-level) | `extract()` class-prefix regex | `classPrefix` prepended to method routes |
+| `@Value("${k}")` | `extractSpringValueBindings` | `constant` node + `references` edge to config key |
+| `@ConfigurationProperties(prefix="X")` | `extractSpringValueBindings` | `constant` node + `references` edge with `:prefix` suffix |
+
+---
+
+### 3.3 Missing Annotations (Not Currently Extracted)
+
+The following Spring and MyBatis annotations are **not** currently handled by the resolver or extractor:
+
+#### `@FeignClient`
+
+Used for declarative HTTP clients in Spring Cloud. The annotation carries a `name`/`value`, a `url`, and may reference a `fallback` class. These are not currently extracted — there is no `FeignClient` handling in `java.ts`. Flows that go through a `@FeignClient` interface will dead-end at the interface declaration with no resolved `calls` edge to the actual HTTP handler.
+
+#### `@Mapper` Interface Bindings
+
+MyBatis mapper interfaces are annotated with `@Mapper` (or discovered via `@MapperScan`). The interface methods are parsed by the Java tree-sitter extractor as `method` nodes, but the SQL implementation lives in the XML mapper file. The `mybatis-extractor.ts` parses the XML and emits `method` nodes qualified as `<namespace>::<id>`. However, the Java interface method has a different qualified name (e.g., `com.example.UserMapper.findAll`) and there is currently no synthesizer that links the Java method to the XML method node. The namespace-to-interface qualified name mapping is not automatic.
+
+#### `@Configuration` + `@Bean`
+
+Spring `@Configuration` classes that produce beans via `@Bean` methods are not currently handled. The `@Bean` method name is the bean name, but there is no extraction of the bean definition or its use as an injection target. Constructor injection via `@Autowired` on constructor parameters is handled by the general Java reference resolver (it looks like a regular parameter type reference), but setter injection and `@Bean` method → bean name resolution is not synthesized.
+
+---
+
+### 3.4 MyBatis XML Extraction (`MyBatisExtractor`)
+
+`src/extraction/mybatis-extractor.ts` contains the `MyBatisExtractor` class. It is not a `FrameworkResolver` — it is a standalone extractor invoked directly on XML mapper files during the extraction phase.
+
+#### What it does
+
+MyBatis splits a DAO interface across two files:
+
+1. A Java interface (parsed by tree-sitter) declares the method signature
+2. An XML mapper file holds the SQL, keyed by `<mapper namespace="...">` and `<select|insert|update|delete id="...">`
+
+Without the XML side in the graph, `trace(Controller, ...DAO.method)` dead-ends at the interface method. The SQL it actually runs is invisible.
+
+#### Extraction method
+
+1. **File node** — a `file` node is always emitted for the XML file (so the watcher can track it).
+2. **Mapper detection** — `findMapperRoot()` looks for `<mapper namespace="X">`. Non-mapper XML (pom.xml, web.xml, log4j config) returns only the file node.
+3. **Statement extraction** — `extractMapper()` scans the mapper body with:
+   ```regex
+   /<(select|insert|update|delete|sql)\b([^>]*)>([\s\S]*?)<\/\1>/g
+   ```
+   Each top-level statement element emits one `method` node with:
+   - `kind = 'method'`
+   - `name = <id>` (the statement id)
+   - `qualifiedName = <namespace>::<id>` (e.g., `com.example.UserMapper::findAll`)
+   - `language = 'xml'`
+   - `signature` built from verb, `parameterType`, and `resultType`
+   - `docstring` = a 200-character SQL preview (XML tags stripped)
+4. **Include references** — `<include refid="X"/>` inside a statement emits an `UnresolvedReference` with `referenceKind = 'references'` and `referenceName = <namespace>::<refid>` (or the fully qualified refid if it contains a `.`).
+
+#### Key limitation
+
+The Java mapper interface method and the XML statement method have different `qualifiedName` formats and are not yet linked by a synthesizer. The `mybatis-extractor.ts` comments reference `src/resolution/frameworks/mybatis.ts` (line 17) as the synthesizer that would link Java method → XML statement by suffix-matching qualified names, but that file does not exist. This means the flow from Java service calling a mapper interface method to the actual SQL in the XML is currently broken — it resolves to the interface method but does not continue to the XML statement.
+
+#### Non-mapper XML handling
+
+Files without `<mapper namespace="...">` return only a file node. This includes `pom.xml`, Spring bean XML configs, `web.xml`, and log4j configuration files. The extractor safely ignores them rather than parsing them as mapper statements.
+
+---
+
+### 3.5 Summary of Framework Coverage
+
+| Framework | Supported | Implementation location |
+|---|---|---|
+| Spring Boot routing (`@GetMapping` etc.) | Yes | `springResolver.extract()` in `java.ts` |
+| Spring `@RequestMapping` | Yes | `springResolver.extract()` in `java.ts` |
+| Spring `@Value` / `@ConfigurationProperties` | Yes | `extractSpringValueBindings()` + `springResolver.resolve()` in `java.ts` |
+| Spring DI by naming convention | Yes | `springResolver.resolve()` in `java.ts` |
+| Spring `@FeignClient` | No | Not in `java.ts` |
+| Spring `@Configuration` + `@Bean` | No | Not in `java.ts` |
+| Spring `@Mapper` interface → XML binding | Partial | `mybatis-extractor.ts` emits nodes; no synthesizer links them yet |
+| MyBatis XML mapper statements | Yes | `MyBatisExtractor` in `mybatis-extractor.ts` |
+| MyBatis `<include refid>` | Yes | `MyBatisExtractor` emits `references` edges |
+
 

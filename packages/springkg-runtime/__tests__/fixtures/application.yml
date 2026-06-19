@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: test-service
+  datasource:
+    password: secret1234
+server:
+  port: 8080

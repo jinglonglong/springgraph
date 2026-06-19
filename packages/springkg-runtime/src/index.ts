@@ -1,9 +1,7 @@
-// packages/springkg-runtime/src/index.ts
-// Team D: Runtime Asset Layer
-
-export const SPRINGKG_PACKAGE = '@colbymchenry/springkg-runtime' as const;
-
-export * from './middleware-inventory';
-export * from './config-resolver';
-export * from './nacos-config-resolver';
-export * from './gateway-route-resolver';
+// Barrel export for all resolvers
+export { ConfigResolver } from './config-resolver.js';
+export { MiddlewareInventory } from './middleware-inventory.js';
+export { NacosConfigResolver } from './nacos-config-resolver.js';
+export { ConfigPropertyUsageTracker } from './config-usage-tracker.js';
+export { GatewayRouteResolver } from './gateway-route-resolver.js';
+export { runSyncNacos } from './sync-nacos.js';

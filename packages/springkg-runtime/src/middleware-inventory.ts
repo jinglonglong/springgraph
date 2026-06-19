@@ -1,164 +1,198 @@
-// packages/springkg-runtime/src/middleware-inventory.ts
-// Team D: Runtime Asset Layer - Middleware Inventory Extractor
+import { computeId } from './internal/key-mask.js';
 
-import type { SpringKgNode, SpringKgEdge } from '@colbymchenry/springkg-shared';
-
-export interface MiddlewareInventoryOutput {
-  symbols: SpringKgNode[];
-  edges: SpringKgEdge[];
+export interface SpringKgEnhanceInput {
+  projectPath: string;
+  kg: any;
 }
 
-interface ParsedDataSource {
+export interface SpringKgEnhanceOutput {
+  middlewareCount: number;
+  edgesCount: number;
+}
+
+interface MiddlewareInfo {
+  kind: string;
   name: string;
-  url: string;
-  driverClassName?: string;
-  username?: string;
-  sourceFile: string;
-  sourceLine: number;
+  qualifiedName: string;
+  metadata: Record<string, any>;
 }
 
 /**
- * Detects spring.datasource.* and spring.datasource.order.* middleware configurations.
- * Detects both regular data sources (spring.datasource.url) and
- * Hibernate/Liquibase order data sources (spring.datasource.order.url).
+ * T16: MiddlewareInventory - infers middleware from config properties and creates CONNECTS_TO edges
  */
-export function inferMiddleware(
-  filePath: string,
-  content: string
-): MiddlewareInventoryOutput {
-  const symbols: SpringKgNode[] = [];
-  const edges: SpringKgEdge[] = [];
-  const dataSources = parseDataSources(filePath, content);
+export class MiddlewareInventory {
+  async enhance(input: SpringKgEnhanceInput): Promise<SpringKgEnhanceOutput> {
+    const { kg } = input;
 
-  for (const ds of dataSources) {
-    const nodeId = `middleware:datasource:${ds.name}:${hashString(ds.sourceFile + ds.sourceLine)}`;
-    const node: SpringKgNode = {
-      id: nodeId,
-      kind: 'middleware',
-      codegraphNodeId: '',
-      name: ds.name,
-      qualifiedName: ds.name,
-      filePath: ds.sourceFile,
-      startLine: ds.sourceLine,
-      endLine: ds.sourceLine,
-      metadata: {
-        middlewareType: 'datasource',
-        url: ds.url,
-        driverClassName: ds.driverClassName,
-        username: ds.username,
-      },
-      confidence: 1.0,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    symbols.push(node);
-  }
-
-  return { symbols, edges };
-}
-
-function parseDataSources(filePath: string, content: string): ParsedDataSource[] {
-  const results: ParsedDataSource[] = [];
-  const lines = content.split('\n');
-
-  // Track current context for YAML parsing
-  let inDatasource = false;
-  let inOrderDatasource = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const lineNum = i + 1;
-    const trimmed = line.trim();
-
-    // Handle YAML indentation-based context tracking
-    if (trimmed === 'datasource:') {
-      inDatasource = true;
-      inOrderDatasource = false;
-      continue;
-    }
-    if (trimmed === 'order:') {
-      inDatasource = false;
-      inOrderDatasource = true;
-      continue;
-    }
-    // Exit datasource context when we see a top-level key
-    if (trimmed && !line.startsWith(' ') && !line.startsWith('\t') && trimmed.includes(':')) {
-      inDatasource = false;
-      inOrderDatasource = false;
+    // Get all runtime_config_properties
+    let configProperties: any[] = [];
+    try {
+      configProperties = await kg.getConfigProperties ? await kg.getConfigProperties() : [];
+    } catch (e) {
+      return { middlewareCount: 0, edgesCount: 0 };
     }
 
-    // Detect spring.datasource.url (regular data source)
-    const dsMatch = trimmed.match(/^spring\.datasource\.url\s*[=:]\s*(.+)/);
-    if (dsMatch) {
-      results.push({
-        name: 'primary',
-        url: dsMatch[1].trim(),
-        sourceFile: filePath,
-        sourceLine: lineNum,
-      });
-      inDatasource = true;
-      inOrderDatasource = false;
-      continue;
-    }
+    // Group by prefix to identify middleware
+    const middlewareMap: Map<string, MiddlewareInfo> = new Map();
+    const serviceMiddleware: Map<string, string[]> = new Map(); // serviceId -> middlewareIds
 
-    // Detect spring.datasource.order.url (Hibernate/Liquibase order data source)
-    const orderMatch = trimmed.match(/^spring\.datasource\.order\.url\s*[=:]\s*(.+)/);
-    if (orderMatch) {
-      results.push({
-        name: 'order',
-        url: orderMatch[1].trim(),
-        sourceFile: filePath,
-        sourceLine: lineNum,
-      });
-      inDatasource = false;
-      inOrderDatasource = true;
-      continue;
-    }
-
-    // Handle YAML nested format: url: value (under datasource:)
-    if ((inDatasource || inOrderDatasource) && trimmed.startsWith('url:')) {
-      const urlMatch = trimmed.match(/^url:\s*(.+)/);
-      if (urlMatch) {
-        const name = inOrderDatasource ? 'order' : 'primary';
-        const existing = results.find((r) => r.name === name && r.sourceFile === filePath);
-        if (!existing) {
-          results.push({
-            name,
-            url: urlMatch[1].trim(),
-            sourceFile: filePath,
-            sourceLine: lineNum,
-          });
-        } else {
-          existing.url = urlMatch[1].trim();
+    for (const prop of configProperties) {
+      const { serviceId, key, valueMasked } = prop;
+      const middleware = this.inferMiddleware(key, valueMasked);
+      if (middleware) {
+        if (!middlewareMap.has(middleware.qualifiedName)) {
+          middlewareMap.set(middleware.qualifiedName, middleware);
         }
-        continue;
+
+        const mid = middlewareMap.get(middleware.qualifiedName)!;
+        if (!serviceMiddleware.has(serviceId)) {
+          serviceMiddleware.set(serviceId, []);
+        }
+        if (!serviceMiddleware.get(serviceId)!.includes(mid.qualifiedName)) {
+          serviceMiddleware.get(serviceId)!.push(mid.qualifiedName);
+        }
       }
     }
 
-    // Detect driver-class-name and username for the current datasource context
-    const currentName = inOrderDatasource ? 'order' : 'primary';
-    const currentDs = results.find((r) => r.name === currentName && r.sourceFile === filePath);
-    if (currentDs) {
-      if (trimmed.startsWith('driver-class-name:')) {
-        const m = trimmed.match(/^driver-class-name:\s*(.+)/);
-        if (m) currentDs.driverClassName = m[1].trim();
-      }
-      if (trimmed.startsWith('username:')) {
-        const m = trimmed.match(/^username:\s*(.+)/);
-        if (m) currentDs.username = m[1].trim();
+    let middlewareCount = 0;
+    let edgesCount = 0;
+
+    // Upsert middleware symbols
+    for (const [, middleware] of middlewareMap) {
+      try {
+        await kg.upsertSymbol({
+          id: computeId('middleware', middleware.qualifiedName),
+          kind: 'middleware',
+          name: middleware.name,
+          qualifiedName: middleware.qualifiedName,
+          filePath: '',
+          startLine: 0,
+          endLine: 0,
+          metadata: middleware.metadata
+        });
+        middlewareCount++;
+      } catch (e) {
+        // May already exist
       }
     }
+
+    // Upsert CONNECTS_TO edges
+    for (const [serviceId, middlewareIds] of serviceMiddleware) {
+      const microServiceId = computeId('micro_service', serviceId);
+
+      for (const midQualifiedName of middlewareIds) {
+        const middlewareId = computeId('middleware', midQualifiedName);
+        try {
+          await kg.upsertEdge({
+            id: computeId('edge', `${microServiceId}:${middlewareId}:CONNECTS_TO`),
+            sourceId: microServiceId,
+            targetId: middlewareId,
+            kind: 'CONNECTS_TO',
+            provenance: 'static',
+            metadata: {}
+          });
+          edgesCount++;
+        } catch (e) {
+          // May already exist
+        }
+      }
+    }
+
+    return { middlewareCount, edgesCount };
   }
 
-  return results;
-}
+  private inferMiddleware(key: string, value: string): MiddlewareInfo | null {
+    // Database middleware
+    if (key.startsWith('spring.datasource.')) {
+      const urlMatch = value.match(/jdbc:(mysql|postgresql|oracle|sqlserver):\/\/([^:]+):(\d+)\/(.+)/);
+      if (urlMatch) {
+        const [, subtype, host, port] = urlMatch;
+        // Extract datasource name from key (e.g., "order" from "spring.datasource.order.url")
+        const keyParts = key.split('.');
+        const datasourceName = keyParts.length > 3 ? keyParts[2] : null;
+        const qualifiedName = datasourceName
+          ? `spring.datasource.${subtype}.${datasourceName}`
+          : `spring.datasource.${subtype}`;
+        return {
+          kind: 'database',
+          name: datasourceName ? `${subtype} (${datasourceName})` : `${subtype} (${host}:${port})`,
+          qualifiedName,
+          metadata: { middlewareKind: 'database', subtype, host, port, url: value, datasourceName }
+        };
+      }
+      // Just datasource without URL
+      if (key === 'spring.datasource.url') {
+        return {
+          kind: 'database',
+          name: 'database',
+          qualifiedName: 'spring.datasource',
+          metadata: { middlewareKind: 'database', subtype: 'unknown', url: value }
+        };
+      }
+    }
 
-function hashString(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
+    // Redis
+    if (key.startsWith('spring.redis.')) {
+      return {
+        kind: 'cache',
+        name: 'redis',
+        qualifiedName: 'spring.redis',
+        metadata: { middlewareKind: 'cache', subtype: 'redis' }
+      };
+    }
+
+    // Kafka
+    if (key.startsWith('spring.kafka.')) {
+      const hostMatch = value.match(/([^:]+):(\d+)/);
+      return {
+        kind: 'mq',
+        name: 'kafka',
+        qualifiedName: 'spring.kafka',
+        metadata: { middlewareKind: 'mq', subtype: 'kafka', bootstrapServers: value, host: hostMatch?.[1], port: hostMatch?.[2] }
+      };
+    }
+
+    // RabbitMQ
+    if (key.startsWith('spring.rabbitmq.')) {
+      return {
+        kind: 'mq',
+        name: 'rabbitmq',
+        qualifiedName: 'spring.rabbitmq',
+        metadata: { middlewareKind: 'mq', subtype: 'rabbitmq' }
+      };
+    }
+
+    // Elasticsearch
+    if (key.startsWith('spring.elasticsearch.')) {
+      return {
+        kind: 'search',
+        name: 'elasticsearch',
+        qualifiedName: 'spring.elasticsearch',
+        metadata: { middlewareKind: 'search', subtype: 'elasticsearch' }
+      };
+    }
+
+    // XXL-Job
+    if (key.startsWith('xxl.job.')) {
+      return {
+        kind: 'job_scheduler',
+        name: 'xxl-job',
+        qualifiedName: 'xxl.job',
+        metadata: { middlewareKind: 'job_scheduler', subtype: 'xxl-job', adminAddresses: value }
+      };
+    }
+
+    // MinIO / OSS
+    if (key.startsWith('minio.') || key.startsWith('oss.')) {
+      const subtype = key.startsWith('minio.') ? 'minio' : 'oss';
+      return {
+        kind: 'object_storage',
+        name: subtype,
+        qualifiedName: subtype,
+        metadata: { middlewareKind: 'object_storage', subtype }
+      };
+    }
+
+    return null;
   }
-  return Math.abs(hash).toString(16);
 }

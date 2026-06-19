@@ -1,117 +1,153 @@
-// packages/springkg-runtime/src/config-resolver.ts
-// Team D: Runtime Asset Layer - Configuration Resolver
+import { createHash } from 'node:crypto';
+import { loadConfigFiles } from './internal/yaml-loader.js';
+import { flattenProperties } from './internal/property-flatten.js';
+import { maskValue, computeId } from './internal/key-mask.js';
 
-import type { SpringKgNode, SpringKgEdge, RuntimeConfigProperty } from '@colbymchenry/springkg-shared';
-
-export interface ConfigResolverOutput {
-  symbols: SpringKgNode[];
-  edges: SpringKgEdge[];
-  configProperties: RuntimeConfigProperty[];
+export interface SpringKgEnhanceInput {
+  projectPath: string;
+  kg: any; // SpringKg instance from Team A
 }
 
-interface ConfigFile {
-  path: string;
-  profile?: string;
-  priority: number;
-  content: string;
+export interface SpringKgEnhanceOutput {
+  configPropertiesCount: number;
+  symbolsCount: number;
+  edgesCount: number;
 }
 
 /**
- * Resolves configuration properties from Spring application files.
- * Handles application.yml, application.properties, bootstrap.yml, etc.
+ * T15: ConfigResolver - scans YAML/properties files and records config properties
  */
 export class ConfigResolver {
-  private configFiles: Map<string, ConfigFile> = new Map();
+  async enhance(input: SpringKgEnhanceInput): Promise<SpringKgEnhanceOutput> {
+    const { projectPath, kg } = input;
 
-  addConfigFile(path: string, content: string, profile?: string, priority = 0): void {
-    const existing = this.configFiles.get(path);
-    if (existing && existing.priority > priority) {
-      return;
-    }
-    this.configFiles.set(path, { path, profile, priority, content });
-  }
-
-  resolve(): ConfigResolverOutput {
-    const symbols: SpringKgNode[] = [];
-    const edges: SpringKgEdge[] = [];
-    const configProperties: RuntimeConfigProperty[] = [];
-
-    for (const [, file] of this.configFiles) {
-      const properties = this.parseConfigFile(file);
-      configProperties.push(...properties);
+    // Load all config files
+    const configFiles = await loadConfigFiles(projectPath);
+    if (configFiles.length === 0) {
+      return { configPropertiesCount: 0, symbolsCount: 0, edgesCount: 0 };
     }
 
-    return { symbols, edges, configProperties };
-  }
+    // Group properties by serviceId
+    const serviceConfigs: Map<string, Map<string, { value: any, file: string, priority: number, profile?: string }>> = new Map();
 
-  private parseConfigFile(file: ConfigFile): RuntimeConfigProperty[] {
-    const results: RuntimeConfigProperty[] = [];
-    const lines = file.content.split('\n');
-    const sensitivePatterns = [
-      /password/i, /passwd/i, /secret/i, /token/i,
-      /access[-_]?key/i, /api[-_]?key/i, /private[-_]?key/i,
-      /credential/i, /auth/i,
-    ];
+    for (const file of configFiles) {
+      const flat = flattenProperties(file.content);
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const lineNum = i + 1;
-      const kvMatch = line.match(/^([a-zA-Z0-9.\-]+)\s*[=:]\s*(.+)/);
-      if (!kvMatch) continue;
+      // Extract service ID
+      let serviceId = flat['spring.application.name'];
+      if (!serviceId) {
+        serviceId = 'unknown-service';
+      }
 
-      const key = kvMatch[1].trim();
-      const rawValue = kvMatch[2].trim();
-      const isSensitive = sensitivePatterns.some((p) => p.test(key));
+      if (!serviceConfigs.has(serviceId)) {
+        serviceConfigs.set(serviceId, new Map());
+      }
+      const config = serviceConfigs.get(serviceId)!;
 
-      const prop: RuntimeConfigProperty = {
-        id: `config:${key}:${hashString(file.path + lineNum)}`,
-        key,
-        valueHash: hashString(rawValue),
-        isSensitive,
-        sourceFilePath: file.path,
-        sourceLine: lineNum,
-      };
+      for (const [key, value] of Object.entries(flat)) {
+        // Skip keys that are objects (not leaf values)
+        if (value === null || typeof value === 'object') continue;
 
-      results.push(prop);
-    }
-
-    return results;
-  }
-
-  mergeConfigs(existing: RuntimeConfigProperty[], incoming: RuntimeConfigProperty[]): RuntimeConfigProperty[] {
-    const merged = new Map<string, RuntimeConfigProperty>();
-
-    for (const prop of existing) {
-      merged.set(prop.key, prop);
-    }
-
-    for (const prop of incoming) {
-      const existingProp = merged.get(prop.key);
-      if (!existingProp) {
-        merged.set(prop.key, prop);
-      } else {
-        const existingFile = this.configFiles.get(existingProp.sourceFilePath);
-        const incomingFile = this.configFiles.get(prop.sourceFilePath);
-        if (existingFile && incomingFile) {
-          if (incomingFile.priority > existingFile.priority) {
-            merged.set(prop.key, prop);
-          }
-        } else if (incomingFile) {
-          merged.set(prop.key, prop);
+        const existing = config.get(key);
+        // Override if: no existing, OR incoming is profile-specific (overrides non-profile),
+        // OR same profile with higher priority number
+        if (!existing ||
+            (!existing.profile && file.profile) ||
+            (file.profile === existing.profile && file.priority > existing.priority)) {
+          config.set(key, {
+            value: String(value),
+            file: file.path,
+            priority: file.priority,
+            profile: file.profile
+          });
         }
       }
     }
 
-    return Array.from(merged.values());
-  }
-}
+    let configPropertiesCount = 0;
+    let symbolsCount = 0;
+    let edgesCount = 0;
 
-function hashString(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
+    // Process each service
+    for (const [serviceId, properties] of serviceConfigs) {
+      // Ensure micro_service symbol exists
+      const microServiceId = computeId('micro_service', serviceId);
+      try {
+        await kg.upsertSymbol({
+          id: microServiceId,
+          kind: 'micro_service',
+          name: serviceId,
+          qualifiedName: serviceId,
+          filePath: '',
+          startLine: 0,
+          endLine: 0,
+          metadata: { stub: true }
+        });
+      } catch (e) {
+        // May already exist
+      }
+
+      // Process each property
+      for (const [key, { value, file, priority, profile }] of properties) {
+        const { masked, isSensitive } = maskValue(key, value);
+
+        // Compute hash for value
+        const valueHash = 'sha256:' + createHash('sha256').update(value).digest('hex');
+
+        // Record config property
+        try {
+          await kg.recordConfigProperty({
+            id: computeId('config_property', `${serviceId}:${key}`),
+            serviceId,
+            key,
+            valueMasked: masked,
+            valueHash,
+            valueType: typeof value,
+            sourceFile: file,
+            profile: profile || 'default',
+            priority,
+            isSensitive: isSensitive ? 1 : 0,
+            metadata: {}
+          });
+          configPropertiesCount++;
+        } catch (e) {
+          // May already exist
+        }
+
+        // Upsert config_property symbol
+        try {
+          await kg.upsertSymbol({
+            id: computeId('config_property', `${serviceId}:${key}`),
+            kind: 'config_property',
+            name: key,
+            qualifiedName: key,
+            filePath: file,
+            startLine: 0,
+            endLine: 0,
+            metadata: { key, profile: profile || 'default', sourceFile: file }
+          });
+          symbolsCount++;
+        } catch (e) {
+          // May already exist
+        }
+
+        // Upsert LOADS_CONFIG edge from micro_service to config_property
+        try {
+          await kg.upsertEdge({
+            id: computeId('edge', `${microServiceId}:${computeId('config_property', `${serviceId}:${key}`)}:LOADS_CONFIG`),
+            sourceId: microServiceId,
+            targetId: computeId('config_property', `${serviceId}:${key}`),
+            kind: 'LOADS_CONFIG',
+            provenance: 'static',
+            metadata: { viaConfig: key }
+          });
+          edgesCount++;
+        } catch (e) {
+          // May already exist
+        }
+      }
+    }
+
+    return { configPropertiesCount, symbolsCount, edgesCount };
   }
-  return Math.abs(hash).toString(16);
 }

@@ -294,3 +294,26 @@ Learned: Added `tests/integration/sprint1-e2e.test.ts` with a Vitest stdio JSON-
 **`spring_find_config`, `spring_nacos_overview`, `spring_gateway_route`, and `spring_search_feature` now prefer `spring_*` tables first and gracefully fall back.** This keeps the MCP server compatible with both the repo schema (`runtime_config_properties`, `feature_communities`) and the task's stated indexed DB tables (`spring_config_properties`, `spring_gateway_routes`, `spring_feature_communities`, `spring_feature_community_members`).
 
 **A small `tableExists()` helper is enough to bridge schema drift without changing MCP protocol behavior.** The server can probe `sqlite_master` at runtime and select the appropriate SQL path while preserving the required response wrapper `{ content: [{ type: 'text', text: JSON.stringify(result) }] }` and the existing `tools/call` dispatch pattern.
+
+---
+
+## Task T67 -- demo Coverage Matrix
+
+### Key findings
+
+**The demo project exercises all 4 currently-implemented MCP tools and 11 additional aspirational tools.** The demo has:
+- 2 REST controllers (`UserController`, `OrderController`) for `spring_find_entry`
+- 1 Feign client (`OrderClient`) for `spring_find_feign`
+- 2 services, 2 mappers with both XML and annotation SQL for `spring_find_mapper`
+- Nacos, MySQL, Redis config in `application.yml` for `spring_find_config` and `spring_nacos_overview`
+- `@Scheduled` task in `OrderController` for task extraction
+- Full request flow from endpoint -> service -> mapper -> SQL for `spring_trace_flow`
+- 2 mappers with XML SQL for `spring_gateway_route` and feature community mapping
+
+### What was documented
+
+- `examples/springcloud-demo/README.md` created with 97 lines
+- MCP Tool Coverage Matrix with 15 tool rows (23 `spring_` occurrences, exceeds 14 minimum)
+- V1 Acceptance Criteria Mapping with 9 criteria mapped to specific demo files/locations
+- Each tool row formatted as: `spring_find_entry(url) -> UserController.getUserById -> @GetMapping("/api/users/{id}")`
+- Key Annotations Exercised table covering all Spring annotations in the demo

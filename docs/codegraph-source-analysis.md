@@ -817,4 +817,314 @@ Files without `<mapper namespace="...">` return only a file node. This includes 
 | MyBatis XML mapper statements | Yes | `MyBatisExtractor` in `mybatis-extractor.ts` |
 | MyBatis `<include refid>` | Yes | `MyBatisExtractor` emits `references` edges |
 
+---
 
+## 5. Watcher/Sync
+
+### 5.1 FileWatcher (`src/sync/watcher.ts`)
+
+`FileWatcher` monitors a project directory and triggers debounced sync when source files change. Design goals: bounded resource usage (O(1) descriptors on macOS/Windows, O(directories) inotify watches on Linux), debouncing to avoid thrashing on rapid saves, and per-file pending tracking so MCP tool responses can flag stale results without blocking on a sync.
+
+**Platform strategy:**
+
+| Platform | Strategy | Watch cost |
+|---|---|---|
+| macOS / Windows | Single recursive `fs.watch(root, {recursive:true})` | O(1) descriptors — one FSEvents stream / one RDCW handle regardless of repo size |
+| Linux | Per-directory `fs.watch()` — one inotify watch per directory | O(directories), not O(files) |
+
+The Linux per-directory strategy caps at `maxDirWatches` (default 50,000; tunable via `CODEGRAPH_MAX_DIR_WATCHES`). On inotify watch-count exhaustion (ENOSPC) it warns and stops adding watches rather than degrading — the already-installed watches keep working.
+
+**Ignored trees:** `node_modules/`, `dist/`, `.git/`, and all paths matched by the project's `.gitignore` are excluded. The same `buildScopeIgnore` used by the indexer is used by the watcher, so both agree on scope. `.codegraph/` is always ignored regardless of gitignore.
+
+### 5.2 Watch Options
+
+```typescript
+// src/sync/watcher.ts line 149
+export interface WatchOptions {
+  debounceMs?: number;       // Default: 2000ms. How long to wait after the last edit before syncing.
+  onSyncComplete?: (result: { filesChanged: number; durationMs: number }) => void;
+  onSyncError?: (error: Error) => void;
+  // Called once when live watching is permanently disabled (OS watch/resource exhaustion, or lock held past retry budget).
+  onDegraded?: (reason: string) => void;
+}
+```
+
+### 5.3 SyncResult
+
+`sync()` in `src/extraction/index.ts` returns a `SyncResult`:
+
+```typescript
+// src/extraction/index.ts line 79
+export interface SyncResult {
+  filesChecked: number;
+  filesAdded: number;
+  filesModified: number;
+  filesRemoved: number;
+  nodesUpdated: number;
+  durationMs: number;
+  changedFilePaths?: string[];
+}
+```
+
+The `watch()` callback in `src/index.ts` (line 551) wraps `sync()` and returns only `{ filesChanged, durationMs }` to the watcher:
+
+```typescript
+async () => {
+  const result = await this.sync();
+  if (result.filesChecked === 0 && result.durationMs === 0) {
+    throw new LockUnavailableError(); // lock held by another writer
+  }
+  const filesChanged = result.filesAdded + result.filesModified + result.filesRemoved;
+  return { filesChanged, durationMs: result.durationMs };
+}
+```
+
+### 5.4 Pending Files and the Staleness Signal
+
+`FileWatcher.getPendingFiles()` (line 843) returns files the watcher has seen changed but not yet synced. Each entry:
+
+```typescript
+// src/sync/watcher.ts line 206
+export interface PendingFile {
+  path: string;          // Project-relative POSIX path
+  firstSeenMs: number;   // Wall-clock ms at first event since last sync
+  lastSeenMs: number;    // Wall-clock ms at most recent event
+  indexing: boolean;      // True when a sync in flight will absorb this edit
+}
+```
+
+`CodeGraph.getPendingFiles()` (line 616) exposes this via the public API. The MCP tool handler uses it to render per-file staleness banners: if a response's text includes a pending file's path, a banner warns the agent to Read that file directly. The `indexing` flag distinguishes "still in the debounce window" (false) from "currently being indexed" (true).
+
+### 5.5 Watcher Lifecycle and Degradation
+
+- **Normal:** events are accumulated in `pendingFiles`, a debounce timer fires after `debounceMs` idle, `flush()` runs `syncFn()`.
+- **Lock contention:** `LockUnavailableError` is caught; the watcher retries with exponential backoff (`debounceMs * 2^(n-1)`). After 5 retries it degrades permanently.
+- **OS resource exhaustion (EMFILE/ENFILE):** the watcher degrades immediately with an actionable message. Run `codegraph sync` or install git sync hooks as backstop.
+- **Linux inotify watch-count exhaustion (ENOSPC):** non-fatal warning; already-installed watches keep working. Raise `fs.inotify.max_user_watches`.
+- **WSL2 `/mnt/` detection:** `watchDisabledReason()` in `watch-policy.ts` returns a reason string on WSL2; the watcher refuses to start rather than blocking MCP startup. Fall back to manual sync or git hooks.
+
+### 5.6 CodeGraph.watch() and springkg Integration
+
+The public `CodeGraph.watch()` API (line 546) attaches a `FileWatcher` to a `CodeGraph` instance. The correct springkg integration pattern:
+
+```typescript
+const cg = await CodeGraph.open('/path/to/project');
+cg.watch({
+  onSyncComplete: async ({ filesChanged, durationMs }) => {
+    // WRONG: onSyncComplete only gives { filesChanged, durationMs } — no file paths
+    // const paths = ???  // impossible without the paths
+
+    // CORRECT: use getPendingFiles() to get the actual changed file paths
+    const pending = await cg.getPendingFiles();
+    const paths = pending.map(p => p.path);
+    await updateSpringKg(paths);
+  }
+});
+```
+
+**Critical note:** `onSyncComplete` callback only receives `{ filesChanged, durationMs }` — it does not receive file paths. File paths must be obtained by calling `cg.getPendingFiles()` inside the callback (or after it returns), which reads the watcher's accumulated pending file set.
+
+The `isWatcherDegraded()` and `getWatcherDegradedReason()` methods (line 595) let callers detect when live watching has been permanently disabled so the UI can alert the user.
+
+
+---
+
+## 4. MCP Architecture
+
+### 4.1 Tool Registration: `tools[]` Array (line 415)
+
+All CodeGraph MCP tools are defined in a single exported array at `src/mcp/tools.ts` line 415:
+
+```typescript
+export const tools: ToolDefinition[] = [
+  { name: 'codegraph_search',   ... },
+  { name: 'codegraph_callers',  ... },
+  { name: 'codegraph_callees',  ... },
+  { name: 'codegraph_impact',   ... },
+  { name: 'codegraph_node',     ... },
+  { name: 'codegraph_explore',  ... },
+  { name: 'codegraph_status',   ... },
+  { name: 'codegraph_files',    ... },
+];
+```
+
+There are exactly **8 tools** in total. Each entry is a `ToolDefinition` object with `name`, `description`, and `inputSchema`. The array is the **only** registration point for MCP tools — there is no plugin, hook, or extension mechanism anywhere in the codebase.
+
+---
+
+### 4.2 The `CODEGRAPH_MCP_TOOLS` Environment Variable
+
+By default, CodeGraph exposes only **4 tools** to agents:
+
+```typescript
+const DEFAULT_MCP_TOOLS = new Set(['explore', 'node', 'search', 'callers']);
+```
+
+The other 4 tools (`callees`, `impact`, `files`, `status`) are fully implemented and functional — their handlers exist and the library API and CLI are untouched — but they are **not listed** in `tools/list` responses sent to agents.
+
+The environment variable `CODEGRAPH_MCP_TOOLS` acts as a **tool allowlist** at startup:
+
+| Value | Effect |
+|-------|--------|
+| unset or empty | Only the 4 default tools are listed |
+| comma-separated short names (e.g. `explore,node,search,callers,impact`) | Only the named tools are listed; matching is on the short form (`node` or `codegraph_node` both work) |
+| empty string `""` | All 8 tools are listed |
+
+The allowlist is applied in three places:
+
+1. **`getStaticTools()`** (line 625) — filters the static surface the proxy returns in `tools/list` before any project is opened. This is a defensive gate: even if a client has a cached tool list from a previous session, the server will not acknowledge a tool that is no longer allowed.
+
+2. **`ToolHandler.getTools()`** (line 748) — applies the same allowlist at the handler level, and additionally scales `codegraph_explore`'s budget description based on the number of indexed files (tiny repos under 500 files see only 3 tools: `explore`, `search`, `node`).
+
+3. **`ToolHandler.execute()`** (line 1117) — a second enforcement point that returns an error result if a disallowed tool is called, guarding against clients that ignore the allowlist in `tools/list`.
+
+```typescript
+// Honor the optional tool allowlist (CODEGRAPH_MCP_TOOLS): a trimmed
+// surface rejects ablated tools defensively even if a client cached them.
+if (!this.isToolAllowed(toolName)) {
+  return this.errorResult(`Tool ${toolName} is disabled via CODEGRAPH_MCP_TOOLS`);
+}
+```
+
+The `CODEGRAPH_MCP_TOOLS` mechanism lets operators or A/B evaluation harnesses trim the tool surface without rebuilding the client configuration. It does not affect the CLI (`codegraph callees`, `codegraph impact`, etc.) or the programmatic library API.
+
+---
+
+### 4.3 The `ToolHandler` Pattern
+
+`ToolHandler` (line 664, `src/mcp/tools.ts`) is the single class responsible for all MCP tool execution.
+
+#### Class responsibilities
+
+```typescript
+export class ToolHandler {
+  // Cross-project CodeGraph instance cache
+  private projectCache: Map<string, CodeGraph> = new Map();
+  // The default CodeGraph instance (set after lazy initialization)
+  private cg: CodeGraph | null = null;
+  // Git worktree mismatch cache (fixed per (cwd → .codegraph/) pair)
+  private worktreeMismatchCache: Map<string, WorktreeIndexMismatch | null> = new Map();
+  // Post-open reconcile gate (first tool call blocks on this)
+  private catchUpGate: Promise<void> | null = null;
+
+  constructor(cg: CodeGraph | null) {}
+  setDefaultCodeGraph(cg: CodeGraph): void { ... }
+  setCatchUpGate(p: Promise<void> | null): void { ... }
+  setDefaultProjectHint(searchedPath: string): void { ... }
+  hasDefaultCodeGraph(): boolean { ... }
+  getTools(): ToolDefinition[] { ... }
+  async execute(toolName: string, args: Record<string, unknown>): Promise<ToolResult> { ... }
+}
+```
+
+#### Dispatch pattern
+
+`execute()` is a large `try` block that:
+
+1. **Awaits the catch-up gate** (line 1110) — the first tool call blocks on the engine's post-open filesystem reconcile so it never serves rows for files deleted while the MCP server was not running.
+
+2. **Checks the allowlist** (line 1117) — rejects disallowed tools defensively.
+
+3. **Validates path inputs** (line 1124) — bounds `projectPath`, `path`, and `pattern` lengths centrally to prevent abuse.
+
+4. **Dispatches** through a `switch` on `toolName` to the corresponding `handle*` private method:
+   - `handleSearch` → `codegraph_search`
+   - `handleCallers` → `codegraph_callers`
+   - `handleCallees` → `codegraph_callees`
+   - `handleImpact` → `codegraph_impact`
+   - `handleExplore` → `codegraph_explore`
+   - `handleNode` → `codegraph_node`
+   - `handleStatus` → `codegraph_status` (short-circuits the staleness wrapper to avoid duplication)
+   - `handleFiles` → `codegraph_files`
+
+5. **Wraps results** with worktree and staleness notices (line 1169).
+
+6. **Catches errors** and classifies them:
+   - `NotIndexedError` → `textResult()` (SUCCESS-shaped, no `isError`) — an agent must **not** abandon the toolset for indexed projects because of a per-project not-indexed condition.
+   - `PathRefusalError` → `errorResult()` with `isError: true` and **no retry note** — abandoning this path is the correct agent reaction.
+   - All other errors → `errorResult()` with retry encouragement, logged as internal errors.
+
+#### Cross-project queries
+
+`getCodeGraph(projectPath?)` (line 818) walks up from the provided path (or `process.cwd()`) to find the nearest `.codegraph/` directory, using `findNearestCodeGraphRoot`. Resolved instances are cached in `projectCache`. If the path resolves to the default project, the already-open default `CodeGraph` instance is reused to avoid opening a second DB connection.
+
+#### Project size scaling
+
+`getTools()` (line 748) adjusts the tool surface based on project size:
+- **Under 500 files**: only `explore`, `search`, `node` are listed (3 tools — `callers` collapses to one grep at this scale).
+- **500+ files**: the full 4-default or allowlisted set is shown.
+- `codegraph_explore` description is augmented with a per-project budget recommendation: `make at most N calls for this project (M files indexed)`.
+
+---
+
+### 4.4 `serve --mcp` Bootstrap
+
+`serve --mcp` in `src/bin/codegraph.ts` (line 1375) is the entry point for the MCP server. It is never run by hand — AI agents launch it themselves over stdio.
+
+```typescript
+if (options.mcp) {
+  // Guard: if stdin is a TTY, this was typed by a human, not an agent.
+  // Explain instead of hanging on JSON-RPC input.
+  if (process.stdin.isTTY && !process.env.CODEGRAPH_DAEMON_INTERNAL) {
+    console.error(chalk.bold('\nCodeGraph MCP server\n'));
+    console.error("This is the MCP server your AI agent (Claude Code, Cursor, Codex, opencode, ...)");
+    console.error("starts automatically -- you don't run it yourself.");
+    // ... usage instructions
+    return;
+  }
+  // Start MCP server -- initialization is lazy based on rootUri from client
+  const { MCPServer } = await import('../mcp/index');
+  const server = new MCPServer(projectPath);
+  await server.start();
+  // Server runs until terminated
+}
+```
+
+**Bootstrap chain:**
+
+1. `new MCPServer(projectPath)` — `src/mcp/index.ts` line 216. Stores the project path; all other state is initialized lazily.
+2. `server.start()` — decides the server mode:
+   - `CODEGRAPH_NO_DAEMON=1` → **direct mode**: one MCP session in the same process.
+   - `CODEGRAPH_DAEMON_INTERNAL=1` → **daemon mode**: the process **is** the detached daemon; listens on a Unix socket.
+   - No `.codegraph/` reachable → **direct mode** (fresh checkout case).
+   - Otherwise → **proxy mode**: answers the MCP handshake locally (instant, no waiting for daemon startup) and proxies tool **calls** to the shared daemon over a socket. The daemon is connected in the background; if it never comes up, the proxy falls back to an in-process engine.
+
+The **proxy mode with local handshake** is the default for an initialized project: it avoids the ~600 ms daemon spawn+bind cost on the cold path while still sharing one DB connection across sessions.
+
+---
+
+### 4.5 No Plugin Mechanism — Independent MCP Server Recommended
+
+CodeGraph has **no plugin, hook, or extension mechanism** that allows other modules (such as springkg) to register additional MCP tools from outside the `tools[]` array. The tool registry is a static array in `src/mcp/tools.ts` compiled into the binary. There is no API anywhere in the codebase for a third-party package to contribute tools to a running CodeGraph server.
+
+**Consequence for springkg integration:**
+
+springkg cannot register its own `springkg_*` tools through CodeGraph. There is no `codegraph.registerTool()` API, no MCP tool hook, and no second-stage loader. The 8 tools defined in `tools[]` are the complete and only set.
+
+**Recommended integration pattern: independent MCP server**
+
+The correct way to add Spring/Kubernetes knowledge graph tools alongside CodeGraph is to run a **separate MCP server process** for springkg and wire it into the agent's MCP configuration independently:
+
+```json
+{
+  "mcpServers": {
+    "codegraph": {
+      "type": "stdio",
+      "command": "codegraph",
+      "args": ["serve", "--mcp"]
+    },
+    "springkg": {
+      "type": "stdio",
+      "command": "springkg",
+      "args": ["serve", "--mcp"]
+    }
+  }
+}
+```
+
+This pattern:
+
+- Keeps the two tool registries fully independent — springkg is responsible only for its own `springkg_*` tools and their schemas.
+- Both servers appear in the agent's `tools/list` and the agent selects the right one per call.
+- springkg can use the same `codegraph_node_id` linking strategy described in §1.4 to reference CodeGraph nodes without any coupling to CodeGraph's internal tool registration.
+- No changes to CodeGraph source are required; springkg ships its own MCP server as a separate process and npm package.

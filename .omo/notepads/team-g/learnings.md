@@ -213,3 +213,24 @@ Learned: Added `tests/integration/sprint1-e2e.test.ts` with a Vitest stdio JSON-
 ### What was modified
 
 - `examples/springcloud-demo/src/main/java/com/example/user/UserMapper.java` -- Added `selectById` method with `@Select("SELECT id, name, email FROM users WHERE id = #{id}")` annotation and `@Param("id")` parameter. Added imports for `org.apache.ibatis.annotations.Select` and `org.apache.ibatis.annotations.Param`.
+
+---
+
+## Task T36 -- Sprint 2 e2e Test and Documentation
+
+### Key findings
+
+**The sprint2-e2e.test.ts follows sprint1-e2e.test.ts exactly.** Both use stdio JSON-RPC framing (newline-delimited JSON objects), spawn the MCP server as a child process with `SPRINGKG_PROJECT_PATH` env var, back up the `.codegraph` dir to `.codegraph-backup-tmp-{pid}-{timestamp}` before init, and restore it in `afterAll`. The `request()` helper reads responses line-by-line from stdout, parses JSON-RPC, and resolves by message id.
+
+**The test validates the full Endpoint-to-SQL trace chain.** Sprint 2 extends Sprint 1 by adding MyBatis XML SQL extraction (UserMapper.xml `findAll`, `insertUser`, `updateUser`) and annotation SQL extraction (`@Select` on `selectById`). The test uses `depth: 5` on `spring_trace_flow` to reach the SQL layer, and `spring_find_mapper` independently verifies both XML and annotation SQL paths.
+
+**spring_find_mapper has two SQL source types.** XML-based SQL (the majority of mapper methods) sets `sqlSource: 'xml'` and returns a `filePath` pointing to the `.xml` file. Annotation-based SQL sets `sqlSource: 'annotation'` and embeds the SQL text directly in `sqlText`.
+
+**The MCP tools list grows from 4 to 5.** Sprint 1 tools: `spring_find_entry`, `spring_find_feign`, `spring_assets_overview`, `spring_trace_flow`. Sprint 2 adds `spring_find_mapper`.
+
+### What was created
+
+- `tests/integration/sprint2-e2e.test.ts` -- Vitest integration test with 5 test cases: tools list check (5 tools), `selectById` annotation SQL, `findAll` XML SQL, namespace resolution (4+ methods), and `spring_trace_flow` depth 5 reaching the SQL layer.
+- Updated `docs/mcp-tools.md` -- Inserted `spring_find_mapper` as section 3 (promoting `spring_assets_overview` to 4 and `spring_trace_flow` to 5), updated the tool count in the opening paragraph.
+- Updated `docs/validation.md` -- Added Sprint 2 section with 4 validation items (S2-1 through S2-4), updated document title to cover both sprints.
+- Updated `CHANGELOG.md` -- Added 3 bullet points under `### New Features (springkg)` in `[Unreleased]`: `spring_find_mapper` tool, `spring_trace_flow` entryPath+depth params, and MyBatis XML+annotation SQL extraction.

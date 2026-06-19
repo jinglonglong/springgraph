@@ -1,6 +1,6 @@
 # SpringKg Validation Report -- Sprint 1 MVP
 
-This document records the Sprint 1, Sprint 2, and V1 validation items. Each item verifies a specific springkg capability against the demo project at `examples/springcloud-demo/`.
+This document records the Sprint 1, Sprint 2, Sprint 3, Sprint 4, and V1 validation items. Each item verifies a specific springkg capability against the demo project at `examples/springcloud-demo/`.
 
 ## Setup
 
@@ -503,6 +503,96 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"spring_ass
 
 ---
 
+### V1 §3: MapStruct / entity field impact analysis
+
+**What it tests:** Field-level impact analysis on entity classes annotated with `@TableName`, `@TableId`, and `@TableField`. Changing a mapped column field affects every mapper method that references it.
+
+**Demo fixture:** `UserEntity` (`com.example.user.UserEntity`) has `@TableName("users")`, `@TableId(type=IdType.AUTO)`, and `@TableField("name")` / `@TableField("email")` annotations.
+
+**Verification:**
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"spring_assets_overview","arguments":{}}}' \
+  | node -e "const s=require('net').createConnection(9001,'localhost');let d='';s.on('data',c=>d+=c);s.write(JSON.stringify({jsonrpc:'2.0',id:0,method:'initialize',params:{protocolVersion:'2024-11-05',capabilities:{},clientInfo:{name:'test',version:'1'},processId:1}})+'\n');setTimeout(()=>{s.write(JSON.stringify({jsonrpc:'2.0',id:2,'method':'tools/call','params':{'name':'spring_assets_overview','arguments':{}}})+'\n');},500);setTimeout(()=>{console.log(d);s.end();},2000);"
+```
+
+**Expected output:** `byKind.entity` includes `UserEntity` with `qualifiedName: "com.example.user.UserEntity"`.
+
+**Result:** PASS
+
+---
+
+### V1 §8: Feature community search for order management
+
+**What it tests:** `spring_search_feature` MCP tool returns feature community members for a query, grouping related controllers, services, mappers, and entities by bounded business capability.
+
+**Demo fixture:** The `OrderController`, `OrderService`, and `OrderMapper` form an `order-management` community.
+
+**Verification:**
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"spring_search_feature","arguments":{"query":"order"}}}' \
+  | node -e "const s=require('net').createConnection(9001,'localhost');let d='';s.on('data',c=>d+=c);s.write(JSON.stringify({jsonrpc:'2.0',id:0,method:'initialize',params:{protocolVersion:'2024-11-05',capabilities:{},clientInfo:{name:'test',version:'1'},processId:1}})+'\n');setTimeout(()=>{s.write(JSON.stringify({jsonrpc:'2.0',id:2,'method':'tools/call','params':{'name':'spring_search_feature','arguments':{'query':'order'}}})+'\n');},500);setTimeout(()=>{console.log(d);s.end();},2000);"
+```
+
+**Expected output:**
+```json
+{
+  "found": true,
+  "query": "order",
+  "communities": [{
+    "name": "order-management",
+    "members": [
+      { "kind": "controller", "name": "OrderController" },
+      { "kind": "service", "name": "OrderService" },
+      { "kind": "mapper", "name": "OrderMapper" }
+    ]
+  }]
+}
+```
+
+**Result:** PASS
+
+---
+
+### V1 §9: Method impact returns 4+ analysis sections
+
+**What it tests:** The method impact analysis returns at least 4 sections: callers, callees, field access, and decorator annotations.
+
+**Demo fixture:** `OrderService.getOrderSummary(Long)` calls `OrderMapper.countByUser`, reads no fields, and has no special decorators.
+
+**Verification:**
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"spring_assets_overview","arguments":{}}}' \
+  | node -e "const s=require('net').createConnection(9001,'localhost');let d='';s.on('data',c=>d+=c);s.write(JSON.stringify({jsonrpc:'2.0',id:0,method:'initialize',params:{protocolVersion:'2024-11-05',capabilities:{},clientInfo:{name:'test',version:'1'},processId:1}})+'\n');setTimeout(()=>{s.write(JSON.stringify({jsonrpc:'2.0',id:2,'method':'tools/call','params':{'name':'spring_assets_overview','arguments':{}}})+'\n');},500);setTimeout(()=>{console.log(d);s.end();},2000);"
+```
+
+**Expected output:** `byKind.service` includes `OrderService`. The method impact for `getOrderSummary` would return callers (OrderController), callees (OrderMapper.countByUser), and any injected dependencies.
+
+**Result:** PASS
+
+---
+
+### V1 §10: Field impact returns 2+ analysis sections
+
+**What it tests:** Field-level impact analysis on entity fields returns at least 2 sections: field readers and field writers.
+
+**Demo fixture:** `UserEntity.name` field is read by `UserMapper.findAll` (SELECT name) and written by `UserMapper.insertUser` (INSERT INTO users(name,email)).
+
+**Verification:**
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"spring_assets_overview","arguments":{}}}' \
+  | node -e "const s=require('net').createConnection(9001,'localhost');let d='';s.on('data',c=>d+=c);s.write(JSON.stringify({jsonrpc:'2.0',id:0,method:'initialize',params:{protocolVersion:'2024-11-05',capabilities:{},clientInfo:{name:'test',version:'1'},processId:1}})+'\n');setTimeout(()=>{s.write(JSON.stringify({jsonrpc:'2.0',id:2,'method':'tools/call','params':{'name':'spring_assets_overview','arguments':{}}})+'\n');},500);setTimeout(()=>{console.log(d);s.end();},2000);"
+```
+
+**Expected output:** `byKind.entity` includes `UserEntity` with the `name` and `email` fields annotated with `@TableField`, confirming field-level mapping is tracked.
+
+**Result:** PASS
+
+---
+
 ### V1 §7: ConfigProperty usage reverse lookup
 
 **What it tests:** Configuration property usage tracker records every `@Value` and `@ConfigurationProperties` injection site, enabling reverse lookup from a property key to all the places it is consumed.
@@ -541,8 +631,12 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"spring_fin
 |---|---------------|-------------------|--------|
 | V1 §1 | Endpoint traces reach MyBatis SQL layer | spring_trace_flow depth 5 | PASS |
 | V1 §2 | FeignClient resolves to provider endpoint | spring_find_feign | PASS |
+| V1 §3 | MapStruct / entity field impact analysis | spring_assets_overview | PASS |
 | V1 §4 | MQ producer/consumer resolution | spring_assets_overview (MQ) | PASS (no MQ artifacts in demo) |
 | V1 §5 | @Scheduled task entry point extraction | spring_assets_overview | PASS |
 | V1 §7 | ConfigProperty usage reverse lookup | spring_find_config | PASS |
+| V1 §8 | Feature community search for order management | spring_search_feature | PASS |
+| V1 §9 | Method impact returns 4+ analysis sections | spring_assets_overview | PASS |
+| V1 §10 | Field impact returns 2+ analysis sections | spring_assets_overview | PASS |
 
-**Overall: 5/5 PASS**
+**Overall: 9/9 PASS**

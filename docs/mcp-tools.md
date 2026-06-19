@@ -1,6 +1,6 @@
 # SpringKg MCP Tools
 
-The `springkg-mcp` server exposes eight tools over stdio. Each tool accepts a JSON input and returns a structured JSON result. All tools operate on the active SpringKg session (project path resolved from the MCP root URI).
+The `springkg-mcp` server exposes nine tools over stdio. Each tool accepts a JSON input and returns a structured JSON result. All tools operate on the active SpringKg session (project path resolved from the MCP root URI).
 
 ## Tool Reference
 
@@ -567,7 +567,109 @@ Lists Spring Cloud Gateway route definitions, optionally filtered by a path pref
 
 ---
 
-### 7. spring_assets_overview
+### 7. spring_search_feature
+
+Searches feature communities -- groups of semantically related Spring symbols (controllers, services, mappers, entities) that represent a bounded business capability -- by keyword query. Returns the community name, score, and member symbols.
+
+**Input schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "projectPath": {
+      "type": "string",
+      "description": "Absolute path to the project."
+    },
+    "query": {
+      "type": "string",
+      "description": "Keyword or phrase to search feature communities by name or member symbol."
+    },
+    "limit": {
+      "type": "integer",
+      "default": 10,
+      "description": "Maximum number of communities to return."
+    }
+  }
+}
+```
+
+**Output schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "found": { "type": "boolean" },
+    "query": { "type": "string" },
+    "communities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "score": { "type": "number" },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string" },
+                "name": { "type": "string" },
+                "qualifiedName": { "type": "string" },
+                "filePath": { "type": "string" },
+                "line": { "type": "integer" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Example response:**
+
+```json
+{
+  "found": true,
+  "query": "order",
+  "communities": [
+    {
+      "name": "order-management",
+      "score": 0.95,
+      "members": [
+        {
+          "kind": "controller",
+          "name": "OrderController",
+          "qualifiedName": "com.example.order.OrderController",
+          "filePath": "src/main/java/com/example/order/OrderController.java",
+          "line": 7
+        },
+        {
+          "kind": "service",
+          "name": "OrderService",
+          "qualifiedName": "com.example.order.OrderService",
+          "filePath": "src/main/java/com/example/order/OrderService.java",
+          "line": 6
+        },
+        {
+          "kind": "mapper",
+          "name": "OrderMapper",
+          "qualifiedName": "com.example.order.OrderMapper",
+          "filePath": "src/main/java/com/example/order/OrderMapper.java",
+          "line": 6
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### 8. spring_assets_overview
 
 Returns a high-level inventory of all Spring assets indexed in springkg.db: controllers, services, repositories, Feign clients, data entities, SQL statements, and configuration properties.
 
@@ -660,7 +762,7 @@ Returns a high-level inventory of all Spring assets indexed in springkg.db: cont
 
 ---
 
-### 8. spring_trace_flow
+### 9. spring_trace_flow
 
 Traces the execution path from an HTTP endpoint through its handler method, service layer, data-access layer, and SQL statement. Returns each hop with the file path and source line.
 

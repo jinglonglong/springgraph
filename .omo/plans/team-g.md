@@ -480,7 +480,7 @@ Team G 是 7 团队并行模式中的 1 个，负责**验证 + 示例 + 文档**
 
 ### Phase G3: Sprint 4 demo 扩展 + 最终文档 (Tasks 57, 58, 67)
 
-- [ ] 13. [G] T57 — demo community 扩展 + e2e
+- [x] 13. [G] T57 — demo community 扩展 + e2e
 
   **What to do**:
   - 在 `examples/springcloud-demo/` 中：

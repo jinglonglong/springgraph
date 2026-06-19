@@ -1,0 +1,3 @@
+<mapper namespace="com.example.order.OrderMapper">
+  <delete id="deleteExpired">DELETE FROM orders WHERE created_at &lt; NOW() - INTERVAL 30 DAY</delete>
+</mapper>

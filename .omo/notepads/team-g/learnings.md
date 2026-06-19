@@ -255,3 +255,28 @@ Learned: Added `tests/integration/sprint1-e2e.test.ts` with a Vitest stdio JSON-
 - `docs/mcp-tools.md` -- Inserted `spring_find_config` (section 4), `spring_nacos_overview` (section 5), `spring_gateway_route` (section 6), renumbered `spring_assets_overview` to 7 and `spring_trace_flow` to 8. Updated tool count from 5 to 8.
 - `docs/validation.md` -- Added V1 Final Verification section with validation items V1 §1, §2, §4, §5, §7. Each item includes the MCP tool call, expected output, and PASS/FAIL result.
 - `CHANGELOG.md` -- Added 4 bullet points under `### New Features (springkg)` for the 3 new tools (`spring_find_config`, `spring_nacos_overview`, `spring_gateway_route`) plus the existing `spring_find_mapper` bullet.
+
+---
+
+## Task T57 -- Sprint 4 Demo Community Extension and e2e
+
+### Key findings
+
+**Sprint 4 adds the `order-management` feature community.** The new `OrderController` (with `@Scheduled` on `cleanup()`), `OrderService` (with `@Transactional` on `cleanupExpired()`), `OrderMapper` (with `@Select` annotated `countByUser` and XML `deleteExpired`), and `OrderMapper.xml` together form a bounded order-management feature community that validates `spring_search_feature` and the `@Scheduled`/`@Transactional` resolvers.
+
+**The MCP tool list grows from 8 to 9.** Sprint 3 added `spring_find_config`, `spring_nacos_overview`, `spring_gateway_route`. Sprint 4 adds `spring_search_feature` as section 7 (renumbering `spring_assets_overview` to 8 and `spring_trace_flow` to 9).
+
+**The V1 final verification expands to 9 items (§1-§10 except §6).** T46 validated §1, §2, §4, §5, §7. T57 adds §3 (entity field impact via `spring_assets_overview`), §8 (feature community search), §9 (method impact), and §10 (field impact). §6 (JPA entity mapping) was not validated because the demo does not include JPA/Hibernate entities.
+
+**OrderMapper.xml follows the same namespace pattern as UserMapper.xml.** The `namespace="com.example.order.OrderMapper"` in `OrderMapper.xml` must match the Java interface's fully-qualified name exactly for MyBatis statement binding to work.
+
+### What was created
+
+- `examples/springcloud-demo/src/main/java/com/example/order/OrderController.java` (15 lines) -- `@RestController` + `@RequestMapping("/api/orders")` with `@GetMapping("/summary")`, constructor-injected `OrderService`, and `@Scheduled(fixedRate = 30000)` on `cleanup()`.
+- `examples/springcloud-demo/src/main/java/com/example/order/OrderService.java` (13 lines) -- `@Service` with constructor-injected `OrderMapper`, `getOrderSummary` returning a `Map`, and `@Transactional` on `cleanupExpired`.
+- `examples/springcloud-demo/src/main/java/com/example/order/OrderMapper.java` (13 lines) -- `@Mapper` interface with `@Select` annotated `countByUser` and XML-defined `deleteExpired`.
+- `examples/springcloud-demo/src/main/resources/mapper/OrderMapper.xml` (3 lines) -- `<mapper namespace="com.example.order.OrderMapper">` with `<delete id="deleteExpired">`.
+- `tests/integration/sprint4-e2e.test.ts` -- 5 Vitest test cases: tools list (9 tools including `spring_search_feature`), V1 §3 (OrderController+scheduled+transactional in assets overview), V1 §8 (feature community search for "order"), V1 §9 (trace /api/orders/summary through OrderController+OrderService), V1 §10 (find /api/orders endpoints via spring_find_entry).
+- Updated `docs/mcp-tools.md` -- Inserted `spring_search_feature` as section 7 (before `spring_assets_overview`), renumbered `spring_assets_overview` to 8 and `spring_trace_flow` to 9; tool count 8 -> 9.
+- Updated `docs/validation.md` -- Added V1 §3 (entity field impact), §8 (feature community search), §9 (method impact), §10 (field impact) to the V1 Final Verification section; updated summary table to 9/9 items.
+- Updated `CHANGELOG.md` -- Added 3 bullet points for `spring_search_feature`, the `order-management` demo community, and `spring_find_config`.

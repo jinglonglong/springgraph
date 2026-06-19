@@ -19,6 +19,9 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### New Features (springkg)
 
+- SpringKg: Added `spring_find_mapper` MCP tool for querying MyBatis mappers by namespace or method name, returning mapper methods with their SQL source (XML or annotation) and location.
+- SpringKg: Extended `spring_trace_flow` to accept `entryPath` (e.g. `/api/users`) and `depth` parameters, tracing HTTP endpoints through controller, service, mapper, and SQL layers with depth up to 10.
+- SpringKg: Added MyBatis XML and annotation SQL extraction -- `UserMapper.xml` SQL statements (`findAll`, `insertUser`, `updateUser`) are parsed and stored in `spring_sql_statements`, and `@Select`-annotated mapper methods are extracted as annotation-based SQL.
 - SpringKg: Added SpringCloud semantic knowledge graph layer with 8-table schema in `springkg.db` (`spring_symbols`, `spring_edges`, `spring_endpoints`, `spring_feign_clients`, `spring_sql_statements`, `runtime_config_properties`, `feature_communities`, `feature_community_members`).
 - SpringKg: Added 4 MCP tools (`spring_find_entry`, `spring_find_feign`, `spring_assets_overview`, `spring_trace_flow`) for querying Spring Boot assets and tracing request flows.
 - SpringKg: Added 5 Team B semantic resolvers (AnnotationSemanticEngine, EndpointResolver, FeignResolver, FeignProviderBridge, FeignRequestResponseType) for Spring annotations, REST endpoints, and OpenFeign client resolution.

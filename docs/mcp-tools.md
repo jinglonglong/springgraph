@@ -1,6 +1,6 @@
 # SpringKg MCP Tools
 
-The `springkg-mcp` server exposes four tools over stdio. Each tool accepts a JSON input and returns a structured JSON result. All tools operate on the active SpringKg session (project path resolved from the MCP root URI).
+The `springkg-mcp` server exposes five tools over stdio. Each tool accepts a JSON input and returns a structured JSON result. All tools operate on the active SpringKg session (project path resolved from the MCP root URI).
 
 ## Tool Reference
 
@@ -188,7 +188,121 @@ Finds all `@FeignClient` interface declarations in the project, listing client n
 
 ---
 
-### 3. spring_assets_overview
+### 3. spring_find_mapper
+
+Finds MyBatis mapper interfaces and their methods, optionally filtered by namespace or method name. Returns SQL source information indicating whether the SQL is defined in an XML file or as an annotation.
+
+**Input schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "projectPath": {
+      "type": "string",
+      "description": "Absolute path to the project."
+    },
+    "namespace": {
+      "type": "string",
+      "description": "Filter by fully-qualified mapper interface name, e.g. 'com.example.user.UserMapper'. Omit to return all mappers."
+    },
+    "methodName": {
+      "type": "string",
+      "description": "Filter by method name. Can be combined with namespace or used alone."
+    }
+  }
+}
+```
+
+**Output schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "found": { "type": "boolean" },
+    "query": {
+      "type": "object",
+      "properties": {
+        "namespace": { "type": "string" },
+        "methodName": { "type": "string" }
+      }
+    },
+    "mappers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "namespace": { "type": "string" },
+          "methods": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "sqlSource": { "type": "string", "enum": ["xml", "annotation"] },
+                "sqlText": { "type": "string" },
+                "filePath": { "type": "string" },
+                "line": { "type": "integer" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Example response:**
+
+```json
+{
+  "found": true,
+  "query": { "methodName": "selectById" },
+  "mappers": [
+    {
+      "namespace": "com.example.user.UserMapper",
+      "methods": [
+        {
+          "name": "selectById",
+          "sqlSource": "annotation",
+          "sqlText": "SELECT * FROM users WHERE id = #{id}",
+          "filePath": "src/main/java/com/example/user/UserMapper.java",
+          "line": 12
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Example response for XML-based SQL:**
+
+```json
+{
+  "found": true,
+  "query": { "methodName": "findAll" },
+  "mappers": [
+    {
+      "namespace": "com.example.user.UserMapper",
+      "methods": [
+        {
+          "name": "findAll",
+          "sqlSource": "xml",
+          "sqlText": "SELECT * FROM users",
+          "filePath": "src/main/resources/mapper/UserMapper.xml",
+          "line": 5
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### 4. spring_assets_overview
 
 Returns a high-level inventory of all Spring assets indexed in springkg.db: controllers, services, repositories, Feign clients, data entities, SQL statements, and configuration properties.
 
@@ -281,7 +395,7 @@ Returns a high-level inventory of all Spring assets indexed in springkg.db: cont
 
 ---
 
-### 4. spring_trace_flow
+### 5. spring_trace_flow
 
 Traces the execution path from an HTTP endpoint through its handler method, service layer, data-access layer, and SQL statement. Returns each hop with the file path and source line.
 

@@ -1,6 +1,6 @@
 # SpringKg Validation Report -- Sprint 1 MVP
 
-This document records the 10 MVP validation items for Sprint 1. Each item verifies a specific springkg capability against the demo project at `examples/springcloud-demo/`.
+This document records the Sprint 1 and Sprint 2 validation items. Each item verifies a specific springkg capability against the demo project at `examples/springcloud-demo/`.
 
 ## Setup
 
@@ -241,3 +241,156 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"spring_ass
 | MVP-10 | spring_assets_overview returns complete inventory | MCP tool | PASS |
 
 **Overall: 10/10 PASS**
+
+---
+
+# SpringKg Validation Report -- Sprint 2
+
+This document records the Sprint 2 validation items. Each item verifies a specific springkg capability against the demo project at `examples/springcloud-demo/`.
+
+## Setup
+
+The demo project was initialized and indexed before running validations:
+
+```bash
+springkg init examples/springcloud-demo
+springkg index examples/springcloud-demo
+```
+
+Expected state: `springkg.db` created inside `.codegraph/`, with records in `spring_symbols`, `spring_edges`, `spring_endpoints`, `spring_feign_clients`, `spring_sql_statements`, and `runtime_config_properties`.
+
+---
+
+## Validation Items
+
+### S2-1: spring_find_mapper resolves selectById to the annotated SQL mapper method
+
+**What it tests:** `spring_find_mapper` MCP tool, when called with `methodName: 'selectById'`, returns the `UserMapper.selectById` method with `sqlSource: 'annotation'` and the SQL text containing `SELECT`.
+
+**Verification command:**
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"spring_find_mapper","arguments":{"methodName":"selectById"}}}' \
+  | node -e "const s=require('net').createConnection(9001,'localhost');let d='';s.on('data',c=>d+=c);s.write(JSON.stringify({jsonrpc:'2.0',id:0,method:'initialize',params:{protocolVersion:'2024-11-05',capabilities:{},clientInfo:{name:'test',version:'1'},processId:1}})+'\n');setTimeout(()=>{s.write(JSON.stringify({jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'spring_find_mapper',arguments:{methodName:'selectById'}}})+'\n');},500);setTimeout(()=>{console.log(d);s.end();},2000);"
+```
+
+**Expected output:**
+```json
+{
+  "found": true,
+  "mappers": [{
+    "namespace": "com.example.user.UserMapper",
+    "methods": [{
+      "name": "selectById",
+      "sqlSource": "annotation",
+      "sqlText": "SELECT * FROM users WHERE id = #{id}"
+    }]
+  }]
+}
+```
+
+**Result:** PASS
+
+---
+
+### S2-2: spring_find_mapper resolves findAll to XML SQL in UserMapper.xml
+
+**What it tests:** `spring_find_mapper` MCP tool, when called with `methodName: 'findAll'`, returns the `UserMapper.findAll` method with `sqlSource: 'xml'` and a `filePath` pointing to `UserMapper.xml`.
+
+**Verification command:**
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"spring_find_mapper","arguments":{"methodName":"findAll"}}}' \
+  | node -e "const s=require('net').createConnection(9001,'localhost');let d='';s.on('data',c=>d+=c);s.write(JSON.stringify({jsonrpc:'2.0',id:0,method:'initialize',params:{protocolVersion:'2024-11-05',capabilities:{},clientInfo:{name:'test',version:'1'},processId:1}})+'\n');setTimeout(()=>{s.write(JSON.stringify({jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'spring_find_mapper',arguments:{methodName:'findAll'}}})+'\n');},500);setTimeout(()=>{console.log(d);s.end();},2000);"
+```
+
+**Expected output:**
+```json
+{
+  "found": true,
+  "mappers": [{
+    "namespace": "com.example.user.UserMapper",
+    "methods": [{
+      "name": "findAll",
+      "sqlSource": "xml",
+      "filePath": "src/main/resources/mapper/UserMapper.xml"
+    }]
+  }]
+}
+```
+
+**Result:** PASS
+
+---
+
+### S2-3: spring_find_mapper resolves by namespace com.example.user.UserMapper
+
+**What it tests:** `spring_find_mapper` MCP tool, when called with `namespace: 'com.example.user.UserMapper'`, returns the full mapper with all 4 methods.
+
+**Verification command:**
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"spring_find_mapper","arguments":{"namespace":"com.example.user.UserMapper"}}}' \
+  | node -e "const s=require('net').createConnection(9001,'localhost');let d='';s.on('data',c=>d+=c);s.write(JSON.stringify({jsonrpc:'2.0',id:0,method:'initialize',params:{protocolVersion:'2024-11-05',capabilities:{},clientInfo:{name:'test',version:'1'},processId:1}})+'\n');setTimeout(()=>{s.write(JSON.stringify({jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'spring_find_mapper',arguments:{namespace:'com.example.user.UserMapper'}}})+'\n');},500);setTimeout(()=>{console.log(d);s.end();},2000);"
+```
+
+**Expected output:**
+```json
+{
+  "found": true,
+  "mappers": [{
+    "namespace": "com.example.user.UserMapper",
+    "methods": [
+      { "name": "selectById", "sqlSource": "annotation" },
+      { "name": "findAll", "sqlSource": "xml" },
+      { "name": "insertUser", "sqlSource": "xml" },
+      { "name": "updateUser", "sqlSource": "xml" }
+    ]
+  }]
+}
+```
+
+**Result:** PASS
+
+---
+
+### S2-4: spring_trace_flow traces /api/users with depth 5 reaching mapper and SQL layer
+
+**What it tests:** `spring_trace_flow` MCP tool with `entryPath: '/api/users'` and `depth: 5` traces the complete flow: HTTP endpoint -> UserController -> UserService -> UserMapper -> SQL statement.
+
+**Verification command:**
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"spring_trace_flow","arguments":{"entryPath":"/api/users","depth":5}}}' \
+  | node -e "const s=require('net').createConnection(9001,'localhost');let d='';s.on('data',c=>d+=c);s.write(JSON.stringify({jsonrpc:'2.0',id:0,method:'initialize',params:{protocolVersion:'2024-11-05',capabilities:{},clientInfo:{name:'test',version:'1'},processId:1}})+'\n');setTimeout(()=>{s.write(JSON.stringify({jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'spring_trace_flow',arguments:{entryPath:'/api/users',depth:5}}})+'\n');},500);setTimeout(()=>{console.log(d);s.end();},2000);"
+```
+
+**Expected output:**
+```json
+{
+  "found": true,
+  "entryPath": "/api/users",
+  "steps": [
+    { "name": "GET /api/users" },
+    { "name": "UserController.list" },
+    { "name": "UserService.findAll" },
+    { "name": "UserMapper.findAll" },
+    { "name": "select" }
+  ]
+}
+```
+
+**Result:** PASS
+
+---
+
+## Summary Table
+
+| # | Validation Item | Tool / Capability | Result |
+|---|---------------|-------------------|--------|
+| S2-1 | spring_find_mapper resolves selectById annotated SQL | MCP tool | PASS |
+| S2-2 | spring_find_mapper resolves findAll XML SQL | MCP tool | PASS |
+| S2-3 | spring_find_mapper resolves by namespace | MCP tool | PASS |
+| S2-4 | spring_trace_flow depth 5 reaches SQL layer | MCP tool | PASS |
+
+**Overall: 4/4 PASS**

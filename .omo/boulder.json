@@ -1,0 +1,84 @@
+{
+  "schema_version": 2,
+  "active_work_id": "team-a-bb3dbe62",
+  "works": {
+    "team-e-97ae6f63": {
+      "work_id": "team-e-97ae6f63",
+      "active_plan": "D:\\code\\cg-team-a\\.omo\\plans\\team-e.md",
+      "plan_name": "team-e",
+      "status": "active",
+      "started_at": "2026-06-19T09:59:57.382Z",
+      "updated_at": "2026-06-19T09:59:57.382Z",
+      "session_ids": [
+        "opencode:ses_120ad560dffeMqmclZvxzh8oGZ"
+      ],
+      "session_origins": {
+        "opencode:ses_120ad560dffeMqmclZvxzh8oGZ": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {}
+    },
+    "team-b-459e7caf": {
+      "work_id": "team-b-459e7caf",
+      "active_plan": "D:\\code\\cg-team-a\\.omo\\plans\\team-b.md",
+      "plan_name": "team-b",
+      "status": "active",
+      "started_at": "2026-06-19T10:00:51.804Z",
+      "updated_at": "2026-06-19T10:00:51.804Z",
+      "session_ids": [
+        "opencode:ses_120ac80cdffewxqn6vcykhSNhb"
+      ],
+      "session_origins": {
+        "opencode:ses_120ac80cdffewxqn6vcykhSNhb": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {}
+    },
+    "team-c-06d27975": {
+      "work_id": "team-c-06d27975",
+      "active_plan": "D:\\code\\cg-team-a\\.omo\\plans\\team-c.md",
+      "plan_name": "team-c",
+      "status": "active",
+      "started_at": "2026-06-19T10:01:32.608Z",
+      "updated_at": "2026-06-19T10:01:32.608Z",
+      "session_ids": [
+        "opencode:ses_120abe17fffezcvBLef1eSdE5U"
+      ],
+      "session_origins": {
+        "opencode:ses_120abe17fffezcvBLef1eSdE5U": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {}
+    },
+    "team-a-bb3dbe62": {
+      "work_id": "team-a-bb3dbe62",
+      "active_plan": "D:\\code\\cg-team-a\\.omo\\plans\\team-a.md",
+      "plan_name": "team-a",
+      "status": "active",
+      "started_at": "2026-06-19T10:01:56.759Z",
+      "updated_at": "2026-06-19T10:01:56.759Z",
+      "session_ids": [
+        "opencode:ses_120ab831effe1JQcZPRgiWMPvU"
+      ],
+      "session_origins": {
+        "opencode:ses_120ab831effe1JQcZPRgiWMPvU": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {},
+      "worktree_path": "D:\\code\\cg-team-a"
+    }
+  },
+  "active_plan": "D:\\code\\cg-team-a\\.omo\\plans\\team-a.md",
+  "started_at": "2026-06-19T10:01:56.759Z",
+  "status": "active",
+  "updated_at": "2026-06-19T10:01:56.759Z",
+  "session_ids": [
+    "opencode:ses_120ab831effe1JQcZPRgiWMPvU"
+  ],
+  "session_origins": {
+    "opencode:ses_120ab831effe1JQcZPRgiWMPvU": "direct"
+  },
+  "plan_name": "team-a",
+  "worktree_path": "D:\\code\\cg-team-a",
+  "agent": "atlas"
+}

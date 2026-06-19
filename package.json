@@ -22,7 +22,9 @@
     "test:watch": "vitest",
     "test:eval": "vitest run __tests__/evaluation/",
     "eval": "npm run build && npx tsx __tests__/evaluation/runner.ts",
-    "clean": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true})\""
+    "clean": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true})\"",
+    "build:monorepo": "tsc -b packages/springkg-shared packages/springkg-core packages/springkg-installer",
+    "test:team-a": "vitest run __tests__/team-a"
   },
   "keywords": [
     "code-intelligence",
@@ -52,5 +54,9 @@
   },
   "engines": {
     "node": ">=20.0.0 <25.0.0"
+  },
+  "workspaces": ["packages/*"],
+  "peerDependencies": {
+    "@colbymchenry/codegraph": ">=0.9.0 <1.0.0"
   }
 }

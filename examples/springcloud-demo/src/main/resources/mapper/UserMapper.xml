@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.user.UserMapper">
+
+    <select id="selectById" resultType="java.lang.String">
+        SELECT name FROM users WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" resultType="java.lang.String">
+        SELECT name FROM users
+    </select>
+
+    <insert id="insertUser">
+        INSERT INTO users (id, name, email) VALUES (#{user.id}, #{user.name}, #{user.email})
+    </insert>
+
+    <update id="updateUser">
+        UPDATE users SET name = #{user.name}, email = #{user.email} WHERE id = #{user.id}
+    </update>
+
+</mapper>

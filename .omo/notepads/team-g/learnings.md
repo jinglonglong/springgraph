@@ -102,3 +102,28 @@ The allowlist is enforced in three places: `getStaticTools()` (pre-project `tool
 - §6.8 summarizes all validation checks in a table with PASS/FAIL.
 - §6.9 documents the MyBatis flow gap (two different qualifiedName formats) and how `explore` heuristically bridges them.
 - Source files modified: `src/index.ts` (+ `getDecorators`, `getEdgesForNodes`), `src/db/queries.ts` (+ `getEdgesForNodes` + decorator filter), `src/types.ts` (+ `decorators` field on `SearchOptions`).
+
+---
+
+## Task T22 — Sprint 1 SpringCloud Demo Project
+
+### Key findings
+
+**UserEntity requires getter/setter methods for MyBatis-Plus deserialization.** Even though the fields are annotated with `@TableId` and `@TableField`, MyBatis-Plus (and Jackson) needs accessor methods to populate instances from result sets. The `UserEntity` ends up at 25 lines (slightly over the 5-15 line guideline) because of the 6 required getter/setter pairs. This is acceptable for a test fixture.
+
+**Spring Boot 3.2.x requires Java 17+.** The `pom.xml` specifies `<java.version>17</java.version>` and uses Spring Boot 3.2.5 parent. Spring Cloud 2023.0.1 aligns with Boot 3.2.x.
+
+**MyBatis XML `namespace` must exactly match the Java mapper interface fully-qualified name.** In `UserMapper.xml`, `<mapper namespace="com.example.user.UserMapper">` must match `package com.example.user; public interface UserMapper`. A mismatch silently causes statement binding failures.
+
+### What was created
+
+- `examples/springcloud-demo/pom.xml` (97 lines) — Maven project with Spring Boot 3.2.5, MyBatis Spring Boot Starter 3.0.3, MyBatis-Plus 3.5.6, Spring Cloud OpenFeign, Alibaba Nacos discovery + config, Spring Data Redis.
+- `examples/springcloud-demo/src/main/java/com/example/user/UserController.java` (29 lines) — `@RestController` + `@RequestMapping("/api/users")` with `@GetMapping("/{id}")`, `@GetMapping`, `@PostMapping`.
+- `examples/springcloud-demo/src/main/java/com/example/user/UserService.java` (32 lines) — `@Service`, injects `UserMapper`, `@Transactional` on `insert` and `update` methods.
+- `examples/springcloud-demo/src/main/java/com/example/user/UserMapper.java` (16 lines) — `@Mapper` interface with 4 methods: `selectById`, `selectAll`, `insertUser`, `updateUser`.
+- `examples/springcloud-demo/src/main/resources/mapper/UserMapper.xml` (23 lines) — `<mapper namespace="...">` with `<select>` x2 and `<insert>`/`<update>` statements.
+- `examples/springcloud-demo/src/main/java/com/example/order/OrderClient.java` (14 lines) — `@FeignClient(name="order-service", path="/orders")` with `@GetMapping` and `@PostMapping`.
+- `examples/springcloud-demo/src/main/java/com/example/user/UserEntity.java` (25 lines) — `@TableName("users")`, `@TableId(type=IdType.AUTO)`, `@TableField("name")` and `@TableField("email")`, plus getter/setter pairs.
+- `examples/springcloud-demo/src/main/resources/application.yml` (33 lines) — `spring.application.name`, datasource (MySQL), redis, nacos discovery + config, mybatis mapper-locations.
+
+Total: 8 files, 269 lines. All annotations required by the acceptance criteria are present: `@RestController`, `@GetMapping`, `@PostMapping`, `@Service`, `@Transactional`, `@Mapper`, `@FeignClient`, `@TableName`, `@TableId`, `@TableField`.

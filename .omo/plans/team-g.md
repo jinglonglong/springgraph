@@ -120,7 +120,7 @@ Team G 是 7 团队并行模式中的 1 个，负责**验证 + 示例 + 文档**
 
 ### Phase G0: Sprint 0 documentation (Tasks 1-6)
 
-- [ ] 1. [G] T1 — 文档 §1: CodeGraph DB schema
+- [x] 1. [G] T1 — 文档 §1: CodeGraph DB schema
 
   **What to do**:
   - 读 `src/db/schema.sql`（5 张表 + 索引 + FTS5）
@@ -147,7 +147,7 @@ Team G 是 7 团队并行模式中的 1 个，负责**验证 + 示例 + 文档**
     - Tool: Bash
     - Steps: 对比 `grep -c 'CREATE TABLE' src/db/schema.sql`（应为 5）
 
-- [ ] 2. [G] T2 — 文档 §2: Java 抽取器
+- [x] 2. [G] T2 — 文档 §2: Java 抽取器
 
   **What to do**:
   - 读 `src/extraction/languages/java.ts`（AST 节点处理）

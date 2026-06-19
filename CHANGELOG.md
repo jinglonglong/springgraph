@@ -19,6 +19,9 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### New Features (springkg)
 
+- SpringKg: Added `spring_find_config` MCP tool for querying configuration properties by key, returning definition location, Spring profile, sensitivity flag, and all usage sites where the property is injected via `@Value` or `@ConfigurationProperties`. Sensitive values are masked in the response.
+- SpringKg: Added `spring_nacos_overview` MCP tool for listing Nacos clusters, namespaces, data IDs, and registered services discovered from `application.yml` and Nacos config entries.
+- SpringKg: Added `spring_gateway_route` MCP tool for listing Spring Cloud Gateway route definitions with path patterns, target services, predicates, and filters.
 - SpringKg: Added `spring_find_mapper` MCP tool for querying MyBatis mappers by namespace or method name, returning mapper methods with their SQL source (XML or annotation) and location.
 - SpringKg: Extended `spring_trace_flow` to accept `entryPath` (e.g. `/api/users`) and `depth` parameters, tracing HTTP endpoints through controller, service, mapper, and SQL layers with depth up to 10.
 - SpringKg: Added MyBatis XML and annotation SQL extraction -- `UserMapper.xml` SQL statements (`findAll`, `insertUser`, `updateUser`) are parsed and stored in `spring_sql_statements`, and `@Select`-annotated mapper methods are extracted as annotation-based SQL.

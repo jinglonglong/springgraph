@@ -1,6 +1,6 @@
 # SpringKg MCP Tools
 
-The `springkg-mcp` server exposes five tools over stdio. Each tool accepts a JSON input and returns a structured JSON result. All tools operate on the active SpringKg session (project path resolved from the MCP root URI).
+The `springkg-mcp` server exposes eight tools over stdio. Each tool accepts a JSON input and returns a structured JSON result. All tools operate on the active SpringKg session (project path resolved from the MCP root URI).
 
 ## Tool Reference
 
@@ -302,7 +302,272 @@ Finds MyBatis mapper interfaces and their methods, optionally filtered by namesp
 
 ---
 
-### 4. spring_assets_overview
+### 4. spring_find_config
+
+Queries runtime configuration properties by key and returns the definition location, profile scope, sensitivity flag, and all places in code where the property is injected via `@Value` or `@ConfigurationProperties`.
+
+**Input schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "projectPath": {
+      "type": "string",
+      "description": "Absolute path to the project."
+    },
+    "key": {
+      "type": "string",
+      "description": "Configuration property key to look up, e.g. 'spring.datasource.password'."
+    },
+    "profile": {
+      "type": "string",
+      "description": "Optional Spring profile to scope the lookup (e.g. 'dev', 'prod')."
+    }
+  }
+}
+```
+
+**Output schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "found": { "type": "boolean" },
+    "key": { "type": "string" },
+    "definition": {
+      "type": "object",
+      "properties": {
+        "filePath": { "type": "string" },
+        "line": { "type": "integer" },
+        "profile": { "type": "string" },
+        "value": { "type": "string" }
+      }
+    },
+    "isSensitive": { "type": "boolean" },
+    "usedBy": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "methodId": { "type": "string" },
+          "filePath": { "type": "string" },
+          "line": { "type": "integer" }
+        }
+      }
+    }
+  }
+}
+```
+
+**Example response:**
+
+```json
+{
+  "found": true,
+  "key": "spring.datasource.password",
+  "definition": {
+    "filePath": "src/main/resources/application.yml",
+    "line": 3,
+    "profile": null,
+    "value": "secret123"
+  },
+  "isSensitive": true,
+  "usedBy": [
+    {
+      "methodId": "com.example.user.UserService.<init>",
+      "filePath": "src/main/java/com/example/user/UserService.java",
+      "line": 12
+    }
+  ]
+}
+```
+
+**Security note:** Sensitive values (e.g. passwords, tokens, API keys) are masked in the `definition.value` field. The raw value is never included in the response when `isSensitive` is `true`.
+
+---
+
+### 5. spring_nacos_overview
+
+Returns an inventory of Nacos service discovery and configuration management assets: registered clusters, namespaces, data IDs, and services.
+
+**Input schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "projectPath": {
+      "type": "string",
+      "description": "Absolute path to the project."
+    }
+  }
+}
+```
+
+**Output schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "found": { "type": "boolean" },
+    "clusters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "serverAddr": { "type": "string" },
+          "namespace": { "type": "string" }
+        }
+      }
+    },
+    "namespaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "namespaceId": { "type": "string" },
+          "name": { "type": "string" }
+        }
+      }
+    },
+    "dataIds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "dataId": { "type": "string" },
+          "group": { "type": "string" },
+          "fileExtension": { "type": "string" }
+        }
+      }
+    },
+    "services": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "serviceName": { "type": "string" },
+          "clusters": { "type": "array", "items": { "type": "string" } },
+          "metadata": { "type": "object" }
+        }
+      }
+    }
+  }
+}
+```
+
+**Example response:**
+
+```json
+{
+  "found": true,
+  "clusters": [
+    {
+      "name": "DEFAULT",
+      "serverAddr": "127.0.0.1:8848",
+      "namespace": "public"
+    }
+  ],
+  "namespaces": [],
+  "dataIds": [
+    {
+      "dataId": "application.yml",
+      "group": "DEFAULT_GROUP",
+      "fileExtension": "yaml"
+    }
+  ],
+  "services": [
+    {
+      "serviceName": "springcloud-demo",
+      "clusters": ["DEFAULT"],
+      "metadata": {}
+    }
+  ]
+}
+```
+
+---
+
+### 6. spring_gateway_route
+
+Lists Spring Cloud Gateway route definitions, optionally filtered by a path prefix. Returns the route path pattern, target service, and predicate definitions.
+
+**Input schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "projectPath": {
+      "type": "string",
+      "description": "Absolute path to the project."
+    },
+    "path": {
+      "type": "string",
+      "description": "Optional path prefix to filter routes (e.g. '/api')."
+    }
+  }
+}
+```
+
+**Output schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "found": { "type": "boolean" },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "path": { "type": "string" },
+          "targetService": { "type": "string" },
+          "predicates": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "filters": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "filePath": { "type": "string" },
+          "line": { "type": "integer" }
+        }
+      }
+    }
+  }
+}
+```
+
+**Example response:**
+
+```json
+{
+  "found": true,
+  "routes": [
+    {
+      "id": "user-route",
+      "path": "/api/users/**",
+      "targetService": "user-service",
+      "predicates": ["Path=/api/users/**"],
+      "filters": ["StripPrefix=1"],
+      "filePath": "src/main/java/com/example/gateway/GatewayConfig.java",
+      "line": 14
+    }
+  ]
+}
+```
+
+---
+
+### 7. spring_assets_overview
 
 Returns a high-level inventory of all Spring assets indexed in springkg.db: controllers, services, repositories, Feign clients, data entities, SQL statements, and configuration properties.
 
@@ -395,7 +660,7 @@ Returns a high-level inventory of all Spring assets indexed in springkg.db: cont
 
 ---
 
-### 5. spring_trace_flow
+### 8. spring_trace_flow
 
 Traces the execution path from an HTTP endpoint through its handler method, service layer, data-access layer, and SQL statement. Returns each hop with the file path and source line.
 

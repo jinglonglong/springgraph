@@ -450,7 +450,7 @@ Team G 是 7 团队并行模式中的 1 个，负责**验证 + 示例 + 文档**
     - Tool: vitest
     - Steps: 调 spring_trace_flow depth=5 返回 5 层
 
-- [ ] 12. [G] T46 — Sprint 3 e2e + 文档
+- [x] 12. [G] T46 — Sprint 3 e2e + 文档
 
   **What to do**:
   - `tests/integration/sprint3-e2e.test.ts`：

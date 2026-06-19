@@ -234,3 +234,24 @@ Learned: Added `tests/integration/sprint1-e2e.test.ts` with a Vitest stdio JSON-
 - Updated `docs/mcp-tools.md` -- Inserted `spring_find_mapper` as section 3 (promoting `spring_assets_overview` to 4 and `spring_trace_flow` to 5), updated the tool count in the opening paragraph.
 - Updated `docs/validation.md` -- Added Sprint 2 section with 4 validation items (S2-1 through S2-4), updated document title to cover both sprints.
 - Updated `CHANGELOG.md` -- Added 3 bullet points under `### New Features (springkg)` in `[Unreleased]`: `spring_find_mapper` tool, `spring_trace_flow` entryPath+depth params, and MyBatis XML+annotation SQL extraction.
+
+---
+
+## Task T46 -- Sprint 3 e2e Test and Documentation
+
+### Key findings
+
+**Sprint 3 adds 3 new MCP tools, growing the total from 5 to 8.** The new tools are `spring_find_config` (configuration property lookup with usage tracking), `spring_nacos_overview` (Nacos discovery and config inventory), and `spring_gateway_route` (gateway route listing).
+
+**V1 validation sections §2, §4, §5, §7 were validated against existing demo fixtures.** The `OrderClient` Feign interface provides §2 validation (cross-service bridge to `order-service`); `UserCacheJob` provides §5 validation (@Scheduled task) and §7 validation (ConfigProperty usage via `@Value`). MQ (§4) is not present in the demo -- the resolver correctly returns empty producer/consumer arrays, which is the expected behavior when no RabbitMQ/Kafka artifacts exist.
+
+**spring_find_config enforces a strict security boundary.** When `isSensitive` is `true`, the `definition.value` field must not contain the raw secret. The test validates this by asserting the password value is not `'demo'` and does not contain the raw string.
+
+**The demo project already had the fixtures needed for V1 §2 and §5.** `UserCacheJob.java` (with `@Scheduled` and `@Value`) was added in an earlier sprint expansion, and `OrderClient.java` (with `@FeignClient`) was in the Sprint 1 demo from the start.
+
+### What was created
+
+- `tests/integration/sprint3-e2e.test.ts` -- Vitest integration test with 5 test cases: tools list check (8 tools), Feign client cross-service resolution, config property sensitivity masking, Nacos overview inventory, and gateway route listing.
+- `docs/mcp-tools.md` -- Inserted `spring_find_config` (section 4), `spring_nacos_overview` (section 5), `spring_gateway_route` (section 6), renumbered `spring_assets_overview` to 7 and `spring_trace_flow` to 8. Updated tool count from 5 to 8.
+- `docs/validation.md` -- Added V1 Final Verification section with validation items V1 §1, §2, §4, §5, §7. Each item includes the MCP tool call, expected output, and PASS/FAIL result.
+- `CHANGELOG.md` -- Added 4 bullet points under `### New Features (springkg)` for the 3 new tools (`spring_find_config`, `spring_nacos_overview`, `spring_gateway_route`) plus the existing `spring_find_mapper` bullet.

@@ -1,0 +1,91 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - img [ref=e5]
+      - generic [ref=e11]: CodeGraph
+      - generic [ref=e12]: /
+      - generic [ref=e13]: 图谱
+    - generic "C:\\Users\\LONG\\AppData\\Local\\Temp\\tmpfghjvx.tmp" [ref=e14]
+    - generic [ref=e15]:
+      - button "重置" [ref=e16] [cursor=pointer]:
+        - img [ref=e17]
+        - generic [ref=e20]: 重置
+      - button "刷新" [ref=e21] [cursor=pointer]:
+        - img [ref=e22]
+        - generic [ref=e24]: 刷新
+  - complementary [ref=e25]:
+    - generic "图谱统计" [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28]: "3"
+        - generic [ref=e29]: 文件
+      - generic [ref=e30]:
+        - generic [ref=e31]: "7"
+        - generic [ref=e32]: 节点
+      - generic [ref=e33]:
+        - generic [ref=e34]: "11"
+        - generic [ref=e35]: 边
+      - generic [ref=e36]:
+        - generic [ref=e37]: 更新
+        - generic "2026/6/18 19:57:55" [ref=e38]: 刚刚
+    - generic [ref=e39]:
+      - generic [ref=e40]:
+        - img
+        - searchbox "搜索符号" [ref=e41]
+      - toolbar "按节点类型筛选" [ref=e42]:
+        - button "全部" [ref=e43] [cursor=pointer]
+        - button "function" [ref=e44] [cursor=pointer]
+        - button "method" [ref=e45] [cursor=pointer]
+        - button "class" [ref=e46] [cursor=pointer]
+        - button "interface" [ref=e47] [cursor=pointer]
+        - button "struct" [ref=e48] [cursor=pointer]
+        - button "trait" [ref=e49] [cursor=pointer]
+        - button "protocol" [ref=e50] [cursor=pointer]
+        - button "component" [ref=e51] [cursor=pointer]
+        - button "route" [ref=e52] [cursor=pointer]
+        - button "type_alias" [ref=e53] [cursor=pointer]
+        - button "constant" [ref=e54] [cursor=pointer]
+        - button "enum" [ref=e55] [cursor=pointer]
+        - button "file" [ref=e56] [cursor=pointer]
+        - button "module" [ref=e57] [cursor=pointer]
+        - button "property" [ref=e58] [cursor=pointer]
+        - button "field" [ref=e59] [cursor=pointer]
+        - button "variable" [ref=e60] [cursor=pointer]
+        - button "enum_member" [ref=e61] [cursor=pointer]
+        - button "namespace" [ref=e62] [cursor=pointer]
+        - button "parameter" [ref=e63] [cursor=pointer]
+        - button "import" [ref=e64] [cursor=pointer]
+        - button "export" [ref=e65] [cursor=pointer]
+    - generic [ref=e67]: 输入关键词开始搜索…
+  - main [ref=e68]:
+    - generic [ref=e69]:
+      - generic [ref=e70]:
+        - generic [ref=e71]: 布局
+        - combobox "图谱布局" [ref=e72] [cursor=pointer]:
+          - option "力导向 (cose)" [selected]
+          - option "层级"
+          - option "圆形"
+          - option "网格"
+          - option "同心圆"
+      - generic [ref=e73]: 项目概览 · 2 个节点 · 2 条边
+    - application "代码图谱" [ref=e74]
+  - complementary [ref=e79]:
+    - generic [ref=e80]:
+      - img [ref=e81]
+      - paragraph [ref=e84]: 选择一个节点查看详情。
+    - generic [ref=e85]:
+      - generic [ref=e86]:
+        - generic [ref=e87]: —
+        - heading "—" [level=3] [ref=e88]
+      - tablist [ref=e89]:
+        - tab "源码" [selected] [ref=e90] [cursor=pointer]
+        - tab "调用方 0" [ref=e91] [cursor=pointer]:
+          - text: 调用方
+          - generic [ref=e92]: "0"
+        - tab "被调用 0" [ref=e93] [cursor=pointer]:
+          - text: 被调用
+          - generic [ref=e94]: "0"
+      - tabpanel [ref=e96]:
+        - generic [ref=e97]: 加载中…
+      - button "展开邻域 · 深度 3" [ref=e99] [cursor=pointer]:
+        - img [ref=e100]
+        - generic [ref=e102]: 展开邻域 · 深度 3

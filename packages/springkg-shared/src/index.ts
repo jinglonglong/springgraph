@@ -80,8 +80,8 @@ export interface SpringKgFeignClient {
 export interface SpringKgSqlStatement {
   id: string;
   mapperId: string;                   // SpringKgNode.id (mapper)
-  sqlHash: string;                  // sha256 of normalized SQL
-  sqlText: string;                  // canonicalized
+  sqlHash: string;                    // sha256 of normalized SQL
+  sqlText: string;                    // canonicalized
   parameterCount: number;
   tables: string[];                   // derived
   sourceFilePath: string;

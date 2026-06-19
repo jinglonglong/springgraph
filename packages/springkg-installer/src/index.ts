@@ -1,3 +1,4 @@
-// packages/springkg-installer/src/index.ts
-// Scaffold owned by Team A. Real implementation lands in Sprint 2+.
-export const SPRINGKG_PACKAGE = '@colbymchenry/springkg-installer' as const;
+export { ALL_TARGETS, getTarget, listTargetIds, detectAll, resolveTargetFlag } from './targets/registry.js';
+export type { SpringkgAgentTarget, Location, SpringkgTargetId, DetectionResult, WriteResult, InstallOptions } from './targets/types.js';
+export { getMcpServerConfig } from './targets/shared.js';
+export { claudeTarget } from './targets/claude.js';

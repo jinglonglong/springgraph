@@ -4,10 +4,17 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "springkg": "./dist/bin/springkg.js"
+  },
   "scripts": {
     "build": "tsc"
   },
   "dependencies": {
-    "@colbymchenry/springkg-shared": "0.1.0"
+    "@colbymchenry/springkg-shared": "0.1.0",
+    "@colbymchenry/springkg-installer": "0.1.0"
+  },
+  "peerDependencies": {
+    "@colbymchenry/codegraph": ">=0.9.0 <1.0.0"
   }
 }

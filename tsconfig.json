@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "composite": true,
     "target": "ES2022",
     "module": "commonjs",
     "lib": ["ES2022"],
@@ -30,5 +31,10 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "__tests__"]
+  "exclude": ["node_modules", "dist", "__tests__"],
+  "references": [
+    { "path": "./packages/springkg-shared" },
+    { "path": "./packages/springkg-core" },
+    { "path": "./packages/springkg-installer" }
+  ]
 }

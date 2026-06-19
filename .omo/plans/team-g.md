@@ -174,7 +174,7 @@ Team G 是 7 团队并行模式中的 1 个，负责**验证 + 示例 + 文档**
     - Tool: Bash
     - Steps: `grep -c extractDecoratorsFor docs/codegraph-source-analysis.md` >= 1
 
-- [ ] 3. [G] T3 — 文档 §3: Spring/MyBatis framework resolvers
+- [x] 3. [G] T3 — 文档 §3: Spring/MyBatis framework resolvers
 
   **What to do**:
   - 读 `src/resolution/frameworks/java.ts`（Java DI + Spring 路由提取）
@@ -203,7 +203,7 @@ Team G 是 7 团队并行模式中的 1 个，负责**验证 + 示例 + 文档**
     - Tool: Bash
     - Steps: `grep -c 'FeignClient.*未抽取\|缺失' docs/codegraph-source-analysis.md` >= 1
 
-- [ ] 4. [G] T4 — 文档 §4: MCP 架构
+- [x] 4. [G] T4 — 文档 §4: MCP 架构
 
   **What to do**:
   - 读 `src/mcp/tools.ts`（`tools[]` 数组 line 415）
@@ -232,7 +232,7 @@ Team G 是 7 团队并行模式中的 1 个，负责**验证 + 示例 + 文档**
     - Tool: Bash
     - Steps: `grep -n 'export const tools' src/mcp/tools.ts`（应为 415）
 
-- [ ] 5. [G] T5 — 文档 §5: Watcher/Sync
+- [x] 5. [G] T5 — 文档 §5: Watcher/Sync
 
   **What to do**:
   - 读 `src/sync/watcher.ts`（`FileWatcher`、`WatchOptions.onSyncComplete`）
@@ -264,7 +264,7 @@ Team G 是 7 团队并行模式中的 1 个，负责**验证 + 示例 + 文档**
     - Tool: Bash
     - Steps: `grep -c 'getPendingFiles' docs/codegraph-source-analysis.md` >= 2
 
-- [ ] 6. [G] T6 — Sprint 0 Validation Report
+- [x] 6. [G] T6 — Sprint 0 Validation Report
 
   **What to do**:
   - 在临时目录创建小型 Java + Spring Boot + MyBatis demo

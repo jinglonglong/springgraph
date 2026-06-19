@@ -19,20 +19,11 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### New Features (springkg)
 
-- SpringKg: Added `spring_search_feature` MCP tool for searching feature communities -- groups of semantically related Spring symbols (controllers, services, mappers, entities) representing a bounded business capability -- by keyword query, returning community name, score, and member symbols with their locations.
-- SpringKg: Added `OrderController`, `OrderService`, and `OrderMapper` to the demo project, establishing the `order-management` feature community for validating community search, @Scheduled task extraction, and transactional service tracing.
-- SpringKg: Added `spring_find_config` MCP tool for querying configuration properties by key, returning definition location, Spring profile, sensitivity flag, and all usage sites where the property is injected via `@Value` or `@ConfigurationProperties`. Sensitive values are masked in the response.
-- SpringKg: Added `spring_nacos_overview` MCP tool for listing Nacos clusters, namespaces, data IDs, and registered services discovered from `application.yml` and Nacos config entries.
-- SpringKg: Added `spring_gateway_route` MCP tool for listing Spring Cloud Gateway route definitions with path patterns, target services, predicates, and filters.
-- SpringKg: Added `spring_find_mapper` MCP tool for querying MyBatis mappers by namespace or method name, returning mapper methods with their SQL source (XML or annotation) and location.
-- SpringKg: Extended `spring_trace_flow` to accept `entryPath` (e.g. `/api/users`) and `depth` parameters, tracing HTTP endpoints through controller, service, mapper, and SQL layers with depth up to 10.
-- SpringKg: Added MyBatis XML and annotation SQL extraction -- `UserMapper.xml` SQL statements (`findAll`, `insertUser`, `updateUser`) are parsed and stored in `spring_sql_statements`, and `@Select`-annotated mapper methods are extracted as annotation-based SQL.
-- SpringKg: Added SpringCloud semantic knowledge graph layer with 8-table schema in `springkg.db` (`spring_symbols`, `spring_edges`, `spring_endpoints`, `spring_feign_clients`, `spring_sql_statements`, `runtime_config_properties`, `feature_communities`, `feature_community_members`).
-- SpringKg: Added 4 MCP tools (`spring_find_entry`, `spring_find_feign`, `spring_assets_overview`, `spring_trace_flow`) for querying Spring Boot assets and tracing request flows.
-- SpringKg: Added 5 Team B semantic resolvers (AnnotationSemanticEngine, EndpointResolver, FeignResolver, FeignProviderBridge, FeignRequestResponseType) for Spring annotations, REST endpoints, and OpenFeign client resolution.
-- SpringKg: Added 5 Team C data resolvers (MyBatisXmlExtractor, AnnotationSqlExtractor, SqlTableColumnExtractor, MapperBindingResolver, MyBatisPlusResolver) for MyBatis XML/annotation SQL and JPA entity mapping.
-- SpringKg: Added 5 Team D runtime resolvers (ConfigResolver, MiddlewareInventory, NacosConfigResolver, ConfigPropertyUsageTracker, GatewayRouteResolver) for application.yml properties, middleware chains, Nacos config, and gateway routes.
-- SpringKg: Added `SpringKg` orchestrator class with watcher bridge to CodeGraph and staged resolver chain execution.
+- SpringKg: Added SpringCloud semantic knowledge graph layer with SQLite schema in `springkg.db` for storing Spring symbols, endpoints, Feign clients, and configuration properties.
+- SpringKg: Added 4 MCP tools (`spring_find_entry`, `spring_find_feign`, `spring_assets_overview`, `spring_trace_flow`) for querying Spring Boot assets and tracing request flows across controller, service, and data-access layers.
+- SpringKg: `spring_trace_flow` accepts `url` and `depth` parameters to trace HTTP endpoints through controller, service, mapper, and SQL layers.
+- SpringKg: `spring_assets_overview` returns an inventory of indexed controllers, services, middlewares, and sensitive configuration properties.
+- SpringKg: Added semantic resolvers for Spring annotations (`@RestController`, `@Service`, `@Mapper`), REST endpoints, and OpenFeign client resolution.
 
 ### Fixes
 

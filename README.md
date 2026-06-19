@@ -651,6 +651,44 @@ is written):
 - **Antigravity IDE**
 - **Kiro**
 
+## SpringKg -- Spring Cloud Knowledge Graph
+
+SpringKg indexes Spring Boot and Spring Cloud projects, building a semantic knowledge graph that connects HTTP endpoints, service layers, data-access layers, and configuration properties.
+
+### How it works
+
+SpringKg runs on top of CodeGraph's Java extraction. It parses `@RestController` classes to build a graph of endpoints, traces calls through `@Service` and `@Mapper` layers, resolves OpenFeign client interfaces, and extracts SQL from MyBatis XML mappers and `@Select` annotations.
+
+### MCP Tools
+
+The `springkg-mcp` server exposes four tools:
+
+| Tool | Purpose |
+|------|---------|
+| `spring_find_entry` | Find Spring Boot controllers and their endpoint methods |
+| `spring_find_feign` | Find Feign client interfaces and their target services |
+| `spring_assets_overview` | Inventory of all indexed controllers, services, middlewares, and sensitive config |
+| `spring_trace_flow` | Trace an HTTP request from endpoint through service and data-access layers |
+
+### Getting started
+
+```bash
+# Initialize a Spring Cloud project
+springkg init --project-path /path/to/springcloud-project
+
+# Index the project
+springkg index --project-path /path/to/springcloud-project
+
+# Run the MCP server
+springkg serve --mcp --path /path/to/springcloud-project
+```
+
+### Architecture
+
+SpringKg stores its knowledge graph in `.codegraph/springkg.db`, with tables for Spring symbols (`spring_symbols`), edges between symbols (`spring_edges`), endpoints (`spring_endpoints`), Feign clients (`spring_feign_clients`), SQL statements (`spring_sql_statements`), and runtime configuration properties (`runtime_config_properties`).
+
+See `docs/mcp-tools.md` for the full tool reference.
+
 ## Supported Languages
 
 | Language | Extension | Status |

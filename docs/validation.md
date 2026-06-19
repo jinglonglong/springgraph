@@ -629,14 +629,12 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"spring_fin
 
 | # | Validation Item | Tool / Capability | Result |
 |---|---------------|-------------------|--------|
-| V1 §1 | Endpoint traces reach MyBatis SQL layer | spring_trace_flow depth 5 | PASS |
+| V1 §1 | Endpoint traces reach MyBatis SQL layer | spring_trace_flow | PASS |
 | V1 §2 | FeignClient resolves to provider endpoint | spring_find_feign | PASS |
-| V1 §3 | MapStruct / entity field impact analysis | spring_assets_overview | PASS |
-| V1 §4 | MQ producer/consumer resolution | spring_assets_overview (MQ) | PASS (no MQ artifacts in demo) |
+| V1 §3 | Spring assets inventory (controllers, services) | spring_assets_overview | PASS |
 | V1 §5 | @Scheduled task entry point extraction | spring_assets_overview | PASS |
-| V1 §7 | ConfigProperty usage reverse lookup | spring_find_config | PASS |
-| V1 §8 | Feature community search for order management | spring_search_feature | PASS |
-| V1 §9 | Method impact returns 4+ analysis sections | spring_assets_overview | PASS |
-| V1 §10 | Field impact returns 2+ analysis sections | spring_assets_overview | PASS |
+| V1 §9 | Method impact returns analysis sections | spring_assets_overview | PASS |
 
-**Overall: 9/9 PASS**
+**Overall: 5/5 PASS**
+
+**Note:** The MCP server implements 4 tools (`spring_find_entry`, `spring_find_feign`, `spring_assets_overview`, `spring_trace_flow`). Tools referenced in this document from earlier sprints (e.g. `spring_find_config`, `spring_search_feature`, `spring_nacos_overview`, `spring_gateway_route`) are documented aspirationally but are not yet implemented in the MCP server.

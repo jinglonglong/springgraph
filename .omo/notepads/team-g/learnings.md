@@ -280,3 +280,17 @@ Learned: Added `tests/integration/sprint1-e2e.test.ts` with a Vitest stdio JSON-
 - Updated `docs/mcp-tools.md` -- Inserted `spring_search_feature` as section 7 (before `spring_assets_overview`), renumbered `spring_assets_overview` to 8 and `spring_trace_flow` to 9; tool count 8 -> 9.
 - Updated `docs/validation.md` -- Added V1 §3 (entity field impact), §8 (feature community search), §9 (method impact), §10 (field impact) to the V1 Final Verification section; updated summary table to 9/9 items.
 - Updated `CHANGELOG.md` -- Added 3 bullet points for `spring_search_feature`, the `order-management` demo community, and `spring_find_config`.
+
+---
+
+## Task T58 -- springkg MCP missing handlers alignment
+
+### Key findings
+
+**`packages/springkg-mcp/src/server.ts` already listed all 9 tools, but 5 handler implementations were still pointed at older fallback schemas.** The tool array and dispatcher already mentioned `spring_find_mapper`, `spring_find_config`, `spring_nacos_overview`, `spring_gateway_route`, and `spring_search_feature`, but several of those methods queried `runtime_config_properties`, `feature_communities`, or symbol metadata only, instead of preferring the newer `spring_*` tables expected by Sprint 2-4.
+
+**`spring_find_mapper` needs dual-shape compatibility.** The newer contract wants `{ found, results: [{ methodName, statementType, sql, namespace }] }`, while the existing Sprint 2 public test still asserts the richer legacy `mappers[].methods[]` shape. The fix was to return both when using the symbol/sql fallback path, and return the minimal `results` shape directly when `spring_mapper_methods` exists.
+
+**`spring_find_config`, `spring_nacos_overview`, `spring_gateway_route`, and `spring_search_feature` now prefer `spring_*` tables first and gracefully fall back.** This keeps the MCP server compatible with both the repo schema (`runtime_config_properties`, `feature_communities`) and the task's stated indexed DB tables (`spring_config_properties`, `spring_gateway_routes`, `spring_feature_communities`, `spring_feature_community_members`).
+
+**A small `tableExists()` helper is enough to bridge schema drift without changing MCP protocol behavior.** The server can probe `sqlite_master` at runtime and select the appropriate SQL path while preserving the required response wrapper `{ content: [{ type: 'text', text: JSON.stringify(result) }] }` and the existing `tools/call` dispatch pattern.

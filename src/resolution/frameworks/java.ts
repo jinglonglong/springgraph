@@ -187,13 +187,6 @@ export const springResolver: FrameworkResolver = {
   },
 
   extract(filePath, content) {
-    // Spring config files (application.yml / application.properties /
-    // bootstrap.yml + per-profile variants) are extracted on the framework
-    // path, not in the language extractor, so the keys become first-class
-    // nodes a `@Value("${k}")` reference can resolve to.
-    if (isSpringConfigFile(filePath)) {
-      return extractSpringConfig(filePath, content);
-    }
     // Spring Boot is used from both Java and Kotlin (identical @GetMapping etc.
     // annotations); the difference is method syntax — Kotlin `fun name(...)` vs
     // Java `public X name(...)` — handled in the method regex below.
@@ -295,120 +288,6 @@ export const springResolver: FrameworkResolver = {
     return { nodes, references };
   },
 };
-
-/** Spring config file patterns: application(-profile)?.{yml,yaml,properties} +
- * bootstrap variants. Matches the basename, not the path, so a project that
- * vendors `application.yml` under `src/main/resources` and one under `src/test/
- * resources` are both picked up. */
-function isSpringConfigFile(filePath: string): boolean {
-  const base = filePath.split('/').pop() ?? '';
-  return /^(application|bootstrap)(-[\w.-]+)?\.(yml|yaml|properties)$/i.test(base);
-}
-
-/**
- * Parse a Spring config file (YAML or .properties) and emit one `constant`
- * node per LEAF key, with `qualifiedName` = the dotted path. Leaf keys are
- * what `@Value("${k}")` references hit; intermediate keys aren't bound by
- * Spring's `@Value` (a `@ConfigurationProperties` class binds a SUBTREE, and
- * those references are resolved at lookup time by prefix-suffix matching).
- */
-function extractSpringConfig(
-  filePath: string,
-  content: string,
-): { nodes: Node[]; references: UnresolvedRef[] } {
-  const nodes: Node[] = [];
-  const isProperties = /\.properties$/i.test(filePath);
-  const lang = isProperties ? 'properties' : 'yaml';
-  const now = Date.now();
-
-  const emitLeaf = (dottedKey: string, line: number, valueText: string) => {
-    if (!dottedKey) return;
-    nodes.push({
-      id: `spring-config:${filePath}:${line}:${dottedKey}`,
-      kind: 'constant',
-      name: dottedKey.split('.').pop() ?? dottedKey,
-      qualifiedName: dottedKey,
-      filePath,
-      startLine: line,
-      endLine: line,
-      startColumn: 0,
-      endColumn: valueText.length,
-      language: lang,
-      signature: dottedKey,
-      // SECURITY (#383): store the KEY only, never the value. Config files
-      // routinely hold secrets (DB passwords, API keys, JDBC URLs with embedded
-      // credentials), and surfacing the value here pushes it into agent context
-      // unbidden (it lands in codegraph_node/explore output via the docstring).
-      // The key is all `@Value`/`@ConfigurationProperties` resolution needs; an
-      // agent that genuinely needs a value can read the file directly.
-      updatedAt: now,
-    });
-  };
-
-  if (isProperties) {
-    // Properties format: `k1.k2.k3 = value` (or `:` separator, or no value).
-    // Lines starting with `#`/`!` are comments. Backslash continuations are
-    // valid but rare; we don't try to join them (a continued value is still
-    // a value of the same key).
-    const lines = content.split(/\r?\n/);
-    for (let i = 0; i < lines.length; i++) {
-      const raw = lines[i] ?? '';
-      const trimmed = raw.trim();
-      if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('!')) continue;
-      const sep = (() => {
-        for (let j = 0; j < raw.length; j++) {
-          const ch = raw[j];
-          if (ch === '=' || ch === ':') return j;
-          if (ch === '\\' && raw[j + 1]) { j++; continue; }
-        }
-        return -1;
-      })();
-      if (sep < 0) continue;
-      const key = raw.slice(0, sep).trim();
-      const val = raw.slice(sep + 1).trim();
-      emitLeaf(key, i + 1, val);
-    }
-    return { nodes, references: [] };
-  }
-
-  // YAML: indent-based. We track a stack of (indent, key) so the dotted path
-  // is built by joining ancestor keys with `.`. A leaf is a line with a value
-  // on the same line (after `:`). List items, flow-style scalars, and `---`
-  // separators are ignored — they don't bind to `@Value` anyway.
-  const stack: Array<{ indent: number; key: string }> = [];
-  const yamlLines = content.split(/\r?\n/);
-  for (let i = 0; i < yamlLines.length; i++) {
-    const raw = yamlLines[i] ?? '';
-    const trimmed = raw.trim();
-    if (!trimmed || trimmed.startsWith('#') || trimmed === '---' || trimmed.startsWith('- ')) continue;
-    const indent = raw.length - raw.replace(/^[\t ]+/, '').length;
-    const colonIdx = (() => {
-      let inStr: string | null = null;
-      for (let j = 0; j < raw.length; j++) {
-        const ch = raw[j];
-        if (inStr) { if (ch === inStr && raw[j - 1] !== '\\') inStr = null; continue; }
-        if (ch === '"' || ch === "'") { inStr = ch; continue; }
-        if (ch === ':') return j;
-      }
-      return -1;
-    })();
-    if (colonIdx < 0) continue;
-    const key = raw.slice(indent, colonIdx).trim();
-    if (!key) continue;
-    const after = raw.slice(colonIdx + 1).trim();
-    while (stack.length > 0 && stack[stack.length - 1]!.indent >= indent) stack.pop();
-    const dotted = [...stack.map((s) => s.key), key].join('.');
-    if (after === '' || after.startsWith('#')) {
-      stack.push({ indent, key });
-    } else {
-      // A leaf with an inline value (or a flow-mapping like `{ a: 1 }` — we
-      // emit it as a leaf, not as a subtree; precision is fine for `@Value`).
-      const valStripped = after.replace(/^["']|["']$/g, '');
-      emitLeaf(dotted, i + 1, valStripped);
-    }
-  }
-  return { nodes, references: [] };
-}
 
 /** Append `@Value("${k}")` and `@ConfigurationProperties(prefix=...)`
  * references discovered in `safe` (comments stripped) into the caller's

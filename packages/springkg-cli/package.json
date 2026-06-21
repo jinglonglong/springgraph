@@ -8,11 +8,13 @@
     "springkg": "./dist/bin/springkg.js"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc && node ../springkg-shared/scripts/fix-esm-extensions.mjs dist"
   },
   "dependencies": {
+    "@colbymchenry/springkg-core": "0.1.0",
+    "@colbymchenry/springkg-installer": "0.1.0",
     "@colbymchenry/springkg-shared": "0.1.0",
-    "@colbymchenry/springkg-installer": "0.1.0"
+    "commander": "^12.1.0"
   },
   "peerDependencies": {
     "@colbymchenry/codegraph": ">=0.9.0 <1.0.0"

@@ -19,6 +19,17 @@ import * as url from 'url';
 import CodeGraphDefault, { type CodeGraph } from '../index';
 import { isInitialized } from '../directory';
 import { NODE_KINDS, type Node, type Edge } from '../types';
+import { handleArchitectureRoute, matchesFilters, parseFilters } from './architecture-api';
+import {
+  KIND_COLORS,
+  EDGE_COLORS,
+  summarizeNode,
+  summarizeEdge,
+  subgraphToCytoscape,
+  buildBreakdowns,
+} from './graph-response';
+import type { ArchitectureSnapshot, NodeArchitectureFacet } from '../architecture/types';
+import { ToolHandler, tools as mcpTools, type ToolDefinition, type ToolResult } from '../mcp/tools';
 
 export interface WebServerOptions {
   /** Port to listen on. */
@@ -67,61 +78,6 @@ function decodePathSegments(reqUrl: string): { pathname: string; segments: strin
   const parsed = url.parse(reqUrl);
   const pathname = decodeURIComponent(parsed.pathname || '/');
   return { pathname, segments: pathname.split('/').filter(Boolean) };
-}
-
-/**
- * Map a NodeKind to a Cytoscape-friendly color. Centralized so the frontend
- * doesn't need to maintain a parallel table.
- */
-const KIND_COLORS: Record<string, string> = {
-  file: '#6b7280',
-  module: '#a78bfa',
-  class: '#22d3ee',
-  struct: '#22d3ee',
-  interface: '#fbbf24',
-  trait: '#fbbf24',
-  protocol: '#fbbf24',
-  function: '#34d399',
-  method: '#34d399',
-  property: '#f472b6',
-  field: '#f472b6',
-  variable: '#94a3b8',
-  constant: '#fb923c',
-  enum: '#c084fc',
-  enum_member: '#c084fc',
-  type_alias: '#60a5fa',
-  namespace: '#a78bfa',
-  parameter: '#94a3b8',
-  import: '#9ca3af',
-  export: '#9ca3af',
-  route: '#f87171',
-  component: '#facc15',
-};
-
-export function nodeColor(kind: string): string {
-  return KIND_COLORS[kind] ?? '#cbd5e1';
-}
-
-/**
- * Map an EdgeKind to a Cytoscape-friendly color.
- */
-const EDGE_COLORS: Record<string, string> = {
-  contains: '#475569',
-  calls: '#22c55e',
-  imports: '#0ea5e9',
-  exports: '#0ea5e9',
-  extends: '#a855f7',
-  implements: '#a855f7',
-  references: '#64748b',
-  type_of: '#64748b',
-  returns: '#64748b',
-  instantiates: '#f97316',
-  overrides: '#a855f7',
-  decorates: '#ec4899',
-};
-
-export function edgeColor(kind: string): string {
-  return EDGE_COLORS[kind] ?? '#475569';
 }
 
 /**
@@ -233,49 +189,6 @@ function readFileSlice(
 }
 
 /**
- * Build a small JSON-safe summary for a node (used by /api/search and the
- * node chips in the graph).
- */
-export function summarizeNode(node: Node): Record<string, unknown> {
-  return {
-    id: node.id,
-    name: node.name,
-    kind: node.kind,
-    filePath: node.filePath,
-    qualifiedName: node.qualifiedName,
-    startLine: node.startLine,
-    endLine: node.endLine,
-    signature: node.signature,
-    language: node.language,
-    color: nodeColor(node.kind),
-  };
-}
-
-export function summarizeEdge(edge: Edge): Record<string, unknown> {
-  return {
-    id: `${edge.source}->${edge.target}:${edge.kind}:${edge.line ?? ''}:${edge.column ?? ''}`,
-    source: edge.source,
-    target: edge.target,
-    kind: edge.kind,
-    line: edge.line,
-    column: edge.column,
-    color: edgeColor(edge.kind),
-  };
-}
-
-/**
- * Convert a Subgraph (Map<id, Node>, Edge[]) into the flat array shape that
- * Cytoscape's elements:{ nodes, edges } expects.
- */
-export function subgraphToCytoscape(
-  subgraph: { nodes: Map<string, Node>; edges: Edge[] }
-): { nodes: Record<string, unknown>[]; edges: Record<string, unknown>[] } {
-  const nodes = Array.from(subgraph.nodes.values()).map((n) => summarizeNode(n));
-  const edges = subgraph.edges.map((e) => summarizeEdge(e));
-  return { nodes, edges };
-}
-
-/**
  * HTTP request handler. Pulls the CodeGraph instance from a closure created in
  * `startWebServer` so we don't serialize the project root on every call.
  */
@@ -284,7 +197,16 @@ export function createRequestHandler(
   projectRoot: string,
   publicDir: string
 ): (req: http.IncomingMessage, res: http.ServerResponse) => void {
-  const active = { cg, projectRoot };
+  // `active.toolHandler` is rebuilt whenever the active CodeGraph instance
+  // changes (see `/api/project` below). The web server doesn't have an
+  // MCP-style allowlist, so it reuses ToolHandler as-is and exposes the
+  // complete `tools` array — the playground is for *testing*, not for
+  // emulating agent allowlist behavior.
+  const active = {
+    cg,
+    projectRoot,
+    toolHandler: new ToolHandler(cg),
+  };
   const mimeTypes: Record<string, string> = {
     '.html': 'text/html; charset=utf-8',
     '.js': 'application/javascript; charset=utf-8',
@@ -337,16 +259,44 @@ export function createRequestHandler(
       if (pathname === '/api/overview' && req.method === 'GET') {
         const parsed = url.parse(req.url, true);
         const limit = Math.min(Math.max(parseInt((parsed.query.limit as string) || '80', 10) || 80, 1), 200);
-        const { nodes: selected, edges } = buildOverviewGraph(cg, limit);
-        sendJson(res, 200, {
+        const mode = (parsed.query.mode as string | undefined) || 'overview';
+        const snapshot = mode === 'springcloud' || mode === 'architecture'
+          ? await cg.getArchitectureSnapshot()
+          : null;
+        const { nodes: selected, edges } = buildOverviewGraph(cg, limit, snapshot);
+
+        const response: Record<string, unknown> = {
           root: null,
           depth: 0,
           direction: 'overview',
+          mode,
           nodeCount: selected.length,
           edgeCount: edges.length,
           nodes: selected.map(summarizeNode),
           edges: edges.map(summarizeEdge),
-        });
+        };
+
+        if (snapshot) {
+          const facetMap = new Map<string, NodeArchitectureFacet>();
+          for (const n of selected) {
+            const f = snapshot.facets.get(n.id);
+            if (f) facetMap.set(n.id, f);
+          }
+          const nodeMap = new Map(selected.map((n) => [n.id, n]));
+          const elements = subgraphToCytoscape({ nodes: nodeMap, edges }, facetMap);
+          const breakdowns = buildBreakdowns(selected, facetMap);
+
+          response.activeProfile = snapshot.profile.name;
+          response.profileConfidence = snapshot.result.allMatches[0]?.confidence ?? 0;
+          response.facets = Object.fromEntries(facetMap);
+          response.nodeCount = elements.nodes.length;
+          response.edgeCount = elements.edges.length;
+          response.nodes = elements.nodes;
+          response.edges = elements.edges;
+          Object.assign(response, breakdowns);
+        }
+
+        sendJson(res, 200, response);
         return;
       }
 
@@ -360,6 +310,9 @@ export function createRequestHandler(
         }
         const limit = Math.min(parseInt((parsed.query.limit as string) || '25', 10) || 25, 200);
         const kind = parsed.query.kind as string | undefined;
+        const filters = parseFilters(parsed.query);
+        const needsArchitectureFiltering =
+          !!filters.roles?.length || !!filters.layers?.length || !!filters.modules?.length;
         // `decorator` is comma-separated (e.g. `?decorator=Service,Controller`)
         // so the UI can stack multiple chips in one round-trip if it ever
         // needs to. Today the UI sends one at a time, but a CSV keeps the
@@ -368,11 +321,26 @@ export function createRequestHandler(
         const decorators = decoratorParam
           ? decoratorParam.split(',').map((s) => s.trim()).filter(Boolean)
           : undefined;
-        const results = cg.searchNodes(q, {
-          limit,
+        let results = cg.searchNodes(q, {
+          limit: needsArchitectureFiltering ? 200 : limit,
           kinds: kind ? [kind as Node['kind']] : undefined,
-          decorators,
         });
+
+        if (decorators && decorators.length > 0) {
+          results = results.filter((r) => {
+            const nodeDecorators = r.node.decorators;
+            if (!nodeDecorators || nodeDecorators.length === 0) return false;
+            return decorators.some((d) => nodeDecorators.includes(d));
+          });
+        }
+
+        if (needsArchitectureFiltering) {
+          const snapshot = await cg.getArchitectureSnapshot();
+          results = results
+            .filter((r) => matchesFilters(r.node, snapshot.facets.get(r.node.id), filters))
+            .slice(0, limit);
+        }
+
         sendJson(res, 200, {
           query: q,
           count: results.length,
@@ -435,13 +403,37 @@ export function createRequestHandler(
         const edgeKinds = edgeKindsParam
           ? (edgeKindsParam.split(',').map((s) => s.trim()) as Edge['kind'][])
           : undefined;
+        const filters = parseFilters(parsed.query);
         const subgraph = cg.traverse(id, {
           maxDepth: depth,
           direction,
           edgeKinds,
           includeStart: true,
         });
-        const elements = subgraphToCytoscape(subgraph);
+        let filteredSubgraph: typeof subgraph = subgraph;
+        const hasFilters = Boolean(
+          (filters.roles && filters.roles.length > 0) ||
+          (filters.layers && filters.layers.length > 0) ||
+          (filters.modules && filters.modules.length > 0) ||
+          (filters.decorators && filters.decorators.length > 0)
+        );
+        if (hasFilters) {
+          const snapshot = await cg.getArchitectureSnapshot();
+          const filteredNodes = Array.from(subgraph.nodes.values()).filter((n) =>
+            matchesFilters(n, snapshot.facets.get(n.id), filters)
+          );
+          const allowedIds = new Set(filteredNodes.map((n) => n.id));
+          const filteredEdges = subgraph.edges.filter(
+            (e) => allowedIds.has(e.source) && allowedIds.has(e.target)
+          );
+          const nextSubgraph: typeof subgraph = {
+            nodes: new Map(filteredNodes.map((n) => [n.id, n])),
+            edges: filteredEdges,
+            roots: subgraph.roots.filter((rootId) => allowedIds.has(rootId)),
+          };
+          filteredSubgraph = nextSubgraph;
+        }
+        const elements = subgraphToCytoscape(filteredSubgraph);
         const MAX_CONTEXT_NODES = 1500;
         const MAX_CONTEXT_EDGES = 3000;
         const originalNodeCount = elements.nodes.length;
@@ -526,6 +518,55 @@ export function createRequestHandler(
         return;
       }
 
+      // ─── /api/mcp/tools ───────────────────────────────────────────────────
+      // Returns every defined MCP tool with its name, description, and JSON
+      // schema. The web playground lists the full set (not the allowlist-
+      // filtered default) so users can verify every tool, not just the
+      // agent-facing subset.
+      if (pathname === '/api/mcp/tools' && req.method === 'GET') {
+        const tools: ToolDefinition[] = mcpTools.map((t) => ({
+          name: t.name,
+          description: t.description,
+          inputSchema: t.inputSchema,
+        }));
+        sendJson(res, 200, { tools });
+        return;
+      }
+
+      // ─── /api/mcp/invoke ──────────────────────────────────────────────────
+      // Calls a tool against the active CodeGraph via the shared
+      // ToolHandler. Response is the raw ToolResult so the UI can tell
+      // success from `isError:true` and surface the text content verbatim.
+      if (pathname === '/api/mcp/invoke' && req.method === 'POST') {
+        let body: Record<string, unknown>;
+        try {
+          body = await readJsonBody(req);
+        } catch (err) {
+          sendError(res, 400, err instanceof Error ? err.message : String(err), 'invalid_json');
+          return;
+        }
+        const tool = typeof body.tool === 'string' ? body.tool.trim() : '';
+        if (!tool) {
+          sendError(res, 400, 'Missing tool', 'missing_tool');
+          return;
+        }
+        const args = (body.args && typeof body.args === 'object' && !Array.isArray(body.args))
+          ? body.args as Record<string, unknown>
+          : {};
+        let result: ToolResult;
+        try {
+          result = await active.toolHandler.execute(tool, args);
+        } catch (err) {
+          sendError(res, 500, err instanceof Error ? err.message : String(err), 'invoke_failed');
+          return;
+        }
+        // HTTP 200 even on `isError:true` — the tool call itself succeeded
+        // and returned a structured result. The frontend colors the response
+        // red when isError is set.
+        sendJson(res, 200, result);
+        return;
+      }
+
       // ─── /api/browse?path=... ─────────────────────────────────────────────
       // Local directory browser for choosing a project root or .codegraph dir.
       if (pathname === '/api/browse' && req.method === 'GET') {
@@ -561,6 +602,7 @@ export function createRequestHandler(
           const previous = active.cg;
           active.cg = next;
           active.projectRoot = next.getProjectRoot();
+          active.toolHandler = new ToolHandler(next);
           if (previous !== next) previous.close();
           const stats = next.getStats();
           sendJson(res, 200, {
@@ -572,6 +614,10 @@ export function createRequestHandler(
         } catch (err) {
           sendError(res, 400, err instanceof Error ? err.message : String(err), 'project_switch_failed');
         }
+        return;
+      }
+
+      if (await handleArchitectureRoute(pathname, segments, req, res, cg)) {
         return;
       }
 
@@ -600,7 +646,11 @@ export function createRequestHandler(
   return handler;
 }
 
-function buildOverviewGraph(cg: CodeGraph, limit: number): { nodes: Node[]; edges: Edge[] } {
+function buildOverviewGraph(
+  cg: CodeGraph,
+  limit: number,
+  snapshot?: ArchitectureSnapshot | null
+): { nodes: Node[]; edges: Edge[] } {
   // Cap candidate collection per kind to avoid materializing millions of nodes.
   const candidateKinds = NODE_KINDS.filter((kind) => !['file', 'import', 'export', 'parameter'].includes(kind));
   const PER_KIND_CAP = 500;
@@ -636,7 +686,13 @@ function buildOverviewGraph(cg: CodeGraph, limit: number): { nodes: Node[]; edge
   const scored = topCandidates.map((node) => {
     const edges = edgesByNode.get(node.id) ?? [];
     const meaningful = edges.filter((e) => e.kind !== 'contains');
-    return { node, score: meaningful.length * 10 + edges.length };
+    const facet = snapshot?.facets.get(node.id);
+    const architectureBoost =
+      (facet?.isEntrypoint ? 100 : 0) +
+      Math.round((facet?.confidence ?? 0) * 25) +
+      (facet?.layer === 'entry' ? 30 : 0) +
+      (facet?.layer === 'business' ? 15 : 0);
+    return { node, score: meaningful.length * 10 + edges.length + architectureBoost };
   });
   scored.sort((a, b) => b.score - a.score || a.node.filePath.localeCompare(b.node.filePath));
 

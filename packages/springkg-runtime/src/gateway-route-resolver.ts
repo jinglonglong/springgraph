@@ -1,10 +1,12 @@
 import { loadConfigFiles } from './internal/yaml-loader.js';
 import { flattenProperties } from './internal/property-flatten.js';
 import { computeId } from './internal/key-mask.js';
+import { logResolverWarning } from './types.js';
+import type { SpringKgLike } from './types.js';
 
 export interface SpringKgEnhanceInput {
   projectPath: string;
-  kg: any;
+  kg: SpringKgLike;
 }
 
 export interface SpringKgEnhanceOutput {
@@ -18,7 +20,7 @@ interface GatewayRoute {
   uri: string;
   predicates: string[];
   filters: string[];
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 /**
@@ -127,7 +129,9 @@ export class GatewayRouteResolver {
           }
         });
         routesCount++;
-      } catch (e) {}
+      } catch (error) {
+        logResolverWarning('GatewayRouteResolver', `failed to upsert gateway route ${route.id}`, error);
+      }
 
       // Determine target type and create ROUTES_TO edge
       let targetId: string;
@@ -148,7 +152,9 @@ export class GatewayRouteResolver {
             endLine: 0,
             metadata: { stub: true }
           });
-        } catch (e) {}
+        } catch (error) {
+          logResolverWarning('GatewayRouteResolver', `failed to upsert micro_service target ${serviceName}`, error);
+        }
       } else if (route.uri.startsWith('http://') || route.uri.startsWith('https://')) {
         const url = new URL(route.uri);
         const host = url.host;
@@ -166,7 +172,9 @@ export class GatewayRouteResolver {
             endLine: 0,
             metadata: { externalUri: route.uri, host }
           });
-        } catch (e) {}
+        } catch (error) {
+          logResolverWarning('GatewayRouteResolver', `failed to upsert external route target ${host}`, error);
+        }
       } else if (route.uri.startsWith('ws://') || route.uri.startsWith('wss://')) {
         const url = new URL(route.uri);
         targetId = computeId('route_target', `external:${url.host}:websocket`);
@@ -182,7 +190,9 @@ export class GatewayRouteResolver {
             endLine: 0,
             metadata: { externalUri: route.uri, host: url.host, websocket: true }
           });
-        } catch (e) {}
+        } catch (error) {
+          logResolverWarning('GatewayRouteResolver', `failed to upsert websocket route target ${url.host}`, error);
+        }
       } else {
         // Unknown URI scheme, skip
         console.warn(`[springkg] GatewayRouteResolver: unknown URI scheme "${route.uri}"`);
@@ -200,7 +210,9 @@ export class GatewayRouteResolver {
           metadata: { uri: route.uri }
         });
         routesToEdges++;
-      } catch (e) {}
+      } catch (error) {
+        logResolverWarning('GatewayRouteResolver', `failed to create ROUTES_TO edge for ${route.id}`, error);
+      }
 
       // Parse predicates for Path matches
       for (const predicate of route.predicates) {
@@ -223,7 +235,9 @@ export class GatewayRouteResolver {
               endLine: 0,
               metadata: { path, service: serviceNameForEndpoint }
             });
-          } catch (e) {}
+          } catch (error) {
+            logResolverWarning('GatewayRouteResolver', `failed to upsert endpoint stub for ${path}`, error);
+          }
 
           // Create MATCHES_PATH edge
           try {
@@ -236,7 +250,9 @@ export class GatewayRouteResolver {
               metadata: { path }
             });
             matchesPathEdges++;
-          } catch (e) {}
+            } catch (error) {
+              logResolverWarning('GatewayRouteResolver', `failed to create MATCHES_PATH edge for ${route.id}:${path}`, error);
+            }
         }
       }
     }

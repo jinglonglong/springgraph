@@ -1,0 +1,155 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - img [ref=e5]
+      - generic [ref=e11]: CodeGraph
+      - generic [ref=e12]: /
+      - generic [ref=e13]: 图谱
+    - generic "输入项目根目录或 .codegraph 目录后加载" [ref=e14]:
+      - textbox "项目根目录或 .codegraph 路径" [ref=e15]: D:\code\dzjc
+      - button "浏览" [ref=e16] [cursor=pointer]
+      - button "加载" [ref=e17] [cursor=pointer]
+    - group "图谱模式" [ref=e18]:
+      - button "Spring Cloud" [ref=e19] [cursor=pointer]:
+        - generic [ref=e21]: Spring Cloud
+      - button "通用" [ref=e22] [cursor=pointer]:
+        - generic [ref=e24]: 通用
+    - generic [ref=e25]:
+      - button "重置" [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+        - generic [ref=e30]: 重置
+      - button "刷新" [ref=e31] [cursor=pointer]:
+        - img [ref=e32]
+        - generic [ref=e34]: 刷新
+      - button "切换主题" [ref=e35] [cursor=pointer]:
+        - generic [ref=e36]: 🌙
+        - generic [ref=e37]: 主题
+  - complementary [ref=e38]:
+    - generic "图谱统计" [ref=e39]:
+      - generic [ref=e40]:
+        - generic [ref=e41]: "738"
+        - generic [ref=e42]: 文件
+      - generic [ref=e43]:
+        - generic [ref=e44]: 12,193
+        - generic [ref=e45]: 节点
+      - generic [ref=e46]:
+        - generic [ref=e47]: 25,028
+        - generic [ref=e48]: 边
+      - generic [ref=e49]:
+        - generic [ref=e50]: 更新
+        - generic "2026/6/20 20:12:47" [ref=e51]: 刚刚
+    - generic [ref=e52]:
+      - generic [ref=e53]:
+        - img
+        - searchbox "搜索符号" [ref=e54]
+      - generic [ref=e55]:
+        - generic [ref=e56]:
+          - generic [ref=e57]: Spring Cloud 角色
+          - button "ⓘ" [ref=e58] [cursor=pointer]
+        - generic [ref=e59]:
+          - button "C Controller" [ref=e60] [cursor=pointer]
+          - button "⚠ ControllerAdvice" [ref=e61] [cursor=pointer]
+          - button "S Service" [ref=e62] [cursor=pointer]
+          - button "S ServiceImpl" [ref=e63] [cursor=pointer]
+          - button "F FeignClient" [ref=e64] [cursor=pointer]
+          - button "M Mapper" [ref=e65] [cursor=pointer]
+          - button "R Repository" [ref=e66] [cursor=pointer]
+          - button "E Entity/PO/DTO" [ref=e67] [cursor=pointer]
+          - button "⚙ Config" [ref=e68] [cursor=pointer]
+          - button "A Application" [ref=e69] [cursor=pointer]
+          - button "◉ Component" [ref=e70] [cursor=pointer]
+      - generic [ref=e71]:
+        - generic [ref=e72]:
+          - generic [ref=e73]: 关系类型
+          - button "标签 · 开" [ref=e74] [cursor=pointer]
+        - generic [ref=e75]:
+          - button "↦ extends" [ref=e76] [cursor=pointer]
+          - button "⇢ implements" [ref=e77] [cursor=pointer]
+          - button "→ calls" [ref=e78] [cursor=pointer]
+          - button "◇→ instantiates" [ref=e79] [cursor=pointer]
+          - button "·→ references" [ref=e80] [cursor=pointer]
+          - button "★ decorates" [ref=e81] [cursor=pointer]
+          - button "⇢ imports" [ref=e82] [cursor=pointer]
+          - button "⇠ exports" [ref=e83] [cursor=pointer]
+          - button "⊂ contains" [ref=e84] [cursor=pointer]
+          - button "⊃ overrides" [ref=e85] [cursor=pointer]
+          - button "← returns" [ref=e86] [cursor=pointer]
+          - 'button ": type_of" [ref=e87] [cursor=pointer]'
+    - generic [ref=e89]: 输入关键词开始搜索…
+  - main [ref=e90]:
+    - generic [ref=e91]:
+      - generic [ref=e92]:
+        - button "默认" [ref=e93] [cursor=pointer]
+        - button "端点" [ref=e94] [cursor=pointer]
+        - button "调用链" [ref=e95] [cursor=pointer]
+        - button "服务依赖" [ref=e96] [cursor=pointer]
+        - button "数据模型" [ref=e97] [cursor=pointer]
+      - generic [ref=e98]:
+        - generic [ref=e99]: 布局
+        - combobox "图谱布局" [ref=e100] [cursor=pointer]:
+          - option "力导向 (cose)" [selected]
+          - option "层级"
+          - option "圆形"
+          - option "网格"
+          - option "同心圆"
+      - generic "按 Spring Cloud 角色配额选取：Controller/ServiceImpl/Mapper/Service/FeignClient/Config/Entity 等业务核心。" [ref=e101]: Spring Cloud 概览 · 73 个节点 · 40 条边 · Controller×11 · ServiceImpl×10 · Service×4 · Mapper×8 · Config×6 · Entity×24 · 其他×10
+    - application "代码图谱" [ref=e102]
+  - complementary [ref=e107]:
+    - generic [ref=e108]:
+      - generic [ref=e109]:
+        - img [ref=e110]
+        - paragraph [ref=e113]: 选择一个节点查看详情，或从下方快速入口开始探索。
+      - generic [ref=e114]:
+        - generic [ref=e115]:
+          - generic [ref=e116]: "738"
+          - generic [ref=e117]: 文件
+        - generic [ref=e118]:
+          - generic [ref=e119]: 12,193
+          - generic [ref=e120]: 节点
+        - generic [ref=e121]:
+          - generic [ref=e122]: 25,028
+          - generic [ref=e123]: 边
+      - generic [ref=e124]:
+        - generic [ref=e125]: 快速入口
+        - generic [ref=e126]:
+          - button "C CacheController Controller" [ref=e127] [cursor=pointer]:
+            - generic [ref=e128]: C
+            - generic [ref=e129]: CacheController
+            - generic [ref=e130]: Controller
+          - button "C SysConfigController Controller" [ref=e131] [cursor=pointer]:
+            - generic [ref=e132]: C
+            - generic [ref=e133]: SysConfigController
+            - generic [ref=e134]: Controller
+          - button "C BaseController Controller" [ref=e135] [cursor=pointer]:
+            - generic [ref=e136]: C
+            - generic [ref=e137]: BaseController
+            - generic [ref=e138]: Controller
+          - button "C SysDictDataController Controller" [ref=e139] [cursor=pointer]:
+            - generic [ref=e140]: C
+            - generic [ref=e141]: SysDictDataController
+            - generic [ref=e142]: Controller
+          - button "C SysLogininforController Controller" [ref=e143] [cursor=pointer]:
+            - generic [ref=e144]: C
+            - generic [ref=e145]: SysLogininforController
+            - generic [ref=e146]: Controller
+          - button "C SysDeptController Controller" [ref=e147] [cursor=pointer]:
+            - generic [ref=e148]: C
+            - generic [ref=e149]: SysDeptController
+            - generic [ref=e150]: Controller
+    - generic [ref=e151]:
+      - generic [ref=e152]:
+        - generic [ref=e153]: —
+        - heading "—" [level=3] [ref=e154]
+      - tablist [ref=e155]:
+        - tab "源码" [selected] [ref=e156] [cursor=pointer]
+        - tab "调用方 0" [ref=e157] [cursor=pointer]:
+          - text: 调用方
+          - generic [ref=e158]: "0"
+        - tab "被调用 0" [ref=e159] [cursor=pointer]:
+          - text: 被调用
+          - generic [ref=e160]: "0"
+      - tabpanel [ref=e162]:
+        - generic [ref=e163]: 加载中…
+      - button "展开邻域 · 深度 3" [ref=e165] [cursor=pointer]:
+        - img [ref=e166]
+        - generic [ref=e168]: 展开邻域 · 深度 3

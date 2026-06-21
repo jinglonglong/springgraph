@@ -1,0 +1,21 @@
+{
+  "request": {
+    "name": "spring_find_entry",
+    "arguments": {
+      "url": "/api/users",
+      "includeEndpoints": true
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "tool-1",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"found\":false,\"query\":\"/api/users\",\"controller\":null,\"service\":null,\"endpoints\":[]}"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,144 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - img [ref=e5]
+      - generic [ref=e11]: CodeGraph
+      - generic [ref=e12]: /
+      - generic [ref=e13]: 图谱
+    - generic "输入项目根目录或 .codegraph 目录后加载" [ref=e14]:
+      - textbox "项目根目录或 .codegraph 路径" [ref=e15]: D:\code\dzjc
+      - button "浏览" [ref=e16] [cursor=pointer]
+      - button "加载" [ref=e17] [cursor=pointer]
+    - group "图谱模式" [ref=e18]:
+      - button "Spring Cloud" [ref=e19] [cursor=pointer]:
+        - generic [ref=e21]: Spring Cloud
+      - button "通用" [ref=e22] [cursor=pointer]:
+        - generic [ref=e24]: 通用
+    - generic [ref=e25]:
+      - button "重置" [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+        - generic [ref=e30]: 重置
+      - button "刷新" [ref=e31] [cursor=pointer]:
+        - img [ref=e32]
+        - generic [ref=e34]: 刷新
+      - button "切换主题" [ref=e35] [cursor=pointer]:
+        - generic [ref=e36]: 🌙
+        - generic [ref=e37]: 主题
+  - complementary [ref=e38]:
+    - generic "图谱统计" [ref=e39]:
+      - generic [ref=e40]:
+        - generic [ref=e41]: "738"
+        - generic [ref=e42]: 文件
+      - generic [ref=e43]:
+        - generic [ref=e44]: 12,193
+        - generic [ref=e45]: 节点
+      - generic [ref=e46]:
+        - generic [ref=e47]: 25,028
+        - generic [ref=e48]: 边
+      - generic [ref=e49]:
+        - generic [ref=e50]: 更新
+        - generic "2026/6/20 19:26:28" [ref=e51]: 刚刚
+    - generic [ref=e52]:
+      - generic [ref=e53]:
+        - img
+        - searchbox "搜索符号" [ref=e54]
+      - toolbar "按节点类型筛选" [ref=e55]:
+        - button "全部" [ref=e56] [cursor=pointer]
+        - button "function" [ref=e57] [cursor=pointer]
+        - button "method" [ref=e58] [cursor=pointer]
+        - button "class" [ref=e59] [cursor=pointer]
+        - button "interface" [ref=e60] [cursor=pointer]
+        - button "struct" [ref=e61] [cursor=pointer]
+        - button "trait" [ref=e62] [cursor=pointer]
+        - button "protocol" [ref=e63] [cursor=pointer]
+        - button "component" [ref=e64] [cursor=pointer]
+        - button "route" [ref=e65] [cursor=pointer]
+        - button "type_alias" [ref=e66] [cursor=pointer]
+        - button "constant" [ref=e67] [cursor=pointer]
+        - button "enum" [ref=e68] [cursor=pointer]
+        - button "file" [ref=e69] [cursor=pointer]
+        - button "module" [ref=e70] [cursor=pointer]
+        - button "property" [ref=e71] [cursor=pointer]
+        - button "field" [ref=e72] [cursor=pointer]
+        - button "variable" [ref=e73] [cursor=pointer]
+        - button "enum_member" [ref=e74] [cursor=pointer]
+        - button "namespace" [ref=e75] [cursor=pointer]
+        - button "parameter" [ref=e76] [cursor=pointer]
+        - button "import" [ref=e77] [cursor=pointer]
+        - button "export" [ref=e78] [cursor=pointer]
+      - generic [ref=e79]:
+        - generic [ref=e80]: 装饰器标签
+        - generic [ref=e82]: 当前项目无装饰器
+      - generic [ref=e83]:
+        - generic [ref=e84]:
+          - generic [ref=e85]: Spring Cloud 角色
+          - button "ⓘ" [ref=e86] [cursor=pointer]
+        - generic [ref=e87]:
+          - button "C Controller" [ref=e88] [cursor=pointer]
+          - button "⚠ ControllerAdvice" [ref=e89] [cursor=pointer]
+          - button "S Service" [ref=e90] [cursor=pointer]
+          - button "S ServiceImpl" [ref=e91] [cursor=pointer]
+          - button "F FeignClient" [ref=e92] [cursor=pointer]
+          - button "M Mapper" [ref=e93] [cursor=pointer]
+          - button "R Repository" [ref=e94] [cursor=pointer]
+          - button "E Entity/PO/DTO" [ref=e95] [cursor=pointer]
+          - button "⚙ Config" [ref=e96] [cursor=pointer]
+          - button "A Application" [ref=e97] [cursor=pointer]
+          - button "◉ Component" [ref=e98] [cursor=pointer]
+      - generic [ref=e99]:
+        - generic [ref=e100]:
+          - generic [ref=e101]: 关系类型
+          - button "标签 · 开" [ref=e102] [cursor=pointer]
+        - generic [ref=e103]:
+          - button "↦ extends" [ref=e104] [cursor=pointer]
+          - button "⇢ implements" [ref=e105] [cursor=pointer]
+          - button "→ calls" [ref=e106] [cursor=pointer]
+          - button "◇→ instantiates" [ref=e107] [cursor=pointer]
+          - button "·→ references" [ref=e108] [cursor=pointer]
+          - button "★ decorates" [ref=e109] [cursor=pointer]
+          - button "⇢ imports" [ref=e110] [cursor=pointer]
+          - button "⇠ exports" [ref=e111] [cursor=pointer]
+          - button "⊂ contains" [ref=e112] [cursor=pointer]
+          - button "⊃ overrides" [ref=e113] [cursor=pointer]
+          - button "← returns" [ref=e114] [cursor=pointer]
+          - 'button ": type_of" [ref=e115] [cursor=pointer]'
+    - generic [ref=e117]: 输入关键词开始搜索…
+  - main [ref=e118]:
+    - generic [ref=e119]:
+      - generic [ref=e120]:
+        - button "默认" [ref=e121] [cursor=pointer]
+        - button "端点" [ref=e122] [cursor=pointer]
+        - button "调用链" [ref=e123] [cursor=pointer]
+        - button "服务依赖" [ref=e124] [cursor=pointer]
+        - button "数据模型" [ref=e125] [cursor=pointer]
+      - generic [ref=e126]:
+        - generic [ref=e127]: 布局
+        - combobox "图谱布局" [ref=e128] [cursor=pointer]:
+          - option "力导向 (cose)" [selected]
+          - option "层级"
+          - option "圆形"
+          - option "网格"
+          - option "同心圆"
+      - generic [ref=e129]: 项目概览 · 80 个节点 · 78 条边
+    - application "代码图谱" [ref=e130]
+  - complementary [ref=e135]:
+    - generic [ref=e136]:
+      - img [ref=e137]
+      - paragraph [ref=e140]: 选择一个节点查看详情。
+    - generic [ref=e141]:
+      - generic [ref=e142]:
+        - generic [ref=e143]: —
+        - heading "—" [level=3] [ref=e144]
+      - tablist [ref=e145]:
+        - tab "源码" [selected] [ref=e146] [cursor=pointer]
+        - tab "调用方 0" [ref=e147] [cursor=pointer]:
+          - text: 调用方
+          - generic [ref=e148]: "0"
+        - tab "被调用 0" [ref=e149] [cursor=pointer]:
+          - text: 被调用
+          - generic [ref=e150]: "0"
+      - tabpanel [ref=e152]:
+        - generic [ref=e153]: 加载中…
+      - button "展开邻域 · 深度 3" [ref=e155] [cursor=pointer]:
+        - img [ref=e156]
+        - generic [ref=e158]: 展开邻域 · 深度 3

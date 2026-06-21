@@ -30,6 +30,9 @@ import {
   type WatchOptions,
 } from '../src/sync/watcher';
 import CodeGraph from '../src/index';
+import { facetRegistry } from '../src/architecture/facet-engine';
+import { genericProfile, profileRegistry } from '../src/architecture/profile-registry';
+import type { ArchitectureFacet, ArchitectureProfile } from '../src/architecture/types';
 
 type SyncFn = () => Promise<{ filesChanged: number; durationMs: number }>;
 
@@ -57,6 +60,74 @@ function waitFor(
 describe('FileWatcher', () => {
   let testDir: string;
 
+  const registerArchitectureWatcherProfile = () => {
+    const profile: ArchitectureProfile = {
+      id: 'watcher-architecture-profile',
+      name: 'Watcher Architecture Profile',
+      description: 'Test profile for watcher freshness.',
+      facetIds: ['watcher-naming-facet'],
+      layers: [
+        { id: 'entry', label: 'Entry', tier: 1 },
+        { id: 'business', label: 'Business', tier: 2 },
+        { id: 'unknown', label: 'Unknown', tier: 99 },
+      ],
+      roles: [
+        { id: 'controller', label: 'Controller', layerId: 'entry', entrypoint: true },
+        { id: 'service', label: 'Service', layerId: 'business' },
+      ],
+      detect(signals) {
+        return {
+          profileName: signals.length > 0 ? 'watcher-architecture-profile' : 'generic',
+          confidence: signals.length > 0 ? 0.95 : 0.05,
+          nodeCount: signals.length,
+          layerBreakdown: {},
+          roleBreakdown: {},
+          signals,
+        };
+      },
+    };
+
+    const facet: ArchitectureFacet = {
+      id: 'watcher-naming-facet',
+      name: 'Watcher Naming Facet',
+      detect(context) {
+        const rows = context.db
+          .getDb()
+          .prepare("SELECT id, name FROM nodes WHERE kind = 'class'")
+          .all() as Array<{ id: string; name: string }>;
+        return rows.flatMap((row) => {
+          if (row.name.endsWith('Controller')) {
+            return [{
+              nodeId: row.id,
+              facetName: 'watcher-naming-facet',
+              profileName: 'watcher-architecture-profile',
+              confidence: 0.9,
+              evidence: ['controller suffix'],
+              metadata: { role: 'controller', layer: 'entry', isEntrypoint: true },
+            }];
+          }
+          if (row.name.endsWith('Service')) {
+            return [{
+              nodeId: row.id,
+              facetName: 'watcher-naming-facet',
+              profileName: 'watcher-architecture-profile',
+              confidence: 0.9,
+              evidence: ['service suffix'],
+              metadata: { role: 'service', layer: 'business' },
+            }];
+          }
+          return [];
+        });
+      },
+    };
+
+    profileRegistry.clear();
+    facetRegistry.clear();
+    profileRegistry.register(genericProfile);
+    profileRegistry.register(profile);
+    facetRegistry.register(facet);
+  };
+
   // Inert by default — unit tests drive events via __emitWatchEventForTests
   // and never depend on real OS watch delivery.
   const newWatcher = (syncFn: SyncFn, opts: WatchOptions = {}) =>
@@ -73,6 +144,8 @@ describe('FileWatcher', () => {
   afterEach(() => {
     __setFsWatchForTests(null); // reset the injected fs.watch seam
     vi.restoreAllMocks();
+    profileRegistry.clear();
+    facetRegistry.clear();
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
@@ -642,6 +715,27 @@ describe('FileWatcher', () => {
       expect(results.length).toBeGreaterThan(0);
 
       cg.unwatch();
+    });
+
+    it('refreshes architecture facets after a watched edit completes', async () => {
+      registerArchitectureWatcherProfile();
+      fs.writeFileSync(path.join(testDir, 'src', 'arch.ts'), 'export class BillingService {}\n');
+
+      cg = CodeGraph.initSync(testDir, {
+        config: { include: ['**/*.ts'], exclude: [] },
+      });
+      await cg.indexAll();
+      expect(cg.watch({ debounceMs: 75, inertForTests: true })).toBe(true);
+      await cg.waitUntilWatcherReady();
+
+      fs.writeFileSync(path.join(testDir, 'src', 'arch.ts'), 'export class BillingController {}\n');
+      __emitWatchEventForTests(testDir, 'src/arch.ts');
+
+      await waitFor(() => cg.getPendingFiles().length === 0, 3000);
+      const snapshot = await cg.getArchitectureSnapshot();
+      const controller = snapshot.nodes.find((n) => n.name === 'BillingController');
+      expect(controller).toBeDefined();
+      expect(snapshot.facets.get(controller!.id)?.role).toBe('controller');
     });
   });
 });

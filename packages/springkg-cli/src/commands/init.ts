@@ -7,8 +7,10 @@
  */
 
 export async function runInit(projectPath: string): Promise<void> {
-  const { SpringKg } = await import('@colbymchenry/springkg-core');
+  const { SpringDatabase, SpringKg } = await import('@colbymchenry/springkg-core');
   console.log(`Initializing SpringKg at: ${projectPath}`);
+  const dbPath = SpringDatabase.initializeDatabase(projectPath);
+  console.log(`SpringKg database initialized at: ${dbPath}`);
   const sk = await SpringKg.init({ projectPath });
   await sk.close();
   console.log('SpringKg initialized successfully.');

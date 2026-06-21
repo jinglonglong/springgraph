@@ -1,0 +1,181 @@
+{
+  "jsonrpc": "2.0",
+  "id": "tools-list",
+  "result": {
+    "tools": [
+      {
+        "name": "spring_find_entry",
+        "description": "Find Spring entry points (controllers with routes). Returns controllers and their endpoint methods.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Optional search query to filter by controller name or route path"
+            },
+            "url": {
+              "type": "string",
+              "description": "Optional endpoint path alias for query (e.g. /api/users)"
+            },
+            "includeEndpoints": {
+              "type": "boolean",
+              "description": "Include endpoint list in the response"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum results (default: 20)",
+              "default": 20
+            }
+          }
+        }
+      },
+      {
+        "name": "spring_find_feign",
+        "description": "Find Feign clients and their target services. Returns Feign client interfaces and their methods.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Optional search query to filter by client name or target service"
+            },
+            "clientName": {
+              "type": "string",
+              "description": "Optional exact client name or target service"
+            },
+            "name": {
+              "type": "string",
+              "description": "Optional alias for clientName or target service"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum results (default: 20)",
+              "default": 20
+            }
+          }
+        }
+      },
+      {
+        "name": "spring_find_mapper",
+        "description": "Find MyBatis mappers by namespace or method name. Returns matching mappers and their SQL methods.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Optional search query matching mapper namespace or method name"
+            },
+            "namespace": {
+              "type": "string",
+              "description": "Optional exact mapper namespace to match"
+            },
+            "methodName": {
+              "type": "string",
+              "description": "Optional exact method name to match"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum results (default: 20)",
+              "default": 20
+            }
+          }
+        }
+      },
+      {
+        "name": "spring_find_config",
+        "description": "Find Spring runtime configuration properties. Sensitive values are masked.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Optional search query matching config keys"
+            },
+            "key": {
+              "type": "string",
+              "description": "Optional exact property key to find"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum results (default: 20)",
+              "default": 20
+            }
+          }
+        }
+      },
+      {
+        "name": "spring_nacos_overview",
+        "description": "Get an overview of Nacos discovery and config properties.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "spring_gateway_route",
+        "description": "List configured Spring gateway routes.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "number",
+              "description": "Maximum results (default: 50)",
+              "default": 50
+            }
+          }
+        }
+      },
+      {
+        "name": "spring_search_feature",
+        "description": "Search feature communities by name or description.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search query matching community name or summary"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum results (default: 20)",
+              "default": 20
+            }
+          },
+          "required": [
+            "query"
+          ]
+        }
+      },
+      {
+        "name": "spring_assets_overview",
+        "description": "Get an overview of all Spring assets in the project. Returns counts of controllers, services, mappers, feign clients, etc.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "spring_trace_flow",
+        "description": "Trace the flow from an endpoint to its dependencies. Shows the call chain from controller to service to mapper/feign.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "entryId": {
+              "type": "string",
+              "description": "ID of the entry point to trace from (e.g., endpoint ID)"
+            },
+            "entryPath": {
+              "type": "string",
+              "description": "Endpoint path to trace from (e.g., /api/users)"
+            },
+            "depth": {
+              "type": "number",
+              "description": "Maximum depth to trace (default: 5)",
+              "default": 5
+            }
+          }
+        }
+      }
+    ]
+  }
+}

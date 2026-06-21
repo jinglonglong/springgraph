@@ -1,8 +1,10 @@
 import { computeId } from './internal/key-mask.js';
+import { logResolverWarning } from './types.js';
+import type { ConfigPropertyRow, SpringKgLike } from './types.js';
 
 export interface SpringKgEnhanceInput {
   projectPath: string;
-  kg: any;
+  kg: SpringKgLike;
 }
 
 export interface SpringKgEnhanceOutput {
@@ -14,7 +16,7 @@ interface MiddlewareInfo {
   kind: string;
   name: string;
   qualifiedName: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 /**
@@ -25,10 +27,11 @@ export class MiddlewareInventory {
     const { kg } = input;
 
     // Get all runtime_config_properties
-    let configProperties: any[] = [];
+    let configProperties: ConfigPropertyRow[] = [];
     try {
       configProperties = await kg.getConfigProperties ? await kg.getConfigProperties() : [];
-    } catch (e) {
+    } catch (error) {
+      logResolverWarning('MiddlewareInventory', 'failed to load config properties', error);
       return { middlewareCount: 0, edgesCount: 0 };
     }
 
@@ -71,8 +74,8 @@ export class MiddlewareInventory {
           metadata: middleware.metadata
         });
         middlewareCount++;
-      } catch (e) {
-        // May already exist
+      } catch (error) {
+        logResolverWarning('MiddlewareInventory', `failed to upsert middleware ${middleware.qualifiedName}`, error);
       }
     }
 
@@ -92,8 +95,8 @@ export class MiddlewareInventory {
             metadata: {}
           });
           edgesCount++;
-        } catch (e) {
-          // May already exist
+        } catch (error) {
+          logResolverWarning('MiddlewareInventory', `failed to create CONNECTS_TO edge for ${serviceId} -> ${midQualifiedName}`, error);
         }
       }
     }

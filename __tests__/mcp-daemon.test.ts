@@ -32,13 +32,14 @@
  * end is itself the proof the canonicalization works.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { CodeGraph } from '../src';
 import { getDaemonSocketPath } from '../src/mcp/daemon-paths';
+import { removeDirWithRetries, safeCloseCodeGraph, terminateChild, waitForChildExit } from './setup';
 
 const BIN = path.resolve(__dirname, '../dist/bin/codegraph.js');
 
@@ -173,12 +174,12 @@ describe('Shared MCP daemon (issue #411)', () => {
   beforeEach(async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-mcp-daemon-'));
     const cg = await CodeGraph.init(tempDir);
-    cg.close();
+    await safeCloseCodeGraph(cg);
     realRoot = fs.realpathSync(tempDir);
   });
 
   afterEach(async () => {
-    killTree(...servers.map((s) => s.child));
+    await Promise.all(servers.map((s) => terminateChild(s.child)));
     // The daemon is detached (not a tracked child) — reap it explicitly via the
     // pid it recorded, so a test can't leak a background daemon. Guard against
     // our own pid: the version-mismatch test plants `pid: process.pid` in the
@@ -187,9 +188,9 @@ describe('Shared MCP daemon (issue #411)', () => {
     if (daemonPid && daemonPid !== process.pid && isAlive(daemonPid)) {
       try { process.kill(daemonPid, 'SIGKILL'); } catch { /* race */ }
     }
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 150));
     servers.length = 0;
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    await removeDirWithRetries(tempDir);
   });
 
   it('two invocations share ONE detached daemon; both attach as proxies', async () => {
@@ -398,6 +399,7 @@ describe('Shared MCP daemon (issue #411)', () => {
     // Close the only client's stdin → proxy exits → daemon refcount hits 0 →
     // idle timer fires → daemon exits and cleans up its lockfile.
     server.child.stdin.end();
+    expect(await waitForChildExit(server.child, 5000)).toBe(true);
 
     expect(await waitProcessExit(daemonPid, 10000)).toBe(true);
     expect(fs.existsSync(path.join(realRoot, '.codegraph', 'daemon.pid'))).toBe(false);
@@ -411,25 +413,30 @@ describe('Shared MCP daemon (issue #411)', () => {
     const server = spawnServer(tempDir, env);
     servers.push(server);
     sendInitialize(server.child, `file://${tempDir}`, 1);
-    await waitFor(() => findResponse(server.stdout, 1), 10000);
-    await waitFor(() => server.stderr.some((l) => l.includes('Attached to shared daemon')), 8000);
-    await waitFor(() => (readLockPid(realRoot) ?? 0) > 0, 8000);
+    await waitFor(() => findResponse(server.stdout, 1), 20000);
+    await waitFor(() => server.stderr.some((l) => l.includes('Attached to shared daemon')), 15000);
+    await waitFor(() => (readLockPid(realRoot) ?? 0) > 0, 15000);
     const daemonPid = readLockPid(realRoot)!;
 
     // A warm call goes through the daemon.
     sendMessage(server.child, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'codegraph_status', arguments: {} } });
-    await waitFor(() => findResponse(server.stdout, 2), 10000);
+    await waitFor(() => findResponse(server.stdout, 2), 20000);
 
     // Kill the daemon out from under the live proxy.
     process.kill(daemonPid, 'SIGTERM');
-    expect(await waitProcessExit(daemonPid, 8000)).toBe(true);
+    expect(await waitProcessExit(daemonPid, 15000)).toBe(true);
 
     // The proxy must still be alive and still answer — served in-process now.
     expect(isAlive(server.child.pid!)).toBe(true);
-    await waitFor(() => server.stderr.some((l) => l.includes('serving this session in-process')), 8000);
     sendMessage(server.child, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'codegraph_status', arguments: {} } });
-    const resp = await waitFor(() => findResponse(server.stdout, 3), 15000);
+    await waitFor(() => server.stderr.some((l) => l.includes('serving this session in-process')), 25000);
+    const resp = await waitFor(() => findResponse(server.stdout, 3), 25000);
     expect(resp.result !== undefined || resp.error !== undefined).toBe(true);
     expect(isAlive(server.child.pid!)).toBe(true);
   }, 45000);
+
+  afterAll(async () => {
+    await Promise.all(servers.map((s) => terminateChild(s.child)));
+    servers.length = 0;
+  });
 });

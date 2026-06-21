@@ -1,8 +1,10 @@
 import { computeId } from './internal/key-mask.js';
+import { logResolverWarning } from './types.js';
+import type { ConfigPropertyRow, DecoratedCodegraphNode, SpringKgLike } from './types.js';
 
 export interface SpringKgEnhanceInput {
   projectPath: string;
-  kg: any;
+  kg: SpringKgLike;
 }
 
 export interface SpringKgEnhanceOutput {
@@ -19,27 +21,29 @@ export class ConfigPropertyUsageTracker {
     let edgesCount = 0;
 
     // Get nodes with @Value or @ConfigurationProperties decorators
-    let decoratedNodes: any[] = [];
+    let decoratedNodes: DecoratedCodegraphNode[] = [];
     try {
       if (kg.codegraph?.findNodes) {
         decoratedNodes = await kg.codegraph.findNodes({
           decoratorPattern: '@Value|@ConfigurationProperties'
         });
       }
-    } catch (e) {
-      // Fallback: try to get from kg directly
+    } catch (error) {
+      logResolverWarning('ConfigPropertyUsageTracker', 'codegraph.findNodes failed, falling back to kg.findDecoratedNodes', error);
       try {
         decoratedNodes = await kg.findDecoratedNodes?.() || [];
       } catch (err) {
+        logResolverWarning('ConfigPropertyUsageTracker', 'failed to load decorated nodes from fallback source', err);
         return { edgesCount: 0 };
       }
     }
 
     // Get runtime_config_properties for matching
-    let configProperties: any[] = [];
+    let configProperties: ConfigPropertyRow[] = [];
     try {
       configProperties = await kg.getConfigProperties?.() || [];
-    } catch (e) {
+    } catch (error) {
+      logResolverWarning('ConfigPropertyUsageTracker', 'failed to load config properties', error);
       configProperties = [];
     }
 
@@ -84,7 +88,9 @@ export class ConfigPropertyUsageTracker {
             }
           });
           edgesCount++;
-        } catch (e) {}
+          } catch (error) {
+            logResolverWarning('ConfigPropertyUsageTracker', `failed to link @Value key ${configKey} to ${nodeName}`, error);
+          }
       }
 
       // Match @ConfigurationProperties(prefix = "...")
@@ -111,7 +117,9 @@ export class ConfigPropertyUsageTracker {
                 }
               });
               edgesCount++;
-            } catch (e) {}
+            } catch (error) {
+              logResolverWarning('ConfigPropertyUsageTracker', `failed to link @ConfigurationProperties prefix ${prefix} to ${nodeName}`, error);
+            }
           }
         }
       }

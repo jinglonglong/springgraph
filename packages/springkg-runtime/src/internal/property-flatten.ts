@@ -1,11 +1,16 @@
+import type { ConfigArray, ConfigFileContent, ConfigScalar, FlattenedProperties } from '../types.js';
+
 /**
  * Flatten nested map to dotted keys.
  * { spring: { datasource: { url: 'x' } } } → { 'spring.datasource.url': 'x' }
  * Arrays are expanded with index notation:
  * { routes: [{ id: 'a' }, { id: 'b' }] } → { 'routes[0].id': 'a', 'routes[1].id': 'b' }
  */
-export function flattenProperties(obj: any, prefix?: string): Record<string, any> {
-  const result: Record<string, any> = {};
+export function flattenProperties(
+  obj: ConfigScalar | ConfigFileContent | ConfigArray,
+  prefix?: string,
+): FlattenedProperties {
+  const result: FlattenedProperties = {};
 
   if (obj === null || obj === undefined || typeof obj !== 'object') {
     if (prefix) {
@@ -16,7 +21,6 @@ export function flattenProperties(obj: any, prefix?: string): Record<string, any
 
   if (Array.isArray(obj)) {
     if (prefix) {
-      // Expand array elements with indexed keys
       for (let i = 0; i < obj.length; i++) {
         const nested = flattenProperties(obj[i], `${prefix}[${i}]`);
         Object.assign(result, nested);

@@ -1,0 +1,20 @@
+{
+  "request": {
+    "name": "spring_find_feign",
+    "arguments": {
+      "name": "order-service"
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "tool-2",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"found\":false,\"targetService\":\"order-service\",\"client\":null,\"methods\":[]}"
+        }
+      ]
+    }
+  }
+}

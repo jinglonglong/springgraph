@@ -1,0 +1,125 @@
+[
+  {
+    "jsonrpc": "2.0",
+    "id": "init-criteria",
+    "result": {
+      "protocolVersion": "2024-11-05",
+      "capabilities": {
+        "tools": {}
+      },
+      "serverInfo": {
+        "name": "springkg-mcp",
+        "version": "0.1.0"
+      },
+      "instructions": "SpringKG MCP server for Spring Cloud code analysis. Use the spring_* tools to query Spring components."
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": "v1-1-trace-orders",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"found\":true,\"entryPath\":\"/api/orders/summary\",\"steps\":[{\"kind\":\"endpoint\",\"id\":\"endpoint:GET:/api/orders/summary\",\"name\":\"GET /api/orders/summary\"},{\"kind\":\"controller_method\",\"id\":\"controller_method:3fd36185792e3841f3d441af\",\"name\":\"com.example.order.OrderController.summary\"},{\"kind\":\"service\",\"id\":\"service:0062e5ef09a03cfbad1aebbe\",\"name\":\"com.example.order.OrderService.getOrderSummary\"}]}"
+        }
+      ]
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": "v1-2-feign-order-service",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"found\":false,\"targetService\":\"order-service\",\"client\":null,\"methods\":[]}"
+        }
+      ]
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": "v1-4-mq-topic",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"found\":true,\"query\":\"\",\"controller\":{\"className\":\"OrderController\",\"methodName\":\"summary\"},\"service\":{\"className\":\"OrderService\",\"methodName\":\"getOrderSummary\"}}"
+        }
+      ]
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": "v1-5-scheduled",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"found\":true,\"query\":\"\",\"controller\":{\"className\":\"OrderController\",\"methodName\":\"summary\"},\"service\":{\"className\":\"OrderService\",\"methodName\":\"getOrderSummary\"}}"
+        }
+      ]
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": "v1-7-config-password",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"found\":true,\"properties\":[{\"key\":\"spring.datasource.password\",\"value\":\"***\",\"sensitive\":true,\"filePath\":\"D:\\\\code\\\\codegraph-springcloud\\\\examples\\\\springcloud-demo\\\\src\\\\main\\\\resources\\\\application.yml\",\"line\":3,\"beanId\":null}],\"key\":\"spring.datasource.password\",\"definition\":{\"key\":\"spring.datasource.password\",\"value\":\"***\",\"sensitive\":true,\"filePath\":\"D:\\\\code\\\\codegraph-springcloud\\\\examples\\\\springcloud-demo\\\\src\\\\main\\\\resources\\\\application.yml\",\"line\":3}}"
+        }
+      ]
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": "v1-8-feature-chinese",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"found\":false,\"communities\":[]}"
+        }
+      ]
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": "integration-entry-orders",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"found\":true,\"query\":\"/api/orders/summary\",\"controller\":{\"className\":\"OrderController\",\"methodName\":\"summary\"},\"service\":{\"className\":\"OrderService\",\"methodName\":\"getOrderSummary\"},\"endpoints\":[{\"id\":\"endpoint:GET:/api/orders/summary\",\"method\":\"GET\",\"path\":\"/api/orders/summary\",\"controllerClassName\":\"OrderController\",\"controllerMethodName\":\"summary\"}]}"
+        }
+      ]
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": "integration-mapper-order",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"found\":false,\"results\":[],\"mappers\":[{\"namespace\":\"com.example.order.OrderMapper\",\"filePath\":\"D:\\\\code\\\\codegraph-springcloud\\\\examples\\\\springcloud-demo\\\\src\\\\main\\\\java\\\\com\\\\example\\\\order\\\\OrderMapper.java\",\"methods\":[]}]}"
+        }
+      ]
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": "integration-mapper-user",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"found\":false,\"results\":[],\"mappers\":[{\"namespace\":\"com.example.user.UserMapper\",\"filePath\":\"D:\\\\code\\\\codegraph-springcloud\\\\examples\\\\springcloud-demo\\\\src\\\\main\\\\java\\\\com\\\\example\\\\user\\\\UserMapper.java\",\"methods\":[]}]}"
+        }
+      ]
+    }
+  }
+]

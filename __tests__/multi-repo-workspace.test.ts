@@ -21,6 +21,7 @@ import * as os from 'os';
 import { execFileSync } from 'child_process';
 import CodeGraph from '../src/index';
 import { scanDirectory, buildScopeIgnore, discoverEmbeddedRepoRoots } from '../src/extraction';
+import { removeDirWithRetries, safeCloseCodeGraph } from './setup';
 
 function git(cwd: string, ...args: string[]): void {
   execFileSync('git', args, { cwd, stdio: ['ignore', 'ignore', 'ignore'] });
@@ -40,13 +41,18 @@ function write(file: string, content: string): void {
 
 describe('multi-repo workspaces (#514)', () => {
   let ws: string;
+  let activeCg: CodeGraph | undefined;
 
   beforeEach(() => {
     ws = fs.mkdtempSync(path.join(os.tmpdir(), 'cg-multirepo-'));
   });
 
   afterEach(() => {
-    fs.rmSync(ws, { recursive: true, force: true });
+    return (async () => {
+      await safeCloseCodeGraph(activeCg);
+      activeCg = undefined;
+      await removeDirWithRetries(ws);
+    })();
   });
 
   it('indexes embedded repos hidden by the super-repo .gitignore', () => {
@@ -209,19 +215,20 @@ describe('multi-repo workspaces (#514)', () => {
     write(path.join(ws, '.gitignore'), '/packages/\n');
     makeRepo(ws);
 
-    const cg = CodeGraph.initSync(ws, { config: { include: ['**/*.ts'], exclude: [] } });
+    activeCg = CodeGraph.initSync(ws, { config: { include: ['**/*.ts'], exclude: [] } });
     try {
-      await cg.indexAll();
-      expect(cg.searchNodes('login', { limit: 5 }).length).toBeGreaterThan(0);
+      await activeCg.indexAll();
+      expect(activeCg.searchNodes('login', { limit: 5 }).length).toBeGreaterThan(0);
 
       // Change inside the embedded repo — invisible to the parent's `git status`.
       write(path.join(ws, 'packages/proj-a/src/auth.ts'),
         'export function login() { return 1; }\nexport function logout() { return 0; }\n');
-      await cg.sync();
+      await activeCg.sync();
 
-      expect(cg.searchNodes('logout', { limit: 5 }).length).toBeGreaterThan(0);
+      expect(activeCg.searchNodes('logout', { limit: 5 }).length).toBeGreaterThan(0);
     } finally {
-      cg.destroy();
+      await safeCloseCodeGraph(activeCg);
+      activeCg = undefined;
     }
-  });
+  }, 15000);
 });

@@ -15,12 +15,13 @@
  * These tests drive the real stdio transport via a spawned subprocess — no
  * mocking — so they also exercise the new bidirectional request/response path.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { CodeGraph } from '../src';
+import { removeDirWithRetries, safeCloseCodeGraph, terminateChild } from './setup';
 
 const BIN = path.resolve(__dirname, '../dist/bin/codegraph.js');
 
@@ -85,17 +86,17 @@ describe('MCP project resolution via roots/list (issue #196)', () => {
   });
 
   afterEach(() => {
-    if (child && !child.killed) {
-      child.kill('SIGKILL');
+    return (async () => {
+      await terminateChild(child);
       child = null;
-    }
-    fs.rmSync(cwdDir, { recursive: true, force: true });
-    fs.rmSync(projectDir, { recursive: true, force: true });
+      await removeDirWithRetries(cwdDir);
+      await removeDirWithRetries(projectDir);
+    })();
   });
 
   it('resolves the project from the client roots/list when no rootUri is sent', async () => {
     const cg = await CodeGraph.init(projectDir);
-    cg.close();
+    await safeCloseCodeGraph(cg);
 
     child = spawnServer(cwdDir);
     const messages = collectMessages(child);
@@ -152,7 +153,7 @@ describe('MCP project resolution via roots/list (issue #196)', () => {
 
   it('honors an explicit rootUri without asking the client for roots', async () => {
     const cg = await CodeGraph.init(projectDir);
-    cg.close();
+    await safeCloseCodeGraph(cg);
 
     child = spawnServer(cwdDir);
     const messages = collectMessages(child);
@@ -177,4 +178,8 @@ describe('MCP project resolution via roots/list (issue #196)', () => {
     // rootUri is a stronger signal than roots — we never needed to ask.
     expect(messages.some((m) => m.method === 'roots/list')).toBe(false);
   }, 20000);
+
+  afterAll(async () => {
+    await terminateChild(child);
+  });
 });

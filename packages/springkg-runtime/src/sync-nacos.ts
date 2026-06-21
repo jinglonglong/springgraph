@@ -1,4 +1,10 @@
 import { NacosConfigResolver } from './nacos-config-resolver.js';
+import type {
+  RuntimeConfigPropertyRecord,
+  SpringKgEdgeInput,
+  SpringKgLike,
+  SpringKgSymbolInput,
+} from './types.js';
 
 export interface SyncNacosOptions {
   dryRun?: boolean;
@@ -52,11 +58,12 @@ export async function runSyncNacos(
  * Create a mock kg that doesn't persist for dry runs
  */
 function createDryRunKg() {
+  const noop = async (): Promise<void> => {};
   return {
-    upsertSymbol: async () => { },
-    upsertEdge: async () => { },
-    recordConfigProperty: async () => { }
-  };
+    upsertSymbol: async (_symbol: SpringKgSymbolInput) => noop(),
+    upsertEdge: async (_edge: SpringKgEdgeInput) => noop(),
+    recordConfigProperty: async (_prop: RuntimeConfigPropertyRecord) => noop(),
+  } satisfies SpringKgLike;
 }
 
 /**
@@ -64,15 +71,10 @@ function createDryRunKg() {
  */
 function createRealKg() {
   // This would be provided by Team A's SpringKg class
+  const noop = async (): Promise<void> => {};
   return {
-    upsertSymbol: async (_symbol: any) => {
-      // Real implementation would persist to springkg.db
-    },
-    upsertEdge: async (_edge: any) => {
-      // Real implementation would persist to springkg.db
-    },
-    recordConfigProperty: async (_prop: any) => {
-      // Real implementation would persist to springkg.db
-    }
-  };
+    upsertSymbol: async (_symbol: SpringKgSymbolInput) => noop(),
+    upsertEdge: async (_edge: SpringKgEdgeInput) => noop(),
+    recordConfigProperty: async (_prop: RuntimeConfigPropertyRecord) => noop(),
+  } satisfies SpringKgLike;
 }

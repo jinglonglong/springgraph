@@ -1,0 +1,16 @@
+{
+  "request": {
+    "name": "spring_module_summary",
+    "arguments": {
+      "module": "user"
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "tool-12",
+    "error": {
+      "code": -32602,
+      "message": "Unknown tool: spring_module_summary"
+    }
+  }
+}

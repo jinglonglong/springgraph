@@ -10,7 +10,7 @@
  * isError responses teach an agent to abandon codegraph for the whole
  * session; that observed failure mode is what this suite guards.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -146,6 +146,13 @@ describe('Unindexed-workspace session policy', () => {
     // PRESENT", in contrast to the unindexed empty list above.
     expect(tools.length).toBeGreaterThanOrEqual(3);
     expect(tools.map((t) => t.name)).toContain('codegraph_explore');
+  });
+
+  afterAll(async () => {
+    if (child) {
+      child.kill('SIGKILL');
+      child = null;
+    }
   });
 });
 

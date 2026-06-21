@@ -1,0 +1,4 @@
+[springkg-mcp] Seeded springkg.db (symbols=17, endpoints=1, feign=0, sql=0, config=14)
+[springkg-mcp] Server started for project: D:\code\codegraph-springcloud\examples\springcloud-demo
+(node:16736) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)

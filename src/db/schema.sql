@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS nodes (
     is_static INTEGER DEFAULT 0,
     is_abstract INTEGER DEFAULT 0,
     decorators TEXT, -- JSON array
+    metadata TEXT, -- JSON object (role, layer, module, etc. from architecture engine)
     type_parameters TEXT, -- JSON array
     return_type TEXT, -- normalized return/result type name (e.g. C++ method return, for receiver-type inference)
     updated_at INTEGER NOT NULL

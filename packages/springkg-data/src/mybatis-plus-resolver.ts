@@ -21,7 +21,7 @@ export class MyBatisPlusResolver {
     const tableMap = new Map<string, SpringKgNode>();
 
     for (const cls of classes) {
-      if (cls.kind !== 'class') continue;
+      if ((cls.kind as string) !== 'class') continue;
 
       const decorators = cls.metadata?.decorators as string[] ?? [];
       const hasTableName = decorators.some((d: string) => d.includes('@TableName'));

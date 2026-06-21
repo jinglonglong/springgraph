@@ -1,0 +1,20 @@
+{
+  "request": {
+    "name": "spring_find_config",
+    "arguments": {
+      "key": "spring.application.name"
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "tool-6",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"found\":true,\"properties\":[{\"key\":\"spring.application.name\",\"value\":\"springcloud-demo\",\"sensitive\":false,\"filePath\":\"D:\\\\code\\\\codegraph-springcloud\\\\examples\\\\springcloud-demo\\\\src\\\\main\\\\resources\\\\application.yml\",\"line\":2,\"beanId\":null}],\"key\":\"spring.application.name\",\"definition\":{\"key\":\"spring.application.name\",\"value\":\"springcloud-demo\",\"sensitive\":false,\"filePath\":\"D:\\\\code\\\\codegraph-springcloud\\\\examples\\\\springcloud-demo\\\\src\\\\main\\\\resources\\\\application.yml\",\"line\":2}}"
+        }
+      ]
+    }
+  }
+}

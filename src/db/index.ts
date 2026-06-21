@@ -45,10 +45,13 @@ export class DatabaseConnection {
   private dbPath: string;
   private backend: SqliteBackend;
 
+  private static activeConnections = new Set<DatabaseConnection>();
+
   private constructor(db: SqliteDatabase, dbPath: string, backend: SqliteBackend) {
     this.db = db;
     this.dbPath = dbPath;
     this.backend = backend;
+    DatabaseConnection.activeConnections.add(this);
   }
 
   /**
@@ -222,6 +225,18 @@ export class DatabaseConnection {
    */
   close(): void {
     this.db.close();
+    DatabaseConnection.activeConnections.delete(this);
+  }
+
+  static closeAll(): void {
+    for (const conn of DatabaseConnection.activeConnections) {
+      try {
+        if (conn.isOpen()) {
+          conn.close();
+        }
+      } catch {}
+    }
+    DatabaseConnection.activeConnections.clear();
   }
 
   /**

@@ -1,0 +1,16 @@
+{
+  "request": {
+    "name": "spring_field_impact",
+    "arguments": {
+      "symbol": "com.example.user.UserEntity.name"
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "tool-11",
+    "error": {
+      "code": -32602,
+      "message": "Unknown tool: spring_field_impact"
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "request": {
+    "name": "spring_search_feature",
+    "arguments": {
+      "query": "order"
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "tool-9",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"found\":true,\"communities\":[{\"name\":\"OrderService-management\",\"description\":\"Spring assets discovered under com.example.order.OrderService\",\"members\":[\"cleanupExpired\",\"getOrderSummary\"]},{\"name\":\"order-management\",\"description\":\"Spring assets discovered under com.example.order\",\"members\":[\"OrderClient\",\"OrderController\",\"OrderMapper\"]}]}"
+        }
+      ]
+    }
+  }
+}

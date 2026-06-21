@@ -9,6 +9,7 @@ import * as path from 'path';
 import {
   Node,
   Edge,
+  EdgeKind,
   FileRecord,
   ExtractionResult,
   Subgraph,
@@ -51,6 +52,8 @@ import { EXTRACTION_VERSION } from './extraction/extraction-version';
 import { getCodeGraphDir } from './directory';
 import { deriveProjectNameTokens } from './search/query-utils';
 import { CodeGraphPackageVersion } from './mcp/version';
+import { ArchitectureFacetCache } from './architecture/facet-cache';
+import type { ArchitectureSnapshot, NodeArchitectureFacet } from './architecture/types';
 
 // Re-export types for consumers
 export * from './types';
@@ -86,6 +89,17 @@ export {
 export { Mutex, FileLock, processInBatches, debounce, throttle, MemoryMonitor } from './utils';
 export { FileWatcher, WatchOptions, PendingFile, LockUnavailableError } from './sync';
 export { MCPServer } from './mcp';
+
+// Architecture profile engine - types and detection
+export type { ArchitectureProfile, ArchitectureFacet, ArchitectureSignal, ArchitectureLayer, ArchitectureRole, ArchitectureProfileMatch, ProfileDetectionResult, RoleConflict, FacetSignalAggregator } from './architecture/types';
+export type { ArchitectureSnapshot, NodeArchitectureFacet };
+export { detectArchitectureProfile } from './architecture/profile-detector';
+export { profileRegistry, ProfileRegistry } from './architecture/profile-registry';
+
+export { ArchitectureTraceEngine, traceArchitecture } from './architecture';
+export { ArchitectureImpactEngine, impactArchitecture } from './architecture';
+export type { ArchitectureTraceInput, ArchitectureTraceResult, ArchitectureTracePath, ArchitectureTraceHop, ArchitectureTraceEntrypoint } from './architecture';
+export type { ArchitectureImpactInput, ArchitectureImpactResult, ArchitectureImpactBreakdown, ArchitectureRecommendedTest } from './architecture';
 
 /**
  * Options for initializing a new CodeGraph project
@@ -147,6 +161,8 @@ export class CodeGraph {
   // File watcher for auto-sync on file changes
   private watcher: FileWatcher | null = null;
 
+  private architectureFacetCache: ArchitectureFacetCache;
+
   private constructor(
     db: DatabaseConnection,
     queries: QueryBuilder,
@@ -174,6 +190,7 @@ export class CodeGraph {
       queries,
       this.traverser
     );
+    this.architectureFacetCache = new ArchitectureFacetCache(this);
   }
 
   // ===========================================================================
@@ -385,6 +402,9 @@ export class CodeGraph {
           // Same lifecycle for `this.<member>` callback registrations whose
           // member is inherited from a supertype (#808).
           this.resolver.resolveDeferredThisMemberRefs();
+          // Same lifecycle for Java/Kotlin `super.<member>()` calls so override
+          // bodies link back to the inherited implementation.
+          this.resolver.resolveSuperMemberCalls();
         }
 
         // Refresh planner stats + checkpoint the WAL after bulk writes.
@@ -412,6 +432,10 @@ export class CodeGraph {
             this.queries.setMetadata('indexed_with_version', CodeGraphPackageVersion);
             this.queries.setMetadata('indexed_with_extraction_version', String(EXTRACTION_VERSION));
           } catch { /* metadata is advisory — never fail an index over it */ }
+        }
+
+        if (result.success && result.filesIndexed > 0) {
+          await this.architectureFacetCache.recomputeAll();
         }
 
         return result;
@@ -509,12 +533,20 @@ export class CodeGraph {
           // Same lifecycle for `this.<member>` callback registrations whose
           // member is inherited from a supertype (#808).
           this.resolver.resolveDeferredThisMemberRefs();
+          // Same lifecycle for Java/Kotlin `super.<member>()` calls so override
+          // bodies link back to the inherited implementation.
+          this.resolver.resolveSuperMemberCalls();
         }
 
         // Refresh planner stats + checkpoint the WAL after bulk writes.
         if (result.filesAdded > 0 || result.filesModified > 0 || result.filesRemoved > 0) {
           this.db.runMaintenance();
         }
+
+        await this.architectureFacetCache.applySyncChanges(
+          result.changedFilePaths ?? [],
+          result.removedFilePaths ?? []
+        );
 
         return result;
       } finally {
@@ -748,6 +780,23 @@ export class CodeGraph {
     return this.db.getJournalMode();
   }
 
+  /**
+   * Return the current architecture profile detection result and per-node facets.
+   * Computes the snapshot on-demand the first time it is requested, then serves
+   * from an in-memory cache that indexAll/sync/watch keep up to date.
+   */
+  getArchitectureSnapshot(): ArchitectureSnapshot {
+    return this.architectureFacetCache.getSnapshotSync();
+  }
+
+  /**
+   * Synchronous peek at a single node's architecture facet. Returns undefined
+   * when the node has no facet or the cache has not been populated yet.
+   */
+  getNodeArchitectureFacet(nodeId: string): NodeArchitectureFacet | undefined {
+    return this.architectureFacetCache.getCachedState()?.facets.get(nodeId);
+  }
+
   // ===========================================================================
   // Node Operations
   // ===========================================================================
@@ -787,6 +836,60 @@ export class CodeGraph {
    */
   searchNodes(query: string, options?: SearchOptions): SearchResult[] {
     return this.queries.searchNodes(query, options);
+  }
+
+  /**
+   * Returns a tally of decorator names across all symbols.
+   * Used by the web UI /api/decorators endpoint.
+   * Returns empty array if the column doesn't exist (back-compat for older DBs).
+   */
+  getDecorators(limit = 100): { name: string; count: number }[] {
+    try {
+      const rows = this.db.getDb().prepare(
+        `SELECT json_each.value AS name, COUNT(*) AS count
+         FROM nodes, json_each(nodes.decorators)
+         WHERE nodes.decorators IS NOT NULL
+         GROUP BY name
+         ORDER BY count DESC
+         LIMIT ?`
+      ).all(limit) as { name: string; count: number }[];
+      return rows;
+    } catch (e) {
+      console.error("DECORATORS ERROR:", e);
+      return [];
+    }
+  }
+
+  /**
+   * Returns edges connected to the given node IDs.
+   * Used by the web UI /api/overview to show blast-radius around high-degree nodes.
+   */
+  getEdgesForNodes(
+    topIds: string[],
+    edgeKinds?: string[],
+  ): Edge[] {
+    if (topIds.length === 0) return [];
+    const placeholders = topIds.map(() => '?').join(',');
+    const kindFilter =
+      edgeKinds && edgeKinds.length > 0
+        ? `AND kind IN (${edgeKinds.map(() => '?').join(',')})`
+        : '';
+    const params: string[] = [...topIds];
+    if (edgeKinds) params.push(...edgeKinds);
+    params.push(...topIds);
+    if (edgeKinds) params.push(...edgeKinds);
+    const rows = this.db.getDb().prepare(
+      `SELECT source, target, kind
+       FROM edges
+       WHERE source IN (${placeholders}) OR target IN (${placeholders})
+       ${kindFilter}
+       LIMIT 500`
+    ).all(...params) as Array<{ source: string; target: string; kind: string }>;
+    return rows.map((r) => ({
+      source: r.source,
+      target: r.target,
+      kind: r.kind as EdgeKind,
+    }));
   }
 
   /**

@@ -1,32 +1,13 @@
 package com.example.user;
 
+import com.example.user.dto.UserCreateRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 
 @Service
 public class UserService {
-
-    private final UserMapper userMapper;
-
-    public UserService(UserMapper userMapper) {
-        this.userMapper = userMapper;
-    }
-
-    public String findById(Long id) {
-        return userMapper.selectById(id);
-    }
-
-    public String findAll() {
-        return userMapper.selectAll();
-    }
-
-    @Transactional
-    public String insert(UserEntity user) {
-        return userMapper.insertUser(user);
-    }
-
-    @Transactional
-    public String update(UserEntity user) {
-        return userMapper.updateUser(user);
-    }
+  private final UserMapper userMapper; public UserService(UserMapper userMapper) { this.userMapper = userMapper; }
+  public List<UserEntity> findAll() { return userMapper.findAll(); }
+  @Transactional public UserEntity create(UserCreateRequest request) { UserEntity user = new UserEntity(request.name(), request.email()); userMapper.insertUser(user); return user; }
 }

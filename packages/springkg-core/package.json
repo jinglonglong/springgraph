@@ -5,11 +5,15 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc && npm run copy-assets",
-    "copy-assets": "node -e \"const fs=require('fs'),path=require('path');fs.mkdirSync('dist/db',{recursive:true});fs.mkdirSync('dist/community',{recursive:true});fs.copyFileSync('src/db/schema.sql','dist/db/springkg-schema.sql');fs.mkdirSync('dist/db/migrations',{recursive:true});fs.readdirSync('src/db/migrations').forEach(f=>fs.copyFileSync(path.join('src/db/migrations',f),path.join('dist/db/migrations',f)));fs.readdirSync('src/community').forEach(f=>fs.copyFileSync(path.join('src/community',f),path.join('dist/community',f)))\""
+    "build": "tsc && npm run copy-assets && node ../springkg-shared/scripts/fix-esm-extensions.mjs dist",
+    "copy-assets": "node -e \"const fs=require('fs'),path=require('path');fs.mkdirSync('dist/db',{recursive:true});fs.mkdirSync('dist/community',{recursive:true});fs.copyFileSync('src/db/schema.sql','dist/db/schema.sql');fs.mkdirSync('dist/db/migrations',{recursive:true});fs.readdirSync('src/db/migrations').forEach(f=>fs.copyFileSync(path.join('src/db/migrations',f),path.join('dist/db/migrations',f)));fs.readdirSync('src/community').forEach(f=>fs.copyFileSync(path.join('src/community',f),path.join('dist/community',f)))\""
   },
   "dependencies": {
-    "@colbymchenry/springkg-shared": "0.1.0"
+    "@colbymchenry/springkg-community": "0.1.0",
+    "@colbymchenry/springkg-shared": "0.1.0",
+    "@colbymchenry/springkg-semantic": "0.1.0",
+    "@colbymchenry/springkg-data": "0.1.0",
+    "@springkg/runtime": "0.1.0"
   },
   "peerDependencies": {
     "@colbymchenry/codegraph": ">=0.9.0 <1.0.0"

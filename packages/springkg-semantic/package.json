@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc && node ../springkg-shared/scripts/fix-esm-extensions.mjs dist"
   },
   "dependencies": {
     "@colbymchenry/springkg-shared": "0.1.0"

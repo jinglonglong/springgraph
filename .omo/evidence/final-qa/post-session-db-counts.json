@@ -1,0 +1,24 @@
+{
+  "tables": [
+    "feature_communities",
+    "feature_community_members",
+    "runtime_config_properties",
+    "schema_versions",
+    "spring_edges",
+    "spring_endpoints",
+    "spring_feign_clients",
+    "spring_sql_statements",
+    "spring_symbols"
+  ],
+  "counts": {
+    "feature_communities": 4,
+    "feature_community_members": 9,
+    "runtime_config_properties": 14,
+    "schema_versions": 1,
+    "spring_edges": 12,
+    "spring_endpoints": 1,
+    "spring_feign_clients": 0,
+    "spring_sql_statements": 0,
+    "spring_symbols": 17
+  }
+}

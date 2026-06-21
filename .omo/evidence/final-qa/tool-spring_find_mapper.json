@@ -1,0 +1,20 @@
+{
+  "request": {
+    "name": "spring_find_mapper",
+    "arguments": {
+      "namespace": "com.example.user.UserMapper"
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "tool-5",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"found\":false,\"results\":[],\"mappers\":[{\"namespace\":\"com.example.user.UserMapper\",\"filePath\":\"D:\\\\code\\\\codegraph-springcloud\\\\examples\\\\springcloud-demo\\\\src\\\\main\\\\java\\\\com\\\\example\\\\user\\\\UserMapper.java\",\"methods\":[]}]}"
+        }
+      ]
+    }
+  }
+}

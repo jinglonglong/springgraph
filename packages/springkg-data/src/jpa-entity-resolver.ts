@@ -16,7 +16,7 @@ export class JPAEntityResolver {
     const edges: SpringKgEdge[] = [];
 
     for (const entity of entities) {
-      if (entity.kind !== 'class') continue;
+      if ((entity.kind as string) !== 'class') continue;
 
       const decorators = entity.metadata?.decorators as string[] ?? [];
       const hasEntity = decorators.some((d: string) => d.includes('@Entity'));

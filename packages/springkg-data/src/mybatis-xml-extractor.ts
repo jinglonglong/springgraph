@@ -194,7 +194,10 @@ export class MyBatisXmlExtractor {
 
   private attrs(raw: string): Record<string, string> {
     const out: Record<string, string> = {};
-    for (const match of raw.matchAll(ATTR)) out[match[1]] = match[2];
+    for (const match of raw.matchAll(ATTR)) {
+      const k = match[1];
+      if (k) out[k] = match[2] || '';
+    }
     return out;
   }
 

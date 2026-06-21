@@ -247,7 +247,7 @@ Loaded via `js-yaml` (already in deps per `package.json`) and a small hand-rolle
 
 ### 5.2 Tasks
 
-- [ ] 1. [D] **T15 — ConfigResolver**: implement `config-resolver.ts`
+- [x] 1. [D] **T15 — ConfigResolver**: implement `config-resolver.ts`
   - **What to do**:
     1. Implement `ConfigResolver.enhance(input: SpringKgEnhanceInput): Promise<SpringKgEnhanceOutput>` in `packages/springkg-runtime/src/config-resolver.ts`.
     2. Scan all matching config files (8 patterns above) under `projectPath/src/main/resources` (and `src/test/resources` if a profile name like `test` exists; skip in production paths).
@@ -288,7 +288,7 @@ Loaded via `js-yaml` (already in deps per `package.json`) and a small hand-rolle
     ```
   - **Evidence**: `.omo/evidence/team-d/task-15-config-resolver.txt` — paste test output + sqlite query result.
 
-- [ ] 2. [D] **T16 — MiddlewareInventory**: implement `middleware-inventory.ts`
+- [x] 2. [D] **T16 — MiddlewareInventory**: implement `middleware-inventory.ts`
   - **What to do**:
     1. Read `runtime_config_properties` (already populated by T15) filtered by keys starting with one of:
        - `spring.datasource.` → `middlewareKind='database'`, subtype inferred from `url` (`jdbc:mysql://` → `mysql`, `jdbc:postgresql://` → `postgres`, `jdbc:oracle://` → `oracle`, `jdbc:sqlserver://` → `sqlserver`).
@@ -318,7 +318,7 @@ Loaded via `js-yaml` (already in deps per `package.json`) and a small hand-rolle
     ```
   - **Evidence**: `.omo/evidence/team-d/task-16-middleware-inventory.txt`.
 
-- [ ] 3. [D] **T37 — NacosConfigResolver**: implement `nacos-config-resolver.ts`
+- [x] 3. [D] **T37 — NacosConfigResolver**: implement `nacos-config-resolver.ts`
   - **What to do**:
     1. Scan same YAML/properties files (reuse `yaml-loader.ts` + `property-flatten.ts`).
     2. Extract `spring.cloud.nacos.discovery.*` and `spring.cloud.nacos.config.*` namespaces.
@@ -349,7 +349,7 @@ Loaded via `js-yaml` (already in deps per `package.json`) and a small hand-rolle
     ```
   - **Evidence**: `.omo/evidence/team-d/task-37-nacos.txt`.
 
-- [ ] 4. [D] **T38 — ConfigPropertyUsageTracker**: implement `config-usage-tracker.ts`
+- [x] 4. [D] **T38 — ConfigPropertyUsageTracker**: implement `config-usage-tracker.ts`
   - **What to do**:
     1. Query `codegraph.db.nodes` (NOT `springkg.db`) via Team A's `kg.codegraph.findNodes({ decoratorPattern: '@Value|@ConfigurationProperties' })`.
     2. For `@Value("${some.key}")`:
@@ -376,7 +376,7 @@ Loaded via `js-yaml` (already in deps per `package.json`) and a small hand-rolle
     ```
   - **Evidence**: `.omo/evidence/team-d/task-38-config-usage.txt`.
 
-- [ ] 5. [D] **T39 — GatewayRouteResolver**: implement `gateway-route-resolver.ts`
+- [x] 5. [D] **T39 — GatewayRouteResolver**: implement `gateway-route-resolver.ts`
   - **What to do**:
     1. Scan all `application.yml` / `bootstrap.yml` (any service whose `spring.application.name` is `*-gateway` OR which has `spring.cloud.gateway` block) for `spring.cloud.gateway.routes[]`.
     2. For each route entry:
@@ -408,7 +408,7 @@ Loaded via `js-yaml` (already in deps per `package.json`) and a small hand-rolle
     ```
   - **Evidence**: `.omo/evidence/team-d/task-39-gateway.txt`.
 
-- [ ] 6. [D] **T63 — `springkg sync-nacos [path]` CLI command**: implement `sync-nacos.ts`
+- [x] 6. [D] **T63 — `springkg sync-nacos [path]` CLI command**: implement `sync-nacos.ts`
   - **What to do**:
     1. Implement `runSyncNacos(projectPath: string, options: { dryRun?: boolean; profile?: string }): Promise<{ scanned: number; added: number; updated: number; removed: number }>` in `packages/springkg-runtime/src/sync-nacos.ts`.
     2. This is a thin wrapper around `NacosConfigResolver.enhance()` (T37) — invokes the resolver, reports counts by kind, exits 0 on success / 1 on error.
@@ -635,14 +635,16 @@ git diff --stat main  # only packages/springkg-runtime/** and .omo/evidence/team
 
 ## 10. Definition of Done (Team D)
 
-- [ ] All 6 tasks (T15, T16, T37, T38, T39, T63) implemented with tests passing.
-- [ ] 6 evidence files in `.omo/evidence/team-d/`.
-- [ ] `npx vitest run` in `packages/springkg-runtime` → 0 failures.
-- [ ] `npx tsc --noEmit` → 0 errors.
+- [x] All 6 tasks (T15, T16, T37, T38, T39, T63) implemented with tests passing.
+- [x] 6 evidence files in `.omo/evidence/team-d/`.
+- [x] `npx vitest run` in `packages/springkg-runtime` → 0 failures.
+- [x] `npx tsc --noEmit` → 0 errors.
 - [ ] Demo project (`examples/springcloud-demo`) integration test passes — sqlite has rows in `runtime_config_properties` and `spring_symbols(kind IN {config_property, middleware, nacos_*, gateway_route})`.
 - [ ] Zero plaintext sensitive values in DB (verified via `sqlite3` query).
-- [ ] Only writes `config_property`, `middleware`, `nacos_cluster`, `nacos_config`, `nacos_service`, `gateway_route` kinds (no other teams' kinds leaked).
-- [ ] Only writes `CONNECTS_TO`, `LOADS_CONFIG`, `ROUTES_TO`, `MATCHES_PATH`, `USED_BY` edges (no other teams' edges leaked).
-- [ ] `packages/codegraph/**` UNTOUCHED (verified by `git diff main -- packages/codegraph/`).
-- [ ] No files outside `packages/springkg-runtime/**` modified (except the optional 10-line CLI shim in `packages/springkg-cli/src/commands/sync-nacos.ts`).
+- [x] Only writes `config_property`, `middleware`, `nacos_cluster`, `nacos_config`, `nacos_service`, `gateway_route` kinds (no other teams' kinds leaked).
+- [x] Only writes `CONNECTS_TO`, `LOADS_CONFIG`, `ROUTES_TO`, `MATCHES_PATH`, `USED_BY` edges (no other teams' edges leaked).
+- [x] `packages/codegraph/**` UNTOUCHED (verified by `git diff main -- packages/codegraph/`).
+- [x] No files outside `packages/springkg-runtime/**` modified (except the optional 10-line CLI shim in `packages/springkg-cli/src/commands/sync-nacos.ts`).
 - [ ] PR `team-d-runtime` reviewed by at least one Team A reviewer (for API contract compliance).
+
+**Note**: Items 5-6 (Demo project integration test and sensitive value verification) require `examples/springcloud-demo` to be set up, which is Team G's responsibility. Item 9 requires Team A code review.**

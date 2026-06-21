@@ -26,7 +26,6 @@ export class SqlWriter {
     for (const input of inputs) {
       // Table symbols
       for (const table of input.tables) {
-        const tableId = this.tableId(input.sqlStatement.xmlPath, table.name);
         byKind[table.name] = (byKind[table.name] ?? 0) + 1;
         symbolsAdded.table++;
         edgesAdded[table.access === 'READ' ? 'READS_TABLE' : 'WRITES_TABLE']++;
@@ -48,10 +47,5 @@ export class SqlWriter {
       edgesAdded: totalEdges,
       byKind,
     };
-  }
-
-  private tableId(xmlPath: string, tableName: string): string {
-    const crypto = require('node:crypto') as typeof import('node:crypto');
-    return `table:${crypto.createHash('sha256').update(`${xmlPath}|${tableName}`).digest('hex').slice(0, 16)}`;
   }
 }

@@ -1,10 +1,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
+import type { ConfigFileContent } from '../types.js';
+import { logResolverWarning } from '../types.js';
 
 export interface ConfigFile {
   path: string;
-  content: Record<string, any>;
+  content: ConfigFileContent;
   profile?: string;
   priority: number;
 }
@@ -14,8 +16,8 @@ export interface ConfigFile {
 /**
  * Parse .properties file content into key-value pairs
  */
-function parseProperties(content: string): Record<string, any> {
-  const result: Record<string, any> = {};
+function parseProperties(content: string): ConfigFileContent {
+  const result: ConfigFileContent = {};
   const lines = content.split('\n');
 
   for (const line of lines) {
@@ -80,14 +82,19 @@ function determinePriority(filename: string, profile?: string): number {
 /**
  * Load and parse a config file
  */
-function loadFile(filePath: string): Record<string, any> | null {
+function loadFile(filePath: string): ConfigFileContent | null {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
     if (filePath.endsWith('.properties')) {
       return parseProperties(content);
     }
-    return yaml.load(content) as Record<string, any>;
-  } catch (e) {
+    const loaded = yaml.load(content);
+    if (!loaded || typeof loaded !== 'object' || Array.isArray(loaded)) {
+      return {};
+    }
+    return loaded as ConfigFileContent;
+  } catch (error) {
+    logResolverWarning('YamlLoader', `failed to load config file ${filePath}`, error);
     return null;
   }
 }

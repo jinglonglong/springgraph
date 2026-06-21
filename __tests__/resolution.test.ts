@@ -17,6 +17,7 @@ import type { UnresolvedRef } from '../src/resolution/types';
 import { detectFrameworks, getAllFrameworkResolvers } from '../src/resolution/frameworks';
 import { QueryBuilder } from '../src/db/queries';
 import { DatabaseConnection } from '../src/db';
+import { removeDirWithRetries, safeCloseCodeGraph } from './setup';
 
 describe('Resolution Module', () => {
   let tempDir: string;
@@ -28,12 +29,11 @@ describe('Resolution Module', () => {
   });
 
   afterEach(() => {
-    // Clean up
-    if (cg) {
-      cg.destroy();
-    } else if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true });
-    }
+    return (async () => {
+      await safeCloseCodeGraph(cg);
+      cg = undefined as unknown as CodeGraph;
+      await removeDirWithRetries(tempDir);
+    })();
   });
 
   describe('Name Matcher', () => {
@@ -1996,6 +1996,7 @@ func main() {
             and src.kind = 'file'
             and src.file_path = 'src/main.cpp'
         `).all() as Array<{ dstKind: string; dstPath: string }>;
+        db.close();
         const resolvedToHeader = rows.find(
           (r) => r.dstKind === 'file' && r.dstPath === 'include/utils.h'
         );
@@ -2006,7 +2007,9 @@ func main() {
         );
         expect(stdlibFile).toBeUndefined();
       } finally {
-        fs.rmSync(tempProject, { recursive: true, force: true });
+        await safeCloseCodeGraph(cg);
+        cg = undefined as unknown as CodeGraph;
+        await removeDirWithRetries(tempProject);
       }
     });
   });
@@ -2060,12 +2063,15 @@ func main() {
             and src.kind = 'file'
             and src.file_path = 'src/page.php'
         `).all() as Array<{ dstKind: string; dstPath: string }>;
+        db.close();
         const resolved = rows.find(
           (r) => r.dstKind === 'file' && r.dstPath === 'src/lib.php'
         );
         expect(resolved, 'page.php → src/lib.php imports edge missing').toBeDefined();
       } finally {
-        fs.rmSync(tempProject, { recursive: true, force: true });
+        await safeCloseCodeGraph(cg);
+        cg = undefined as unknown as CodeGraph;
+        await removeDirWithRetries(tempProject);
       }
     });
 
@@ -2094,12 +2100,15 @@ func main() {
             and src.kind = 'file'
             and src.file_path = 'index.php'
         `).all() as Array<{ dstKind: string; dstPath: string }>;
+        db.close();
         expect(
           rows.find((r) => r.dstKind === 'file' && r.dstPath === 'inc/db.php'),
           'index.php → inc/db.php imports edge missing'
         ).toBeDefined();
       } finally {
-        fs.rmSync(tempProject, { recursive: true, force: true });
+        await safeCloseCodeGraph(cg);
+        cg = undefined as unknown as CodeGraph;
+        await removeDirWithRetries(tempProject);
       }
     });
 
@@ -2133,12 +2142,15 @@ func main() {
             and src.kind = 'file'
             and src.file_path = 'app/page.php'
         `).all() as Array<{ dstKind: string; dstPath: string }>;
+        db.close();
         expect(
           rows.find((r) => r.dstKind === 'file' && r.dstPath === 'lib/inc/db.php'),
           'app/page.php must NOT mis-connect to unrelated lib/inc/db.php'
         ).toBeUndefined();
       } finally {
-        fs.rmSync(tempProject, { recursive: true, force: true });
+        await safeCloseCodeGraph(cg);
+        cg = undefined as unknown as CodeGraph;
+        await removeDirWithRetries(tempProject);
       }
     });
   });

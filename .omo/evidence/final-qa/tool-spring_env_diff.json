@@ -1,0 +1,17 @@
+{
+  "request": {
+    "name": "spring_env_diff",
+    "arguments": {
+      "left": "dev",
+      "right": "prod"
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "tool-15",
+    "error": {
+      "code": -32602,
+      "message": "Unknown tool: spring_env_diff"
+    }
+  }
+}

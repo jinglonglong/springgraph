@@ -77,9 +77,12 @@ export class SpringKg {
    */
   static async init(options: SpringKgOptions): Promise<SpringKg> {
     // Dynamic import of CodeGraph (peer dependency)
-    const { CodeGraph } = await import('@colbymchenry/codegraph');
+    const cgModule = await import('@colbymchenry/codegraph');
+    const CodeGraph = (cgModule as any).CodeGraph || (cgModule as any).default?.CodeGraph || (cgModule as any).default;
 
-    const cg = await CodeGraph.init(options.projectPath);
+    const cg = CodeGraph.isInitialized(options.projectPath)
+      ? await CodeGraph.open(options.projectPath)
+      : await CodeGraph.init(options.projectPath);
     const db = SpringDatabase.initialize(options.projectPath);
     const sk = new SpringKg(cg, db, options.projectPath);
 
@@ -98,7 +101,8 @@ export class SpringKg {
    * Open an existing SpringKg — opens CodeGraph + SpringDatabase.
    */
   static async open(options: SpringKgOptions): Promise<SpringKg> {
-    const { CodeGraph } = await import('@colbymchenry/codegraph');
+    const cgModule = await import('@colbymchenry/codegraph');
+    const CodeGraph = (cgModule as any).CodeGraph || (cgModule as any).default?.CodeGraph || (cgModule as any).default;
 
     const cg = await CodeGraph.open(options.projectPath);
     const db = SpringDatabase.open(options.projectPath);

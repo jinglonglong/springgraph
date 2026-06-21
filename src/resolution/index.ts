@@ -20,6 +20,11 @@ import { matchReference, matchFunctionRef, matchDottedCallChain, matchScopedCall
 import { resolveViaImport, resolveJvmImport, extractImportMappings, extractReExports, loadCppIncludeDirs, isPhpIncludePathRef } from './import-resolver';
 import { detectFrameworks } from './frameworks';
 import { synthesizeCallbackEdges } from './callback-synthesizer';
+import { synthesizeSpringBeanWiring } from './spring-bean-wiring';
+import { synthesizeInterfaceImplDispatch, synthesizeClassExtendsDispatch } from './interface-impl-dispatch';
+import { synthesizeMyBatisEdges } from './frameworks/mybatis';
+import { synthesizeJavaFieldImpact } from '../architecture/java-field-impact';
+import { synthesizeSpringConfigImpact } from '../architecture/spring-config-impact';
 import { loadProjectAliases, type AliasMap } from './path-aliases';
 import { loadGoModule, type GoModule } from './go-module';
 import { loadWorkspacePackages, type WorkspacePackages } from './workspace-packages';
@@ -212,6 +217,11 @@ export class ReferenceResolver {
   // same reason as deferredChainRefs and drained by
   // resolveDeferredThisMemberRefs once implements/extends edges exist (#808).
   private deferredThisMemberRefs: UnresolvedRef[] = [];
+  // Java/Kotlin `super.<member>` method calls. Extraction strips the receiver
+  // to a bare name today, which resolves back to the subclass override; by
+  // preserving `super.` and resolving it against the direct superclass in a
+  // second pass we link override bodies back to the inherited implementation.
+  private deferredSuperMemberRefs: UnresolvedRef[] = [];
   // Per-`.razor`/`.cshtml`-file `@using` namespace set (own directives + folder
   // `_Imports.razor`, cascading to the project root). Used to disambiguate a
   // markup type ref to the right C# namespace.
@@ -699,6 +709,15 @@ export class ReferenceResolver {
       return this.gateLanguage(matchFunctionRef(ref, this.context), ref);
     }
 
+    // Java/Kotlin `super.<member>` method calls need the extends edges the
+    // main resolution pass is still building, so defer them to the super-member
+    // pass instead of letting them match by bare name (which lands back on the
+    // subclass override).
+    if (ref.referenceName.startsWith('super.') && (ref.language === 'java' || ref.language === 'kotlin')) {
+      this.deferredSuperMemberRefs.push(ref);
+      return null;
+    }
+
     // JVM FQN imports skip framework/name-matcher: `import com.example.Bar`
     // resolves directly through the qualifiedName index, which is unambiguous
     // even when several `Bar` classes exist in different packages.
@@ -1002,6 +1021,29 @@ export class ReferenceResolver {
     } catch {
       // synthesis is additive and optional; ignore failures
     }
+
+    // Phase 4 relationship synthesis: Spring DI, interface dispatch, MyBatis
+    // Java↔XML links, Java field impact, and Spring config bindings. These are
+    // additive and best-effort; failures must not abort indexing.
+    try {
+      aggregateStats.byMethod['spring-bean-wiring'] = synthesizeSpringBeanWiring(this.queries, this.context);
+    } catch { /* additive */ }
+    try {
+      aggregateStats.byMethod['interface-impl-dispatch'] = synthesizeInterfaceImplDispatch(this.queries);
+    } catch { /* additive */ }
+    try {
+      aggregateStats.byMethod['class-extends-dispatch'] = synthesizeClassExtendsDispatch(this.queries);
+    } catch { /* additive */ }
+    try {
+      aggregateStats.byMethod['mybatis-xml-impact'] = synthesizeMyBatisEdges(this.queries, this.context);
+    } catch { /* additive */ }
+    try {
+      aggregateStats.byMethod['java-field-impact'] = synthesizeJavaFieldImpact(this.queries, this.context);
+    } catch { /* additive */ }
+    try {
+      const configResult = synthesizeSpringConfigImpact(this.queries, this.context);
+      aggregateStats.byMethod['spring-config-impact'] = configResult.edgesInserted;
+    } catch { /* additive */ }
 
     return {
       resolved: [],
@@ -1342,6 +1384,106 @@ export class ReferenceResolver {
           targetNodeId: target.id,
           confidence: 0.85,
           resolvedBy: 'function-ref',
+        });
+      }
+    }
+    if (resolved.length === 0) return 0;
+
+    const edges = this.createEdges(resolved);
+    if (edges.length > 0) {
+      this.queries.insertEdges(edges);
+      this.clearCaches();
+    }
+    return edges.length;
+  }
+
+  /**
+   * Resolve deferred Java/Kotlin `super.<member>` method calls once extends
+   * edges exist. Walks from the enclosing class up the `extends` chain and
+   * returns the first superclass method with the matching name. This links
+   * override bodies like `super.setMethod(x)` back to the inherited
+   * implementation instead of resolving them as a self-call.
+   */
+  resolveSuperMemberCalls(): number {
+    const deferred = this.deferredSuperMemberRefs;
+    this.deferredSuperMemberRefs = [];
+    if (deferred.length === 0) return 0;
+
+    this.clearCaches();
+    const resolved: ResolvedRef[] = [];
+    for (const ref of deferred) {
+      const member = ref.referenceName.slice('super.'.length);
+      const fromNode = this.queries.getNodeById(ref.fromNodeId);
+      if (!fromNode || !member) continue;
+
+      // Find the enclosing class node.
+      let className: string;
+      if (SUPERTYPE_BEARING_KINDS.has(fromNode.kind) || fromNode.kind === 'module') {
+        className = fromNode.name;
+      } else {
+        const sep = fromNode.qualifiedName.lastIndexOf('::');
+        if (sep <= 0) continue;
+        const classPrefix = fromNode.qualifiedName.slice(0, sep);
+        className = classPrefix.includes('::')
+          ? classPrefix.slice(classPrefix.lastIndexOf('::') + 2)
+          : classPrefix;
+      }
+
+      let frontierNodes = this.context
+        .getNodesByName(className)
+        .filter(
+          (n) =>
+            SUPERTYPE_BEARING_KINDS.has(n.kind) &&
+            n.filePath === ref.filePath,
+        );
+      if (frontierNodes.length === 0) {
+        frontierNodes = this.context
+          .getNodesByName(className)
+          .filter(
+            (n) =>
+              SUPERTYPE_BEARING_KINDS.has(n.kind) &&
+              sameLanguageFamily(n.language, ref.language),
+          );
+      }
+
+      const seenNodes = new Set<string>(frontierNodes.map((n) => n.id));
+      let target: Node | null = null;
+      // Start from the direct superclass; do NOT match the enclosing class
+      // itself, because `super.method()` must bypass any override.
+      for (let depth = 0; depth < 5 && frontierNodes.length > 0 && !target; depth++) {
+        const next: Node[] = [];
+        for (const typeNode of frontierNodes) {
+          for (const edge of this.queries.getOutgoingEdges(typeNode.id, ['extends'])) {
+            const superNode = this.queries.getNodeById(edge.target);
+            if (!superNode || seenNodes.has(superNode.id)) continue;
+            seenNodes.add(superNode.id);
+            if (!SUPERTYPE_BEARING_KINDS.has(superNode.kind)) continue;
+            for (const c of this.queries.getOutgoingEdges(superNode.id, ['contains'])) {
+              const m = this.queries.getNodeById(c.target);
+              if (
+                m &&
+                m.name === member &&
+                (m.kind === 'function' || m.kind === 'method') &&
+                sameLanguageFamily(m.language, ref.language)
+              ) {
+                target = m;
+                break;
+              }
+            }
+            if (target) break;
+            next.push(superNode);
+          }
+          if (target) break;
+        }
+        frontierNodes = next;
+      }
+
+      if (target) {
+        resolved.push({
+          original: ref,
+          targetNodeId: target.id,
+          confidence: 0.9,
+          resolvedBy: 'super-member',
         });
       }
     }

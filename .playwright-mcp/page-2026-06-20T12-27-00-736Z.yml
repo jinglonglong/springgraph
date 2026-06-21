@@ -1,0 +1,172 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - img [ref=e5]
+      - generic [ref=e11]: CodeGraph
+      - generic [ref=e12]: /
+      - generic [ref=e13]: 图谱
+    - generic "输入项目根目录或 .codegraph 目录后加载" [ref=e14]:
+      - textbox "项目根目录或 .codegraph 路径" [ref=e15]: D:\code\dzjc
+      - button "浏览" [ref=e16] [cursor=pointer]
+      - button "加载" [ref=e17] [cursor=pointer]
+    - group "图谱模式" [ref=e18]:
+      - button "Spring Cloud" [ref=e19] [cursor=pointer]:
+        - generic [ref=e21]: Spring Cloud
+      - button "通用" [ref=e22] [cursor=pointer]:
+        - generic [ref=e24]: 通用
+    - generic [ref=e25]:
+      - button "重置" [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+        - generic [ref=e30]: 重置
+      - button "刷新" [ref=e31] [cursor=pointer]:
+        - img [ref=e32]
+        - generic [ref=e34]: 刷新
+      - button "切换主题" [ref=e35] [cursor=pointer]:
+        - generic [ref=e36]: 🌙
+        - generic [ref=e37]: 主题
+  - complementary [ref=e38]:
+    - generic "图谱统计" [ref=e39]:
+      - generic [ref=e40]:
+        - generic [ref=e41]: "738"
+        - generic [ref=e42]: 文件
+      - generic [ref=e43]:
+        - generic [ref=e44]: 12,193
+        - generic [ref=e45]: 节点
+      - generic [ref=e46]:
+        - generic [ref=e47]: 25,028
+        - generic [ref=e48]: 边
+      - generic [ref=e49]:
+        - generic [ref=e50]: 更新
+        - generic "2026/6/20 20:26:42" [ref=e51]: 刚刚
+    - generic [ref=e52]:
+      - generic [ref=e53]:
+        - img
+        - searchbox "搜索符号" [ref=e54]
+      - generic [ref=e55]:
+        - generic [ref=e56]:
+          - generic [ref=e57]: Spring Cloud 角色
+          - button "ⓘ" [ref=e58] [cursor=pointer]
+        - generic [ref=e59]:
+          - button "C Controller" [ref=e60] [cursor=pointer]
+          - button "⚠ ControllerAdvice" [ref=e61] [cursor=pointer]
+          - button "S Service" [ref=e62] [cursor=pointer]
+          - button "S ServiceImpl" [ref=e63] [cursor=pointer]
+          - button "F FeignClient" [ref=e64] [cursor=pointer]
+          - button "M Mapper" [ref=e65] [cursor=pointer]
+          - button "R Repository" [ref=e66] [cursor=pointer]
+          - button "E Entity/PO/DTO" [ref=e67] [cursor=pointer]
+          - button "⚙ Config" [ref=e68] [cursor=pointer]
+          - button "A Application" [ref=e69] [cursor=pointer]
+          - button "◉ Component" [ref=e70] [cursor=pointer]
+      - generic [ref=e71]:
+        - generic [ref=e72]:
+          - generic [ref=e73]: 关系类型
+          - button "标签 · 开" [ref=e74] [cursor=pointer]
+        - generic [ref=e75]:
+          - button "↦ extends" [ref=e76] [cursor=pointer]
+          - button "⇢ implements" [ref=e77] [cursor=pointer]
+          - button "→ calls" [ref=e78] [cursor=pointer]
+          - button "◇→ instantiates" [ref=e79] [cursor=pointer]
+          - button "·→ references" [ref=e80] [cursor=pointer]
+          - button "★ decorates" [ref=e81] [cursor=pointer]
+          - button "⇢ imports" [ref=e82] [cursor=pointer]
+          - button "⇠ exports" [ref=e83] [cursor=pointer]
+          - button "⊂ contains" [ref=e84] [cursor=pointer]
+          - button "⊃ overrides" [ref=e85] [cursor=pointer]
+          - button "← returns" [ref=e86] [cursor=pointer]
+          - 'button ": type_of" [ref=e87] [cursor=pointer]'
+    - generic [ref=e89]: 输入关键词开始搜索…
+  - main [ref=e90]:
+    - generic [ref=e91]:
+      - generic [ref=e92]:
+        - button "默认" [ref=e93] [cursor=pointer]
+        - button "端点" [ref=e94] [cursor=pointer]
+        - button "调用链" [ref=e95] [cursor=pointer]
+        - button "服务依赖" [ref=e96] [cursor=pointer]
+        - button "数据模型" [ref=e97] [cursor=pointer]
+      - generic [ref=e98]:
+        - generic [ref=e99]: 布局
+        - combobox "图谱布局" [ref=e100] [cursor=pointer]:
+          - option "力导向 (cose)" [selected]
+          - option "层级"
+          - option "圆形"
+          - option "网格"
+          - option "同心圆"
+      - generic "按 Spring Cloud 角色配额选取：Controller/ServiceImpl/Mapper/Service/FeignClient/Config/Entity 等业务核心。" [ref=e101]: 66 个节点 · 65 条边 · 深度 2 · 双向
+    - application "代码图谱" [ref=e102]
+  - complementary [ref=e107]:
+    - generic [ref=e155]:
+      - generic [ref=e156]:
+        - generic [ref=e157]: class
+        - heading "CacheController" [level=3] [ref=e158]
+        - generic "ruoyi-admin/src/main/java/com/ruoyi/web/controller/monitor/CacheController.java:30–121" [ref=e159]
+      - tablist [ref=e160]:
+        - tab "源码" [ref=e161] [cursor=pointer]
+        - tab "成员 9" [selected] [ref=e162] [cursor=pointer]:
+          - text: 成员
+          - generic [ref=e163]: "9"
+        - tab "调用堆栈 0↑ / 7↓" [ref=e164] [cursor=pointer]:
+          - text: 调用堆栈
+          - generic [ref=e165]: 0↑ / 7↓
+        - tab "调用方 0" [ref=e166] [cursor=pointer]:
+          - text: 调用方
+          - generic [ref=e167]: "0"
+        - tab "被调用 7" [ref=e168] [cursor=pointer]:
+          - text: 被调用
+          - generic [ref=e169]: "7"
+      - tabpanel [ref=e178]:
+        - generic [ref=e179]:
+          - generic [ref=e180]:
+            - generic [ref=e181]: 方法 · 7
+            - generic "AjaxResult () ruoyi-admin/src/main/java/com/ruoyi/web/controller/monitor/CacheController.java:48" [ref=e182] [cursor=pointer]:
+              - generic [ref=e183]: M
+              - generic [ref=e184]: getInfo
+              - generic [ref=e185]: AjaxResult ()
+              - generic [ref=e186]: :48
+            - generic "AjaxResult () ruoyi-admin/src/main/java/com/ruoyi/web/controller/monitor/CacheController.java:72" [ref=e187] [cursor=pointer]:
+              - generic [ref=e188]: M
+              - generic [ref=e189]: cache
+              - generic [ref=e190]: AjaxResult ()
+              - generic [ref=e191]: :72
+            - generic "AjaxResult (@PathVariable String cacheName) ruoyi-admin/src/main/java/com/ruoyi/web/controller/monitor/CacheController.java:79" [ref=e192] [cursor=pointer]:
+              - generic [ref=e193]: M
+              - generic [ref=e194]: getCacheKeys
+              - generic [ref=e195]: AjaxResult (@PathVariable String cacheNa…
+              - generic [ref=e196]: :79
+            - generic "AjaxResult (@PathVariable String cacheName, @PathVariable String cacheKey) ruoyi-admin/src/main/java/com/ruoyi/web/controller/monitor/CacheController.java:87" [ref=e197] [cursor=pointer]:
+              - generic [ref=e198]: M
+              - generic [ref=e199]: getCacheValue
+              - generic [ref=e200]: AjaxResult (@PathVariable String cacheNa…
+              - generic [ref=e201]: :87
+            - generic "AjaxResult (@PathVariable String cacheName) ruoyi-admin/src/main/java/com/ruoyi/web/controller/monitor/CacheController.java:96" [ref=e202] [cursor=pointer]:
+              - generic [ref=e203]: M
+              - generic [ref=e204]: clearCacheName
+              - generic [ref=e205]: AjaxResult (@PathVariable String cacheNa…
+              - generic [ref=e206]: :96
+            - generic "AjaxResult (@PathVariable String cacheKey) ruoyi-admin/src/main/java/com/ruoyi/web/controller/monitor/CacheController.java:105" [ref=e207] [cursor=pointer]:
+              - generic [ref=e208]: M
+              - generic [ref=e209]: clearCacheKey
+              - generic [ref=e210]: AjaxResult (@PathVariable String cacheKe…
+              - generic [ref=e211]: :105
+            - generic "AjaxResult () ruoyi-admin/src/main/java/com/ruoyi/web/controller/monitor/CacheController.java:113" [ref=e212] [cursor=pointer]:
+              - generic [ref=e213]: M
+              - generic [ref=e214]: clearCacheAll
+              - generic [ref=e215]: AjaxResult ()
+              - generic [ref=e216]: :113
+          - generic [ref=e217]:
+            - generic [ref=e218]: 字段 · 1
+            - generic "RedisTemplate<String, String> redisTemplate ruoyi-admin/src/main/java/com/ruoyi/web/controller/monitor/CacheController.java:35" [ref=e219] [cursor=pointer]:
+              - generic [ref=e220]: ∇
+              - generic [ref=e221]: redisTemplate
+              - generic [ref=e222]: RedisTemplate<String, String> redisTempl…
+              - generic [ref=e223]: :35
+          - generic [ref=e224]:
+            - generic [ref=e225]: 常量 · 1
+            - generic "List<SysCache> caches ruoyi-admin/src/main/java/com/ruoyi/web/controller/monitor/CacheController.java:37" [ref=e226] [cursor=pointer]:
+              - generic [ref=e227]: "#"
+              - generic [ref=e228]: caches
+              - generic [ref=e229]: List<SysCache> caches
+              - generic [ref=e230]: :37
+      - button "展开邻域 · 深度 3" [ref=e174] [cursor=pointer]:
+        - img [ref=e175]
+        - generic [ref=e177]: 展开邻域 · 深度 3

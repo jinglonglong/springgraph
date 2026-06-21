@@ -1,0 +1,18 @@
+{
+  "request": {
+    "name": "spring_nacos_overview",
+    "arguments": {}
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": "tool-7",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"found\":true,\"discoveryServer\":null,\"configServer\":null}"
+        }
+      ]
+    }
+  }
+}

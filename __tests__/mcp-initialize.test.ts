@@ -10,12 +10,13 @@
  * kicking off the heavy init in the background. These tests guard the
  * contract that initialize is fast regardless of how much work init does.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { CodeGraph } from '../src';
+import { removeDirWithRetries, safeCloseCodeGraph, terminateChild } from './setup';
 
 const BIN = path.resolve(__dirname, '../dist/bin/codegraph.js');
 
@@ -108,11 +109,11 @@ describe('MCP initialize handshake (issue #172)', () => {
   });
 
   afterEach(() => {
-    if (child && !child.killed) {
-      child.kill('SIGKILL');
+    return (async () => {
+      await terminateChild(child);
       child = null;
-    }
-    fs.rmSync(tempDir, { recursive: true, force: true });
+      await removeDirWithRetries(tempDir);
+    })();
   });
 
   it('responds to initialize quickly when no .codegraph exists in cwd', async () => {
@@ -137,7 +138,7 @@ describe('MCP initialize handshake (issue #172)', () => {
     // tryInitializeDefault before sendResult, this ordering inverts and the
     // test fails — regardless of how fast the local filesystem is.
     const cg = await CodeGraph.init(tempDir);
-    cg.close();
+    await safeCloseCodeGraph(cg);
 
     child = spawnServer(tempDir);
     const events = tagStreams(child);
@@ -180,4 +181,8 @@ describe('MCP initialize handshake (issue #172)', () => {
     expect(prompts.error).toBeUndefined();
     expect(prompts.result.prompts).toEqual([]);
   }, 15000);
+
+  afterAll(async () => {
+    await terminateChild(child);
+  });
 });

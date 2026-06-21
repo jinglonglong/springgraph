@@ -28,6 +28,7 @@ import { AstroExtractor } from './astro-extractor';
 import { DfmExtractor } from './dfm-extractor';
 import { VueExtractor } from './vue-extractor';
 import { MyBatisExtractor } from './mybatis-extractor';
+import { ConfigExtractor, isSpringConfigFile } from './config-extractor';
 import {
   getAllFrameworkResolvers,
   getApplicableFrameworks,
@@ -39,9 +40,14 @@ export { generateNodeId } from './tree-sitter-helpers';
 /**
  * Extract the name from a node based on language
  */
-function extractName(node: SyntaxNode, source: string, extractor: LanguageExtractor): string {
-  const hookName = extractor.resolveName?.(node, source);
-  if (hookName) return hookName;
+function extractNameNode(node: SyntaxNode, extractor: LanguageExtractor): SyntaxNode | null {
+  // Arrow/function expressions have no name of their own; their name is
+  // resolved from the parent variable_declarator by the caller. Returning null
+  // here prevents us from naming them after an identifier in their parameter
+  // list or body (e.g. `const refund = (amount) => amount` becoming `amount`).
+  if (node.type === 'arrow_function' || node.type === 'function_expression') {
+    return null;
+  }
 
   // Try field name first
   const nameNode = getChildByField(node, extractor.nameField);
@@ -56,20 +62,20 @@ function extractName(node: SyntaxNode, source: string, extractor: LanguageExtrac
     // Handle complex declarators (C/C++)
     if (resolved.type === 'function_declarator' || resolved.type === 'declarator') {
       const innerName = getChildByField(resolved, 'declarator') || resolved.namedChild(0);
-      return innerName ? getNodeText(innerName, source) : getNodeText(resolved, source);
+      return innerName ?? resolved;
     }
     // Lua: `function t.f()` / `function t:m()` — the name node is a dot/method
     // index expression; the simple name is the trailing field/method (the table
     // receiver is captured separately via getReceiverType).
     if (resolved.type === 'dot_index_expression') {
       const field = getChildByField(resolved, 'field');
-      if (field) return getNodeText(field, source);
+      if (field) return field;
     }
     if (resolved.type === 'method_index_expression') {
       const method = getChildByField(resolved, 'method');
-      if (method) return getNodeText(method, source);
+      if (method) return method;
     }
-    return getNodeText(resolved, source);
+    return resolved;
   }
 
   // For Dart method_signature, look inside inner signature types
@@ -87,19 +93,11 @@ function extractName(node: SyntaxNode, source: string, extractor: LanguageExtrac
         for (let j = 0; j < child.namedChildCount; j++) {
           const inner = child.namedChild(j);
           if (inner?.type === 'identifier') {
-            return getNodeText(inner, source);
+            return inner;
           }
         }
       }
     }
-  }
-
-  // Arrow/function expressions get their name from the parent variable_declarator,
-  // not from identifiers in their body. Without this, single-expression arrow
-  // functions like `const fn = () => someIdentifier` get named "someIdentifier"
-  // instead of "fn", because the fallback below finds the body identifier.
-  if (node.type === 'arrow_function' || node.type === 'function_expression') {
-    return '<anonymous>';
   }
 
   // Fall back to first identifier child
@@ -112,8 +110,26 @@ function extractName(node: SyntaxNode, source: string, extractor: LanguageExtrac
         child.type === 'simple_identifier' ||
         child.type === 'constant')
     ) {
-      return getNodeText(child, source);
+      return child;
     }
+  }
+
+  return null;
+}
+
+function extractName(node: SyntaxNode, source: string, extractor: LanguageExtractor): string {
+  const hookName = extractor.resolveName?.(node, source);
+  if (hookName) return hookName;
+
+  const nameNode = extractNameNode(node, extractor);
+  if (nameNode) return getNodeText(nameNode, source);
+
+  // Arrow/function expressions get their name from the parent variable_declarator,
+  // not from identifiers in their body. Without this, single-expression arrow
+  // functions like `const fn = () => someIdentifier` get named "someIdentifier"
+  // instead of "fn", because the fallback below finds the body identifier.
+  if (node.type === 'arrow_function' || node.type === 'function_expression') {
+    return '<anonymous>';
   }
 
   return '<anonymous>';
@@ -1119,8 +1135,6 @@ export class TreeSitterExtractor {
       return null;
     }
 
-    const id = generateNodeId(this.filePath, kind, name, node.startPosition.row + 1);
-
     // Some grammars (e.g. Dart) model a function/method body as a *sibling* of
     // the signature node, so the declaration node's own range is just the
     // signature line. Extend endLine to the resolved body when it sits beyond
@@ -1135,6 +1149,14 @@ export class TreeSitterExtractor {
       }
     }
 
+    // Use the name node's line for startLine/ID when possible so leading
+    // annotations/decorators (e.g. Java @Override) don't push the symbol's
+    // reported location onto the annotation line.
+    const nameNode = this.extractor ? extractNameNode(node, this.extractor) : null;
+    const startLine = extra?.startLine ?? (nameNode ? nameNode.startPosition.row + 1 : node.startPosition.row + 1);
+
+    const id = generateNodeId(this.filePath, kind, name, startLine);
+
     const newNode: Node = {
       id,
       kind,
@@ -1142,7 +1164,7 @@ export class TreeSitterExtractor {
       qualifiedName: this.buildQualifiedName(name),
       filePath: this.filePath,
       language: this.language,
-      startLine: node.startPosition.row + 1,
+      startLine,
       endLine,
       startColumn: node.startPosition.column,
       endColumn: node.endPosition.column,
@@ -3050,9 +3072,14 @@ export class TreeSitterExtractor {
       receiverName = receiverName.replace(/^\$/, '');
 
       if (methodName) {
-        // Skip self/this/parent/static receivers — they don't aid resolution
-        const SKIP_RECEIVERS = new Set(['self', 'this', 'cls', 'super', 'parent', 'static']);
-        if (SKIP_RECEIVERS.has(receiverName)) {
+        // Skip self/this/cls/parent/static receivers — they don't aid resolution
+        const SKIP_RECEIVERS = new Set(['self', 'this', 'cls', 'parent', 'static']);
+        if (receiverName === 'super' && (this.language === 'java' || this.language === 'kotlin')) {
+          // Java/Kotlin `super.method()` must resolve to the superclass's
+          // implementation, not the subclass override. Preserve the `super.`
+          // prefix so resolution can walk the extends edge explicitly.
+          calleeName = `super.${methodName}`;
+        } else if (SKIP_RECEIVERS.has(receiverName)) {
           calleeName = methodName;
         } else {
           calleeName = `${receiverName}.${methodName}`;
@@ -3590,6 +3617,15 @@ export class TreeSitterExtractor {
         line: n.startPosition.row + 1,
         column: n.startPosition.column,
       });
+      // Also populate the `decorators` column on the node itself so that
+      // getDecorators() / GET /api/decorators can find them.
+      const decoratedNode = this.nodes.find((nd) => nd.id === decoratedId);
+      if (decoratedNode) {
+        if (!decoratedNode.decorators) decoratedNode.decorators = [];
+        if (!decoratedNode.decorators.includes(name)) {
+          decoratedNode.decorators.push(name);
+        }
+      }
     };
 
     // 1. Decorators that are direct children of the declaration
@@ -5173,11 +5209,15 @@ export function extractFromSource(
     const extractor = new MyBatisExtractor(filePath, source);
     result = extractor.extract();
   } else if (isFileLevelOnlyLanguage(detectedLanguage)) {
-    // No symbol extraction at this stage — files are tracked at the file-record
-    // level only. Framework extractors (Drupal routing yml, Spring `@Value`
-    // resolution against application.yml/application.properties) run later and
-    // add per-file nodes/references when they apply.
-    result = { nodes: [], edges: [], unresolvedReferences: [], errors: [], durationMs: 0 };
+    // Spring config files (application.yml / application.properties) get
+    // first-class constant nodes so @Value/@ConfigurationProperties can resolve
+    // to them. Other file-level-only languages return empty extraction here.
+    if (isSpringConfigFile(filePath)) {
+      const extractor = new ConfigExtractor(filePath, source);
+      result = extractor.extract();
+    } else {
+      result = { nodes: [], edges: [], unresolvedReferences: [], errors: [], durationMs: 0 };
+    }
   } else if (
     detectedLanguage === 'pascal' &&
     (fileExtension === '.dfm' || fileExtension === '.fmx')

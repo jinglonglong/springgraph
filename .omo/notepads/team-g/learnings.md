@@ -317,3 +317,15 @@ Learned: Added `tests/integration/sprint1-e2e.test.ts` with a Vitest stdio JSON-
 - V1 Acceptance Criteria Mapping with 9 criteria mapped to specific demo files/locations
 - Each tool row formatted as: `spring_find_entry(url) -> UserController.getUserById -> @GetMapping("/api/users/{id}")`
 - Key Annotations Exercised table covering all Spring annotations in the demo
+
+---
+
+## Task T68 -- springkg MCP startup self-seeding
+
+### Key findings
+
+**The real MCP server can self-heal an empty `springkg.db` without waiting for resolver registration.** A startup seeding pass in `packages/springkg-mcp/src/server.ts` can check the Spring tables immediately after opening the DB, then repopulate `spring_symbols`, `spring_edges`, `spring_endpoints`, `spring_feign_clients`, `spring_sql_statements`, and `runtime_config_properties` from a combination of `codegraph.db` lookups and lightweight regex-based parsing of Java, MyBatis XML, and YAML/properties files.
+
+**The existing MCP queries only need a narrow subset of columns, so regex extraction is sufficient.** For the current tools, the critical rows are endpoint records (`path`, `method`, `handler_method_id`, `handler_class_id`), Feign client rows (`client_name`, `target_service`), config rows (`key`, `value_hash`, `is_sensitive`, `source_file_path`), and `calls` edges connecting controller methods to services and mapper/sql symbols.
+
+**TypeScript package verification worked, but LSP diagnostics were unavailable in this environment.** `lsp_diagnostics` could not run on `packages/springkg-mcp/src/server.ts` because `typescript-language-server` is not installed here, so package build (`npm run build -w packages/springkg-mcp`) was used as the authoritative verification step.

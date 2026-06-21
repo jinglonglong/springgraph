@@ -11,10 +11,15 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { runMigrations as runPendingMigrations, getCurrentVersion, CURRENT_SCHEMA_VERSION } from './migrations';
-
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');
+import { runMigrations as runPendingMigrations, getCurrentVersion, CURRENT_SCHEMA_VERSION } from './migrations.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 interface RawStatement {
   run(...params: unknown[]): { changes: number; lastInsertRowid: number | bigint };
@@ -79,37 +84,67 @@ function configureConnection(db: SqliteDatabase): void {
   db.pragma('mmap_size = 268435456');
 }
 
+function getSpringDatabasePath(projectPath: string): string {
+  return path.join(projectPath, '.codegraph', 'springkg.db');
+}
+
+function ensureDatabaseDirectory(dbPath: string): void {
+  const dir = path.dirname(dbPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+function applySchema(db: SqliteDatabase): void {
+  const schemaPath = path.join(__dirname, 'schema.sql');
+  const schema = fs.readFileSync(schemaPath, 'utf-8');
+  db.exec(schema);
+
+  const currentVersion = getCurrentVersion(db);
+  if (currentVersion < CURRENT_SCHEMA_VERSION) {
+    db.prepare(
+      'INSERT OR IGNORE INTO schema_versions (version, applied_at, description) VALUES (?, ?, ?)' 
+    ).run(CURRENT_SCHEMA_VERSION, Date.now(), 'Initial schema');
+  }
+
+  runPendingMigrations(db, getCurrentVersion(db));
+}
+
 export class SpringDatabase {
-  private constructor(private db: SqliteDatabase, readonly path: string) {}
+  private static activeConnections = new Set<SpringDatabase>();
+
+  private constructor(private db: SqliteDatabase, readonly path: string) {
+    SpringDatabase.activeConnections.add(this);
+  }
+
+  static initializeDatabase(projectPath: string): string {
+    const dbPath = getSpringDatabasePath(projectPath);
+    ensureDatabaseDirectory(dbPath);
+
+    const raw = new DatabaseSync(dbPath);
+    const db = wrapDatabaseSync(raw);
+    try {
+      configureConnection(db);
+      applySchema(db);
+    } finally {
+      db.close();
+    }
+
+    return dbPath;
+  }
 
   static initialize(projectPath: string): SpringDatabase {
-    const dbPath = path.join(projectPath, '.codegraph', 'springkg.db');
-
-    const dir = path.dirname(dbPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+    const dbPath = SpringDatabase.initializeDatabase(projectPath);
 
     const raw = new DatabaseSync(dbPath);
     const db = wrapDatabaseSync(raw);
     configureConnection(db);
 
-    const schemaPath = path.join(__dirname, 'schema.sql');
-    const schema = fs.readFileSync(schemaPath, 'utf-8');
-    db.exec(schema);
-
-    const currentVersion = getCurrentVersion(db);
-    if (currentVersion < CURRENT_SCHEMA_VERSION) {
-      db.prepare(
-        'INSERT OR IGNORE INTO schema_versions (version, applied_at, description) VALUES (?, ?, ?)'
-      ).run(CURRENT_SCHEMA_VERSION, Date.now(), 'Initial schema');
-    }
-
     return new SpringDatabase(db, dbPath);
   }
 
   static open(projectPath: string): SpringDatabase {
-    const dbPath = path.join(projectPath, '.codegraph', 'springkg.db');
+    const dbPath = getSpringDatabasePath(projectPath);
 
     if (!fs.existsSync(dbPath)) {
       throw new Error(`Database not found: ${dbPath}`);
@@ -159,7 +194,19 @@ export class SpringDatabase {
 
   close(): void {
     this.db.close();
+    SpringDatabase.activeConnections.delete(this);
+  }
+
+  static closeAll(): void {
+    for (const conn of SpringDatabase.activeConnections) {
+      try {
+        if (conn.isOpen()) {
+          conn.close();
+        }
+      } catch {}
+    }
+    SpringDatabase.activeConnections.clear();
   }
 }
 
-export { runMigrations, getCurrentVersion, CURRENT_SCHEMA_VERSION } from './migrations';
+export { runMigrations, getCurrentVersion, CURRENT_SCHEMA_VERSION } from './migrations.js';

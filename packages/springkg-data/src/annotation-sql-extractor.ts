@@ -169,6 +169,7 @@ export class AnnotationSqlExtractor {
     };
   }
 
+  /*
   private findResultsNear(_sql: string, _line: number): Array<{ property: string; column: string; jdbcType?: string }> {
     // Find @Results annotation following the method — simplified approach
     // Look for @Result entries within ~5 lines after the annotation
@@ -180,6 +181,7 @@ export class AnnotationSqlExtractor {
     }
     return results;
   }
+  */
 
   private computeConfidence(dynamicTags: Record<string, number>): number {
     const keys = Object.keys(dynamicTags);

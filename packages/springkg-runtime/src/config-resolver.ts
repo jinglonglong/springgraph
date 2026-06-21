@@ -2,16 +2,25 @@ import { createHash } from 'node:crypto';
 import { loadConfigFiles } from './internal/yaml-loader.js';
 import { flattenProperties } from './internal/property-flatten.js';
 import { maskValue, computeId } from './internal/key-mask.js';
+import { logResolverWarning } from './types.js';
+import type { SpringKgLike } from './types.js';
 
 export interface SpringKgEnhanceInput {
   projectPath: string;
-  kg: any; // SpringKg instance from Team A
+  kg: SpringKgLike;
 }
 
 export interface SpringKgEnhanceOutput {
   configPropertiesCount: number;
   symbolsCount: number;
   edgesCount: number;
+}
+
+interface ServiceConfigEntry {
+  value: string;
+  file: string;
+  priority: number;
+  profile?: string;
 }
 
 /**
@@ -28,7 +37,7 @@ export class ConfigResolver {
     }
 
     // Group properties by serviceId
-    const serviceConfigs: Map<string, Map<string, { value: any, file: string, priority: number, profile?: string }>> = new Map();
+    const serviceConfigs = new Map<string, Map<string, ServiceConfigEntry>>();
 
     for (const file of configFiles) {
       const flat = flattenProperties(file.content);
@@ -83,8 +92,8 @@ export class ConfigResolver {
           endLine: 0,
           metadata: { stub: true }
         });
-      } catch (e) {
-        // May already exist
+      } catch (error) {
+        logResolverWarning('ConfigResolver', `failed to upsert micro_service ${serviceId}`, error);
       }
 
       // Process each property
@@ -110,8 +119,8 @@ export class ConfigResolver {
             metadata: {}
           });
           configPropertiesCount++;
-        } catch (e) {
-          // May already exist
+        } catch (error) {
+          logResolverWarning('ConfigResolver', `failed to record config property ${serviceId}:${key}`, error);
         }
 
         // Upsert config_property symbol
@@ -127,8 +136,8 @@ export class ConfigResolver {
             metadata: { key, profile: profile || 'default', sourceFile: file }
           });
           symbolsCount++;
-        } catch (e) {
-          // May already exist
+        } catch (error) {
+          logResolverWarning('ConfigResolver', `failed to upsert config_property symbol ${serviceId}:${key}`, error);
         }
 
         // Upsert LOADS_CONFIG edge from micro_service to config_property
@@ -142,8 +151,8 @@ export class ConfigResolver {
             metadata: { viaConfig: key }
           });
           edgesCount++;
-        } catch (e) {
-          // May already exist
+        } catch (error) {
+          logResolverWarning('ConfigResolver', `failed to upsert LOADS_CONFIG edge for ${serviceId}:${key}`, error);
         }
       }
     }

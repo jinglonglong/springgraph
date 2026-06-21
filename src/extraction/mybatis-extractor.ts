@@ -1,5 +1,6 @@
 import { Edge, ExtractionError, ExtractionResult, Node, UnresolvedReference } from '../types';
 import { generateNodeId } from './tree-sitter-helpers';
+import { extractSqlHints } from '../resolution/frameworks/mybatis';
 
 /**
  * MyBatisExtractor — parses MyBatis mapper XML files.
@@ -124,6 +125,8 @@ export class MyBatisExtractor {
       const qualified = `${namespace}::${id}`;
       const isSqlFragment = elemType === 'sql';
       const nodeId = generateNodeId(this.filePath, 'method', qualified, startLine);
+      const preview = this.previewSql(elemBody);
+      const { tables, columns } = extractSqlHints(preview);
       const node: Node = {
         id: nodeId,
         kind: 'method',
@@ -136,7 +139,8 @@ export class MyBatisExtractor {
         endLine,
         startColumn: 0,
         endColumn: 0,
-        docstring: this.previewSql(elemBody),
+        docstring: preview,
+        metadata: isSqlFragment ? undefined : { tableHints: tables, columnHints: columns },
         updatedAt: Date.now(),
       };
       this.nodes.push(node);

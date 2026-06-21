@@ -84,6 +84,7 @@ export interface SyncResult {
   nodesUpdated: number;
   durationMs: number;
   changedFilePaths?: string[];
+  removedFilePaths?: string[];
 }
 
 /**
@@ -1669,6 +1670,7 @@ export class ExtractionOrchestrator {
     let filesRemoved = 0;
     let nodesUpdated = 0;
     const changedFilePaths: string[] = [];
+    const removedFilePaths: string[] = [];
 
     onProgress?.({
       phase: 'scanning',
@@ -1702,6 +1704,7 @@ export class ExtractionOrchestrator {
     for (const tracked of trackedFiles) {
       if (!currentSet.has(tracked.path) || !fs.existsSync(path.join(this.rootDir, tracked.path))) {
         this.queries.deleteFile(tracked.path);
+        removedFilePaths.push(tracked.path);
         filesRemoved++;
       }
     }
@@ -1782,6 +1785,7 @@ export class ExtractionOrchestrator {
       nodesUpdated,
       durationMs: Date.now() - startTime,
       changedFilePaths: changedFilePaths.length > 0 ? changedFilePaths : undefined,
+      removedFilePaths: removedFilePaths.length > 0 ? removedFilePaths : undefined,
     };
   }
 

@@ -162,6 +162,9 @@ export interface Node {
   /** Decorators/annotations applied */
   decorators?: string[];
 
+  /** Optional metadata bag for language/framework-specific extensions */
+  metadata?: Record<string, unknown>;
+
   /** Generic type parameters */
   typeParameters?: string[];
 
@@ -389,6 +392,12 @@ export interface SearchOptions {
 
   /** Whether search is case-sensitive */
   caseSensitive?: boolean;
+
+  /**
+   * Filter symbols by decorator names (used by web UI for /api/decorators).
+   * When provided, only symbols with at least one matching decorator are returned.
+   */
+  decorators?: string[];
 }
 
 /**

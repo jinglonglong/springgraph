@@ -1,10 +1,12 @@
 import { loadConfigFiles } from './internal/yaml-loader.js';
 import { flattenProperties } from './internal/property-flatten.js';
 import { maskValue, computeId } from './internal/key-mask.js';
+import { logResolverWarning } from './types.js';
+import type { SpringKgLike } from './types.js';
 
 export interface SpringKgEnhanceInput {
   projectPath: string;
-  kg: any;
+  kg: SpringKgLike;
 }
 
 export interface SpringKgEnhanceOutput {
@@ -166,7 +168,9 @@ export class NacosConfigResolver {
           }
         });
         clustersCount++;
-      } catch (e) {}
+      } catch (error) {
+        logResolverWarning('NacosConfigResolver', `failed to upsert nacos_cluster ${serverAddr}`, error);
+      }
 
       // Link service to cluster
       for (const serviceName of services) {
@@ -186,7 +190,9 @@ export class NacosConfigResolver {
             metadata: { cluster: serverAddr, group: cluster.group }
           });
           servicesCount++;
-        } catch (e) {}
+        } catch (error) {
+          logResolverWarning('NacosConfigResolver', `failed to upsert nacos_service ${serviceName}`, error);
+        }
 
         // LOADS_CONFIG edge
         try {
@@ -199,7 +205,9 @@ export class NacosConfigResolver {
             metadata: { viaCluster: serverAddr }
           });
           edgesCount++;
-        } catch (e) {}
+        } catch (error) {
+          logResolverWarning('NacosConfigResolver', `failed to create LOADS_CONFIG edge for ${serviceName}`, error);
+        }
       }
     }
 
@@ -228,7 +236,9 @@ export class NacosConfigResolver {
           }
         });
         configsCount++;
-      } catch (e) {}
+      } catch (error) {
+        logResolverWarning('NacosConfigResolver', `failed to upsert nacos_config ${configKey}`, error);
+      }
     }
 
     return { clustersCount, configsCount, servicesCount, edgesCount };

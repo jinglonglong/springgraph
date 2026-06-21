@@ -8,5 +8,5 @@
     "rootDir": "./src"
   },
   "include": ["src/**/*"],
-  "references": [{ "path": "../springkg-shared" }, { "path": "../springkg-installer" }]
+  "references": [{ "path": "../springkg-core" }, { "path": "../springkg-shared" }, { "path": "../springkg-installer" }]
 }

@@ -34,13 +34,17 @@ function get(port: number, urlPath: string): Promise<{ status: number; body: str
       (res) => {
         const chunks: Buffer[] = [];
         res.on('data', (c: Buffer) => chunks.push(c));
-        res.on('end', () =>
+        res.on('end', () => {
+          const body = Buffer.concat(chunks).toString('utf-8');
+          if (res.statusCode === 500) {
+            console.error("500 URL:", urlPath, "body:", body);
+          }
           resolve({
             status: res.statusCode ?? 0,
             headers: res.headers,
-            body: Buffer.concat(chunks).toString('utf-8'),
-          }),
-        );
+            body,
+          });
+        });
       },
     );
     req.on('error', reject);

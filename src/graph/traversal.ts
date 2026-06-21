@@ -231,9 +231,85 @@ export class GraphTraverser {
     const result: Array<{ node: Node; edge: Edge }> = [];
     const visited = new Set<string>();
 
-    this.getCallersRecursive(nodeId, maxDepth, 0, result, visited);
+    // Java interface dispatch: a method reachable via an interface is also
+    // reachable via any of its implementations, and vice versa. The
+    // interface-impl-dispatch synthesizer records this as `overrides` edges.
+    // To match Java semantics — "who calls this method?" must include BOTH
+    // direct-call sites (this.<x> in the impl) AND interface-call sites
+    // (IService.x() from a controller) — expand the dispatch group before
+    // collecting. Without this, an impl method surfaces only same-file
+    // callers and an interface method surfaces only cross-class callers.
+    //
+    // The visited set tracks "which target nodes we've already expanded" so
+    // recursion into a caller doesn't loop back. Only the ORIGINAL target
+    // is marked here — dispatch-group siblings must remain free to be
+    // expanded too (a sibling reached via a spurious `calls` edge from
+    // the first member would otherwise block the second member's
+    // collection). Siblings that show up as their own callers' "calls"
+    // edge (an `@Override` annotation resolving to the interface method)
+    // are filtered below — they're not real callers, just dispatch-loop
+    // self-references that the Java extractor happens to emit.
+    visited.add(nodeId);
+    const group = this.getDispatchGroup(nodeId);
+
+    for (const memberId of group) {
+      const edges = this.queries.getIncomingEdges(memberId, ['calls', 'references', 'imports', 'instantiates']);
+      const sourceIds = edges.map((e) => e.source);
+      const callerNodes = this.queries.getNodesByIds(sourceIds);
+      for (const edge of edges) {
+        const callerNode = callerNodes.get(edge.source);
+        if (callerNode && !visited.has(callerNode.id)) {
+          const isGroupSibling = group.has(callerNode.id);
+          const isSuperMemberEdge = edge.metadata?.resolvedBy === 'super-member';
+          // Drop dispatch-group siblings that the extractor accidentally
+          // wired as `calls` (impl → interface via @Override). They're
+          // polymorphic twins of the target, not real callers. Keep
+          // super.method() edges, but only attribute them to the base
+          // method they actually target (memberId === nodeId) to avoid
+          // reporting a subclass override as a caller of its sibling.
+          if (!isGroupSibling || (isSuperMemberEdge && memberId === nodeId)) {
+            visited.add(callerNode.id);
+            result.push({ node: callerNode, edge });
+          }
+        }
+      }
+    }
+
+    if (maxDepth > 1) {
+      const directCallerIds = result.map((r) => r.node.id);
+      for (const callerId of directCallerIds) {
+        this.getCallersRecursive(callerId, maxDepth, 1, result, visited);
+      }
+    }
 
     return result;
+  }
+
+  /**
+   * Compute the polymorphic-dispatch group for a node by walking `overrides`
+   * edges in both directions. The interface-impl-dispatch synthesizer writes
+   * interface-method → implementation-method `overrides` edges; a query on
+   * any member of the same group yields the same call set as any other.
+   *
+   * Cycles are not possible in practice (the synthesizer writes a bipartite
+   * shape, no impl can re-implement a method back to an interface), but the
+   * visited guard defends against any future re-entrancy.
+   */
+  private getDispatchGroup(nodeId: string): Set<string> {
+    const group = new Set<string>();
+    const queue: string[] = [nodeId];
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      if (group.has(id)) continue;
+      group.add(id);
+      for (const e of this.queries.getOutgoingEdges(id, ['overrides'])) {
+        if (!group.has(e.target)) queue.push(e.target);
+      }
+      for (const e of this.queries.getIncomingEdges(id, ['overrides'])) {
+        if (!group.has(e.source)) queue.push(e.source);
+      }
+    }
+    return group;
   }
 
   private getCallersRecursive(
@@ -281,7 +357,38 @@ export class GraphTraverser {
     const result: Array<{ node: Node; edge: Edge }> = [];
     const visited = new Set<string>();
 
-    this.getCalleesRecursive(nodeId, maxDepth, 0, result, visited);
+    // Symmetric with getCallers: a method's callees span the same dispatch
+    // group as its callers. If the method calls `helper()` and a sibling
+    // implementation also calls `helper()`, asking for "what does this
+    // method call?" should include that too (Java's static dispatch
+    // routes through the interface either way). The visited/filter
+    // discipline mirrors getCallers — see that comment for the rationale.
+    visited.add(nodeId);
+    const group = this.getDispatchGroup(nodeId);
+
+    for (const memberId of group) {
+      const edges = this.queries.getOutgoingEdges(memberId, ['calls', 'references', 'imports', 'instantiates']);
+      const targetIds = edges.map((e) => e.target);
+      const calleeNodes = this.queries.getNodesByIds(targetIds);
+      for (const edge of edges) {
+        const calleeNode = calleeNodes.get(edge.target);
+        if (
+          calleeNode &&
+          !visited.has(calleeNode.id) &&
+          (!group.has(calleeNode.id) || edge.metadata?.resolvedBy === 'super-member')
+        ) {
+          visited.add(calleeNode.id);
+          result.push({ node: calleeNode, edge });
+        }
+      }
+    }
+
+    if (maxDepth > 1) {
+      const directCalleeIds = result.map((r) => r.node.id);
+      for (const calleeId of directCalleeIds) {
+        this.getCalleesRecursive(calleeId, maxDepth, 1, result, visited);
+      }
+    }
 
     return result;
   }

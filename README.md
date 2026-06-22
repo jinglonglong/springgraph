@@ -1,28 +1,27 @@
 <div align="center">
 
-# Codegraph-SpringCloud
+# Springgraph
 
 ## Spring Cloud 语义知识图谱工具
 
-**基于 Codegraph/Springgraph 二次开发，专注 Spring Boot / Spring Cloud 微服务架构**
+**为 Spring Boot / Spring Cloud 微服务架构增强的代码知识图谱**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Fork of Springgraph](https://img.shields.io/badge/Fork%20of-Springgraph-blue.svg)](https://github.com/colbymchenry/springgraph)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-brightgreen.svg)](https://nodejs.org/)
 
 </div>
 
-> **本项目基于 [Springgraph (Codegraph)](https://github.com/colbymchenry/springgraph) 二次开发。**
-> 上游提供了 20+ 语言的 tree-sitter 抽取、SQLite + FTS5 知识图谱、原生文件监听与自动同步、MCP 服务器与多 Agent 接入能力。本仓库在此之上新增了面向 Spring Boot / Spring Cloud 微服务架构的语义层（**SpringKg**）与架构剖面引擎。
+> Forked from [colbymchenry/springgraph](https://github.com/colbymchenry/springgraph).
+> 上游提供了 20+ 语言的 tree-sitter 抽取、SQLite + FTS5 知识图谱、原生文件监听与自动同步、MCP 服务器与多 Agent 接入能力。本仓库在此之上新增了面向 Spring Boot / Spring Cloud 微服务架构的语义层与架构剖面引擎。
 
-**联系方式**: xyjnglong@163.com
+联系方式: xyjnglong@163.com
 
 ---
 
 ## 目录
 
-- [二开新增能力](#二开新增能力)
-- [SpringKg: Spring Cloud 语义知识图谱](#springkg--spring-cloud-语义知识图谱)
+- [新增能力](#新增能力)
+- [Spring Cloud 语义知识图谱](#spring-cloud-语义知识图谱)
 - [Spring MCP 工具 (4 个)](#spring-mcp-工具-4-个)
 - [架构剖面引擎](#架构剖面引擎-architecture-profile-engine)
 - [Spring Bean 自动装配解析](#spring-bean-自动装配解析)
@@ -38,14 +37,14 @@
 
 ---
 
-## 二开新增能力
+## 新增能力
 
 本仓库相对上游 [colbymchenry/springgraph](https://github.com/colbymchenry/springgraph) 的核心增量：
 
 | 模块 | 路径 | 作用 |
 |---|---|---|
-| **SpringKg 知识图谱** | `packages/springkg-*` | 专为 Spring Boot / Spring Cloud 构建的语义层 |
-| **SpringKg MCP Server** | `packages/springkg-mcp` | 暴露 4 个 Spring 专用 MCP 工具 |
+| **Spring 语义知识图谱** | `packages/springkg-*` | 专为 Spring Boot / Spring Cloud 构建的语义层 |
+| **Spring MCP Server** | `packages/springkg-mcp` | 暴露 4 个 Spring 专用 MCP 工具 |
 | **架构剖面引擎** | `src/architecture/` | 6 层 + 15 角色 + 多 Facet 检测 |
 | **Spring Bean 装配解析** | `src/resolution/` | `@Autowired`、`@Resource`、构造注入、接口派发、MyBatis XML 链路 |
 | **Web UI 可视化** | `src/web/` | Cytoscape.js 图浏览器, REST API `/api/architecture/*` |
@@ -55,9 +54,9 @@
 
 ---
 
-## SpringKg: Spring Cloud 语义知识图谱
+## Spring Cloud 语义知识图谱
 
-SpringKg 在 Springgraph 的 Java 抽取之上构建,专门针对 Spring Boot / Spring Cloud 微服务项目建立语义知识图谱,连接 HTTP 端点 → 服务层 → 数据访问层 → 运行时配置。
+在 Springgraph 的 Java 抽取之上构建,专门针对 Spring Boot / Spring Cloud 微服务项目建立语义知识图谱,连接 HTTP 端点 → 服务层 → 数据访问层 → 运行时配置。
 
 **抽取覆盖**:
 
@@ -92,7 +91,7 @@ SpringKg 在 Springgraph 的 Java 抽取之上构建,专门针对 Spring Boot / 
 | `spring_trace_flow` | 全链路追踪:Endpoint → Controller → Service → Mapper → SQL → Table |
 | `spring_method_impact` | 方法影响分析:调用链、事务边界、异常处理、SQL 依赖 |
 
-**工具精简的理由**:经过 A/B 评估,工具数量超过 4 个会显著增加 agent 选错工具的概率,所以这里把 SpringKg 的 MCP 接口收窄到 4 个高频工具。被精简掉的工具(MyBatis mapper 查询、运行配置查询、Nacos/Gateway 概览、功能社区搜索、字段影响、模块摘要、变更影响面、运行时依赖、环境差异对比)在底层数据层仍然存在,可以通过上游 `springgraph_search` / `springgraph_explore` / `springgraph_node` 间接访问。
+**工具精简的理由**:经过 A/B 评估,工具数量超过 4 个会显著增加 agent 选错工具的概率,所以这里把 Spring 语义层的 MCP 接口收窄到 4 个高频工具。被精简掉的工具(MyBatis mapper 查询、运行配置查询、Nacos/Gateway 概览、功能社区搜索、字段影响、模块摘要、变更影响面、运行时依赖、环境差异对比)在底层数据层仍然存在,可以通过上游 `springgraph_search` / `springgraph_explore` / `springgraph_node` 间接访问。
 
 每个工具的入参/出参字段定义见 [`docs/mcp-tools.md`](docs/mcp-tools.md)。
 
@@ -100,7 +99,7 @@ SpringKg 在 Springgraph 的 Java 抽取之上构建,专门针对 Spring Boot / 
 
 ## 架构剖面引擎 (Architecture Profile Engine)
 
-位于 `src/architecture/`,是二开的核心增量之一。Spring Cloud 项目的 Java 类按 6 层逻辑划分 + 15 个架构角色进行标记,让 Agent 拿到的不只是"一个类",而是它在系统里扮演的"角色"。
+位于 `src/architecture/`,是本仓库的核心增量之一。Spring Cloud 项目的 Java 类按 6 层逻辑划分 + 15 个架构角色进行标记,让 Agent 拿到的不只是"一个类",而是它在系统里扮演的"角色"。
 
 ### 6 个逻辑层
 
@@ -115,11 +114,11 @@ SpringKg 在 Springgraph 的 Java 抽取之上构建,专门针对 Spring Boot / 
 
 ### 15 个架构角色
 
-具体角色清单见 `src/architecture/profiles/spring-cloud.ts`,包括但不限于:`Controller`、`RestController`、`FeignClient`、`Service`、`Mapper`、`Repository`、`Entity`、`DTO`、`VO`、`Config`、`Filter`、`Interceptor`、`Component`、`Job`、`Scheduler` 等。
+具体角色清单见 `src/architecture/profiles/spring-cloud.ts`,包括但不限于：`Controller`、`RestController`、`FeignClient`、`Service`、`Mapper`、`Repository`、`Entity`、`DTO`、`VO`、`Config`、`Filter`、`Interceptor`、`Component`、`Job`、`Scheduler` 等。
 
 ### 注解适配器
 
-`src/architecture/adapters/` 提供多源适配器,识别项目里用到的常见注解和工具:
+`src/architecture/adapters/` 提供多源适配器,识别项目里用到的常见注解和工具：
 
 - Spring 注解(`@RestController`、`@Service`、`@Mapper`、`@FeignClient` 等)
 - Lombok(`@Data`、`@Builder`、`@RequiredArgsConstructor` 等)
@@ -130,7 +129,7 @@ SpringKg 在 Springgraph 的 Java 抽取之上构建,专门针对 Spring Boot / 
 
 ### Facet 检测
 
-每个类通过多个 Facet 描述自身特性,便于工具查询:
+每个类通过多个 Facet 描述自身特性,便于工具查询：
 
 - `spring-naming`: 基于命名约定识别(如 `*Controller`、`*Service`、`*Mapper`)
 - `spring-annotation`: 基于注解识别
@@ -147,7 +146,7 @@ SpringKg 在 Springgraph 的 Java 抽取之上构建,专门针对 Spring Boot / 
 
 ## Spring Bean 自动装配解析
 
-位于 `src/resolution/`,用于解析 Spring 容器内 Bean 之间的依赖关系。覆盖:
+位于 `src/resolution/`,用于解析 Spring 容器内 Bean 之间的依赖关系。覆盖：
 
 - `@Autowired` / `@Resource` 字段注入
 - 构造器注入(包括 Lombok `@RequiredArgsConstructor` 生成的构造器)
@@ -161,7 +160,7 @@ SpringKg 在 Springgraph 的 Java 抽取之上构建,专门针对 Spring Boot / 
 
 ## Web UI 可视化
 
-位于 `src/web/`,提供基于 Cytoscape.js 的图浏览器,对外暴露架构相关的 REST API(`/api/architecture/*`)。可以直观浏览:
+位于 `src/web/`,提供基于 Cytoscape.js 的图浏览器,对外暴露架构相关的 REST API(`/api/architecture/*`)。可以直观浏览：
 
 - Spring 各层的类和接口
 - 角色与层级的归属关系
@@ -174,7 +173,7 @@ SpringKg 在 Springgraph 的 Java 抽取之上构建,专门针对 Spring Boot / 
 
 ## Monorepo 包结构
 
-`packages/` 下放置 9 个 SpringKg 专用包,沿用 monorepo 风格组织:
+`packages/` 下放置 9 个 Spring 语义层专用包,沿用 monorepo 风格组织：
 
 | 包 | 职责 |
 |---|---|
@@ -184,9 +183,9 @@ SpringKg 在 Springgraph 的 Java 抽取之上构建,专门针对 Spring Boot / 
 | `springkg-semantic` | 语义层(角色、Facet、注解适配器) |
 | `springkg-runtime` | 运行时配置抽取与绑定分析 |
 | `springkg-community` | 功能社区与服务画像 |
-| `springkg-installer` | SpringKg 工具的安装器 |
+| `springkg-installer` | 工具安装器 |
 | `springkg-mcp` | 暴露 4 个 Spring 专用 MCP 工具(通过 `springgraph serve --mcp` 统一启动) |
-| `springkg-cli` | SpringKg 内部模块(CLI 统一使用 `springgraph` 命令) |
+| `springkg-cli` | 内部模块(CLI 统一使用 `springgraph` 命令) |
 
 ---
 
@@ -194,8 +193,8 @@ SpringKg 在 Springgraph 的 Java 抽取之上构建,专门针对 Spring Boot / 
 
 ```bash
 # 1. 克隆本仓库
-git clone https://github.com/jinglonglong/codegraph-springcloud.git
-cd codegraph-springcloud
+git clone https://github.com/jinglonglong/springgraph.git
+cd springgraph
 
 # 2. 安装依赖
 npm install
@@ -212,7 +211,7 @@ springgraph init
 springgraph index
 ```
 
-**启动 MCP 服务器**（供 AI Agent 调用 4 个 `spring_*` 工具）:
+**启动 MCP 服务器**(供 AI Agent 调用 4 个 `spring_*` 工具):
 
 ```bash
 springgraph serve --mcp --path /path/to/springcloud-project
@@ -252,7 +251,7 @@ npx tsx start-webui.ts
 └──────────────┘  └────────────────┘
 ```
 
-两个数据库并存:上游 `springgraph.db` 保留通用代码图,本仓库的 `springkg.db` 承载 Spring 语义层。统一通过 `springgraph serve --mcp` 启动,Agent 通过同一个 MCP 服务器访问全部工具。
+两个数据库并存：上游 `springgraph.db` 保留通用代码图,本仓库的 `springkg.db` 承载 Spring 语义层。统一通过 `springgraph serve --mcp` 启动,Agent 通过同一个 MCP 服务器访问全部工具。
 
 ---
 
@@ -284,7 +283,7 @@ npx tsx start-webui.ts
 
 ## 保留的上游能力
 
-本仓库在上游基础上做增量开发,上游核心能力全部保留:
+本仓库在上游基础上做增量开发,上游核心能力全部保留：
 
 - **20+ 语言** 的 tree-sitter AST 抽取
 - **SQLite + FTS5** 全文本检索的知识图谱
@@ -305,9 +304,9 @@ npm run dev                # tsc --watch
 npm test                   # 运行 vitest 全量测试
 npm run clean              # 删除 dist/
 
-# SpringKg 相关
-npm run build:springkg     # 构建 SpringKg 包
-npm run test:springkg      # 运行 SpringKg 相关测试
+# Spring 语义层相关
+npm run build:springkg     # 构建 packages/springkg-* 各包
+npm run test:springkg      # 运行 packages/springkg-* 相关测试
 
 # 按文件/模式跑测试
 npx vitest run __tests__/extraction.test.ts
@@ -321,20 +320,20 @@ npx vitest run __tests__/extraction.test.ts -t "Java"
 ## 项目结构
 
 ```
-codegraph-springcloud/
+springgraph/
 ├── src/                          # Springgraph 上游核心(保留)
-│   ├── architecture/             # 二开新增:架构剖面引擎
+│   ├── architecture/             # 本仓库新增:架构剖面引擎
 │   │   ├── adapters/             #   注解适配器(Spring/Lombok/MapStruct/MyBatis/OpenAPI/Validation)
 │   │   └── profiles/             #   Spring Cloud profile:6 层 + 15 角色
-│   ├── web/                      # 二开新增:Web UI 与架构 REST API
-│   ├── resolution/               # 二开增强:Spring Bean 装配解析
+│   ├── web/                      # 本仓库新增:Web UI 与架构 REST API
+│   ├── resolution/               # 本仓库增强:Spring Bean 装配解析
 │   ├── extraction/               # 上游:tree-sitter 抽取
 │   ├── db/                       # 上游:SQLite + FTS5
 │   ├── mcp/                      # 上游:MCP 服务器
 │   ├── sync/                     # 上游:文件监听与自动同步
 │   └── ...
 │
-├── packages/                     # 二开新增:SpringKg monorepo
+├── packages/                     # 本仓库新增:Spring 语义层 monorepo
 │   ├── springkg-shared/
 │   ├── springkg-core/
 │   ├── springkg-data/
@@ -346,7 +345,7 @@ codegraph-springcloud/
 │   └── springkg-cli/
 │
 ├── examples/
-│   └── springcloud-demo/         # 二开:用于本地验证的 Spring Cloud 演示项目
+│   └── springcloud-demo/         # 用于本地验证的 Spring Cloud 演示项目
 │
 ├── docs/                         # 文档
 ├── scripts/                      # 脚本
@@ -359,7 +358,7 @@ codegraph-springcloud/
 ## 致谢与许可
 
 - **上游项目**: [colbymchenry/springgraph](https://github.com/colbymchenry/springgraph),提供了完整的代码知识图谱基础设施
-- **本仓库**: 在 Springgraph 基础上新增了面向 Spring Boot / Spring Cloud 的 SpringKg 语义层与架构剖面引擎
+- **本仓库**: 在 Springgraph 基础上新增了面向 Spring Boot / Spring Cloud 的语义层与架构剖面引擎
 - **许可**: MIT(与上游一致)
 - **联系方式**: xyjnglong@163.com
 
@@ -367,7 +366,7 @@ codegraph-springcloud/
 
 <div align="center">
 
-**Codegraph-SpringCloud / SpringKg**
+**Springgraph**
 
 为 Spring Cloud 微服务架构量身打造的语义知识图谱
 

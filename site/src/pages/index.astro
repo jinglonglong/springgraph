@@ -90,12 +90,12 @@ const install = 'npm install -g @jinglonglong/springgraph';
 								<div class="line tool">- spring_trace_flow (全链路追踪: Endpoint -> Service -> Mapper -> SQL)</div>
 								<div class="line tool">- spring_assets_overview (系统服务画像与敏感配置总览)</div>
 								<div class="line tool">- spring_method_impact (分析方法变更的事务、SQL 与异常影响面)</div>
-								<div class="line prompt highlight">AI Agent 提问: "帮我分析 GET /api/users/{id} 的调用链"</div>
+								<div class="line prompt highlight">AI Agent 提问: "帮我分析 GET /api/users/&#123;id&#125; 的调用链"</div>
 								<div class="line result">=== 调用链分析结果 (Trace Flow) ===</div>
 								<div class="line result">1. [入口] UserController.getUser (UserController.java:24)</div>
 								<div class="line result">2. [业务] UserService.getUserById (UserService.java:12)</div>
 								<div class="line result">3. [数据] UserMapper.selectById (UserMapper.java:8)</div>
-								<div class="line result">4. [SQL] select * from users where id = #{id} (UserMapper.xml:4)</div>
+								<div class="line result">4. [SQL] select * from users where id = #&#123;id&#125; (UserMapper.xml:4)</div>
 							</div>
 						</div>
 

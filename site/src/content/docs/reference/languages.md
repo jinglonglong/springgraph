@@ -1,30 +1,30 @@
 ---
-title: Languages
-description: Every language Springgraph parses, and the extensions it recognizes.
+title: 支持语言
+description: Springgraph 支持解析的每种语言及其识别的扩展名。
 ---
 
-Language support is automatic from the file extension — there's nothing to configure.
+Springgraph 根据文件扩展名自动识别并处理支持的语言——您无需进行任何额外配置。
 
-| Language | Extensions | Status |
+| 语言 | 识别扩展名 | 状态 |
 |---|---|---|
-| TypeScript | `.ts`, `.tsx` | Full support |
-| JavaScript | `.js`, `.jsx`, `.mjs` | Full support |
-| Python | `.py` | Full support |
-| Go | `.go` | Full support |
-| Rust | `.rs` | Full support |
-| Java | `.java` | Full support |
-| C# | `.cs` | Full support |
-| PHP | `.php` | Full support |
-| Ruby | `.rb` | Full support |
-| C | `.c`, `.h` | Full support |
-| C++ | `.cpp`, `.hpp`, `.cc` | Full support |
-| Swift | `.swift` | Full support |
-| Kotlin | `.kt`, `.kts` | Full support |
-| Scala | `.scala`, `.sc` | Full support (classes, traits, methods, type aliases, Scala 3 enums) |
-| Dart | `.dart` | Full support |
-| Svelte | `.svelte` | Full support (script extraction, Svelte 5 runes, SvelteKit routes) |
-| Vue | `.vue` | Full support (script + script-setup, Nuxt page/API/middleware routes) |
-| Liquid | `.liquid` | Full support |
-| Pascal / Delphi | `.pas`, `.dpr`, `.dpk`, `.lpr` | Full support (classes, records, interfaces, enums, DFM/FMX forms) |
-| Lua | `.lua` | Full support (functions, methods, locals, `require` imports, call edges) |
-| Luau | `.luau` | Full support (Lua, plus typed signatures, `type` aliases, Roblox `require`) |
+| TypeScript | `.ts`, `.tsx` | 完全支持 |
+| JavaScript | `.js`, `.jsx`, `.mjs` | 完全支持 |
+| Python | `.py` | 完全支持 |
+| Go | `.go` | 完全支持 |
+| Rust | `.rs` | 完全支持 |
+| Java | `.java` | 完全支持（支持 Spring Boot / Spring Cloud 全套依赖、MyBatis、Feign 全面关联） |
+| C# | `.cs` | 完全支持 |
+| PHP | `.php` | 完全支持 |
+| Ruby | `.rb` | 完全支持 |
+| C | `.c`, `.h` | 完全支持 |
+| C++ | `.cpp`, `.hpp`, `.cc` | 完全支持 |
+| Swift | `.swift` | 完全支持 |
+| Kotlin | `.kt`, `.kts` | 完全支持 |
+| Scala | `.scala`, `.sc` | 完全支持（包含类、Trait、方法、类型别名、Scala 3 枚举等） |
+| Dart | `.dart` | 完全支持 |
+| Svelte | `.svelte` | 完全支持（包含 script 代码提取、Svelte 5 runes、SvelteKit 路由） |
+| Vue | `.vue` | 完全支持（包含 script 与 script-setup，Nuxt 页面/API/中间件路由） |
+| Liquid | `.liquid` | 完全支持 |
+| Pascal / Delphi | `.pas`, `.dpr`, `.dpk`, `.lpr` | 完全支持（包含类、Record、接口、枚举，DFM/FMX 窗体文件） |
+| Lua | `.lua` | 完全支持（包含函数、方法、局部变量、`require` 导入，调用关系边） |
+| Luau | `.luau` | 完全支持（Lua 基础、类型签名、`type` 别名、Roblox `require` 引入） |

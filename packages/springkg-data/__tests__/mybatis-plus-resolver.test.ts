@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MyBatisPlusResolver } from '../src/mybatis-plus-resolver';
-import type { SpringKgNode } from '@colbymchenry/springkg-shared';
+import type { SpringKgNode } from '@jinglonglong/springkg-shared';
 
 const makeClass = (id: string, name: string, decorators: string[]): SpringKgNode => ({
   id, kind: 'class', name, qualifiedName: `com.demo.${name}`, filePath: `${name}.java`,

@@ -1,5 +1,5 @@
 {
-  "name": "@colbymchenry/springkg-mcp",
+  "name": "@jinglonglong/springkg-mcp",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
@@ -8,12 +8,12 @@
     "build": "tsc && node ../springkg-shared/scripts/fix-esm-extensions.mjs dist"
   },
   "dependencies": {
-    "@colbymchenry/springkg-shared": "0.1.0",
-    "@colbymchenry/springkg-core": "0.1.0",
+    "@jinglonglong/springkg-shared": "0.1.0",
+    "@jinglonglong/springkg-core": "0.1.0",
     "@modelcontextprotocol/sdk": "^0.5.0"
   },
   "peerDependencies": {
-    "@colbymchenry/springgraph": "*"
+    "@jinglonglong/springgraph": "*"
   },
   "publishConfig": {
     "access": "public"

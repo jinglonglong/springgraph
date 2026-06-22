@@ -3,7 +3,7 @@ import { createMockSpringKg, seedConfigProperty, seedEdge, seedSymbol } from '..
 import { handleRuntimeDependency } from '../../src/tools/runtime-dependency.js';
 
 let mockSk: ReturnType<typeof createMockSpringKg>;
-const sk = () => mockSk as unknown as import('@colbymchenry/springkg-core').SpringKg;
+const sk = () => mockSk as unknown as import('@jinglonglong/springkg-core').SpringKg;
 
 function textOf(result: { content: ReadonlyArray<{ type: string; text: string }> }): string {
   return result.content.map((entry) => entry.text).join('\n');

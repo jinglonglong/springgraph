@@ -9,17 +9,17 @@ Get up and running with Springgraph in seconds.
 
 ```bash
 # macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/colbymchenry/springgraph/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/jinglonglong/springgraph/main/install.sh | sh
 
 # Windows (PowerShell)
-irm https://raw.githubusercontent.com/colbymchenry/springgraph/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/jinglonglong/springgraph/main/install.ps1 | iex
 ```
 
 ## Already have Node? Use npm instead (works on any version)
 
 ```bash
-npx @colbymchenry/springgraph        # zero-install, or:
-npm i -g @colbymchenry/springgraph
+npx @jinglonglong/springgraph        # zero-install, or:
+npm i -g @jinglonglong/springgraph
 ```
 
 Springgraph bundles its own runtime — nothing to compile, no native build, works the same everywhere. The interactive installer auto-configures your agent(s) — Claude Code, Cursor, Codex CLI, opencode, Hermes Agent, Gemini CLI, Antigravity IDE, Kiro.

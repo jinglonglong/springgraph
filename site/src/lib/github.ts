@@ -18,7 +18,7 @@ async function fetchStars(fallback: string): Promise<string> {
 	try {
 		const controller = new AbortController();
 		const timeout = setTimeout(() => controller.abort(), 3000);
-		const res = await fetch('https://api.github.com/repos/colbymchenry/springgraph', {
+		const res = await fetch('https://api.github.com/repos/jinglonglong/springgraph', {
 			headers: {
 				Accept: 'application/vnd.github+json',
 				'User-Agent': 'springgraph-site',

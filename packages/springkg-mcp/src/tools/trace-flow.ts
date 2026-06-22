@@ -16,7 +16,7 @@
  * Read-only — no writes.
  */
 
-import type { SpringKg } from '@colbymchenry/springkg-core';
+import type { SpringKg } from '@jinglonglong/springkg-core';
 import { textResult, notFoundResult, parseMeta, fmtLocation } from '../lib/format.js';
 
 interface TraceFlowArgs {

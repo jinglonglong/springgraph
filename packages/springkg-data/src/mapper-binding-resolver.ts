@@ -1,4 +1,4 @@
-import type { SpringKgNode, SpringKgEdge, SpringKgEnhanceOutput } from '@colbymchenry/springkg-shared';
+import type { SpringKgNode, SpringKgEdge, SpringKgEnhanceOutput } from '@jinglonglong/springkg-shared';
 
 export class MapperBindingResolver {
   resolve(

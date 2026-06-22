@@ -1,4 +1,4 @@
-import type { SpringKg } from '@colbymchenry/springkg-core';
+import type { SpringKg } from '@jinglonglong/springkg-core';
 import { notFoundResult, textResult } from '../lib/format.js';
 
 interface ConfigRow {

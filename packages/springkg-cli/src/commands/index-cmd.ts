@@ -7,7 +7,7 @@
  */
 
 export async function runIndex(projectPath: string): Promise<void> {
-  const { SpringKg } = await import('@colbymchenry/springkg-core');
+  const { SpringKg } = await import('@jinglonglong/springkg-core');
   console.log(`Indexing project at: ${projectPath}`);
   const sk = await SpringKg.open({ projectPath });
   try {

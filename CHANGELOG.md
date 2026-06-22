@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to CodeGraph are documented here. Each entry also ships as
-a [GitHub Release](https://github.com/colbymchenry/codegraph/releases) tagged
+a [GitHub Release](https://github.com/jinglonglong/codegraph/releases) tagged
 `vX.Y.Z`, which is where most people will look.
 
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
@@ -11,7 +11,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Breaking Changes
 
-- The project has been renamed from CodeGraph to Springgraph. The CLI is now `springgraph` (was `codegraph`), the per-project data directory is `.springgraph/` (was `.codegraph/`), the SQLite database is `springgraph.db` (was `codegraph.db`), the MCP tools are now `springgraph_search` / `springgraph_explore` / `springgraph_callers` / `springgraph_node` (and the unlisted `springgraph_callees` / `springgraph_impact` / `springgraph_files` / `springgraph_status`), and the npm package is `@colbymchenry/springgraph` (was `@colbymchenry/codegraph`). Environment variables are now `SPRINGGRAPH_*` (e.g. `SPRINGGRAPH_DIR`, `SPRINGGRAPH_NO_DAEMON`, `SPRINGGRAPH_WATCH_DEBOUNCE_MS`, `SPRINGGRAPH_TELEMETRY`, `SPRINGGRAPH_MCP_LOG_ATTACH`). Existing projects need to be re-initialized: run `springgraph uninit` on a project that has an old `.codegraph/` directory, then `springgraph init` to build a fresh `.springgraph/` index. The web UI now ships under the "springgraph" brand (was "SpringKG").
+- The project has been renamed from CodeGraph to Springgraph. The CLI is now `springgraph` (was `codegraph`), the per-project data directory is `.springgraph/` (was `.codegraph/`), the SQLite database is `springgraph.db` (was `codegraph.db`), the MCP tools are now `springgraph_search` / `springgraph_explore` / `springgraph_callers` / `springgraph_node` (and the unlisted `springgraph_callees` / `springgraph_impact` / `springgraph_files` / `springgraph_status`), and the npm package is `@jinglonglong/springgraph` (was `@jinglonglong/codegraph`). Environment variables are now `SPRINGGRAPH_*` (e.g. `SPRINGGRAPH_DIR`, `SPRINGGRAPH_NO_DAEMON`, `SPRINGGRAPH_WATCH_DEBOUNCE_MS`, `SPRINGGRAPH_TELEMETRY`, `SPRINGGRAPH_MCP_LOG_ATTACH`). Existing projects need to be re-initialized: run `springgraph uninit` on a project that has an old `.codegraph/` directory, then `springgraph init` to build a fresh `.springgraph/` index. The web UI now ships under the "springgraph" brand (was "SpringKG").
 - Web UI brand updated from "SpringKG" to "springgraph" across the dashboard, header, and static assets.
 
 ### Housekeeping
@@ -213,7 +213,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Swift deferred-validation flows (and similar "handler array" patterns) now connect end-to-end in `codegraph_trace` and `codegraph_explore` — following a request's lifecycle reaches the validators registered with `.validate { … }` instead of dead-ending where the framework runs them by iterating a stored list of closures. Any pattern where closures are appended to a collection and later invoked by looping over it is now traced.
 - `codegraph_explore` now spells out the dynamic-dispatch relationships of the symbols you ask about — e.g. "the closures registered here are run by `didCompleteTask`" — so the indirect hops you'd otherwise grep to reconstruct are listed alongside the call flow.
 - `codegraph_explore` answers multi-phase questions that span a large "god file" far more completely. For a flow like "build, send, and validate a request" — where one big file holds the build chain and the validate logic lives in others — it now keeps every method *on the flow path* in full, collapses the file's off-path methods to one-line signatures, and guarantees each phase's defining file is shown (instead of truncating at a fixed size and dropping whichever phase came last, which sent you to read it by hand). Incidental files that merely name-drop the flow are still trimmed, so the response stays focused on the code that answers the question.
-- CodeGraph is usable as an embedded library again: `require("@colbymchenry/codegraph")` and `import` now resolve the programmatic API — the `CodeGraph` class plus building blocks like `DatabaseConnection`, `QueryBuilder`, `initGrammars`, and `FileLock` — so you can drive the graph directly from your own app (for example an Electron process) instead of only through the CLI or MCP server. Embedding runs on your own runtime, so it needs Node 22.5+ for the built-in SQLite. (#354)
+- CodeGraph is usable as an embedded library again: `require("@jinglonglong/codegraph")` and `import` now resolve the programmatic API — the `CodeGraph` class plus building blocks like `DatabaseConnection`, `QueryBuilder`, `initGrammars`, and `FileLock` — so you can drive the graph directly from your own app (for example an Electron process) instead of only through the CLI or MCP server. Embedding runs on your own runtime, so it needs Node 22.5+ for the built-in SQLite. (#354)
 
 ### Fixes
 
@@ -306,7 +306,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Several static-extraction and resolution correctness fixes underpin the routing work above: C++ inheritance edges that were previously missing, Dart methods that were extracted signature-only, Python handlers named `index`/`get`/`update` that were being silently dropped, and an explore output-budget issue that under-returned source on repos with very large files.
 - `codegraph serve --mcp` no longer keeps running after its parent agent is force-killed (OOM, `kill -9`, or container teardown) on Linux, where it used to hold inotify watches, file descriptors, and the SQLite WAL indefinitely; the server now shuts down as soon as its parent process changes, tunable via `CODEGRAPH_PPID_POLL_MS` (#277).
-- Installing `@colbymchenry/codegraph` through a registry mirror that hadn't yet mirrored the matching per-platform package no longer fails with `no prebuilt bundle for <platform>`; the launcher now downloads the bundle from GitHub Releases and caches it, with `CODEGRAPH_NO_DOWNLOAD=1` to disable the fallback and `CODEGRAPH_DOWNLOAD_BASE` to point it at your own mirror (#303).
+- Installing `@jinglonglong/codegraph` through a registry mirror that hadn't yet mirrored the matching per-platform package no longer fails with `no prebuilt bundle for <platform>`; the launcher now downloads the bundle from GitHub Releases and caches it, with `CODEGRAPH_NO_DOWNLOAD=1` to disable the fallback and `CODEGRAPH_DOWNLOAD_BASE` to point it at your own mirror (#303).
 - `install.sh` no longer fails with `403` / "could not resolve latest version" on shared or cloud hosts that exhaust GitHub's unauthenticated API rate limit; it now resolves the version through the unthrottled releases redirect, and `CODEGRAPH_VERSION` accepts a bare version like `0.9.4` as well as `v0.9.4` (#325).
 
 ## [0.9.3] - 2026-05-22
@@ -431,20 +431,20 @@ Thanks @andreinknv for the substantive draft this release was based on.
 
 - Fixed the `codegraph` command failing with `permission denied` right after a fresh global install — the 0.7.5 package shipped the CLI without its executable bit, so your shell refused to run it. New installs work out of the box. If you're stuck on 0.7.5, upgrade to 0.7.6 or unblock yourself in place by making the installed binary executable with `chmod +x`.
 
-[0.9.7]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.7
-[0.9.6]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.6
-[0.9.5]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.5
-[0.9.4]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.4
-[0.9.3]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.3
-[0.9.2]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.2
-[0.9.1]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.1
-[0.9.0]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.0
-[0.8.0]: https://github.com/colbymchenry/codegraph/releases/tag/v0.8.0
-[0.7.10]: https://github.com/colbymchenry/codegraph/releases/tag/v0.7.10
-[0.7.9]: https://github.com/colbymchenry/codegraph/releases/tag/v0.7.9
-[0.7.7]: https://github.com/colbymchenry/codegraph/releases/tag/v0.7.7
-[0.7.6]: https://github.com/colbymchenry/codegraph/releases/tag/v0.7.6
-[0.9.8]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.8
-[0.9.9]: https://github.com/colbymchenry/codegraph/releases/tag/v0.9.9
-[1.0.0]: https://github.com/colbymchenry/codegraph/releases/tag/v1.0.0
-[1.0.1]: https://github.com/colbymchenry/codegraph/releases/tag/v1.0.1
+[0.9.7]: https://github.com/jinglonglong/codegraph/releases/tag/v0.9.7
+[0.9.6]: https://github.com/jinglonglong/codegraph/releases/tag/v0.9.6
+[0.9.5]: https://github.com/jinglonglong/codegraph/releases/tag/v0.9.5
+[0.9.4]: https://github.com/jinglonglong/codegraph/releases/tag/v0.9.4
+[0.9.3]: https://github.com/jinglonglong/codegraph/releases/tag/v0.9.3
+[0.9.2]: https://github.com/jinglonglong/codegraph/releases/tag/v0.9.2
+[0.9.1]: https://github.com/jinglonglong/codegraph/releases/tag/v0.9.1
+[0.9.0]: https://github.com/jinglonglong/codegraph/releases/tag/v0.9.0
+[0.8.0]: https://github.com/jinglonglong/codegraph/releases/tag/v0.8.0
+[0.7.10]: https://github.com/jinglonglong/codegraph/releases/tag/v0.7.10
+[0.7.9]: https://github.com/jinglonglong/codegraph/releases/tag/v0.7.9
+[0.7.7]: https://github.com/jinglonglong/codegraph/releases/tag/v0.7.7
+[0.7.6]: https://github.com/jinglonglong/codegraph/releases/tag/v0.7.6
+[0.9.8]: https://github.com/jinglonglong/codegraph/releases/tag/v0.9.8
+[0.9.9]: https://github.com/jinglonglong/codegraph/releases/tag/v0.9.9
+[1.0.0]: https://github.com/jinglonglong/codegraph/releases/tag/v1.0.0
+[1.0.1]: https://github.com/jinglonglong/codegraph/releases/tag/v1.0.1

@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import type { SpringKg } from '@colbymchenry/springkg-core';
+import type { SpringKg } from '@jinglonglong/springkg-core';
 import { fmtLocation, notFoundResult, textResult } from '../lib/format.js';
 
 interface SurfaceSymbolRow {

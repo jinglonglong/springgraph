@@ -21,7 +21,7 @@ HARNESS="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$HARNESS/../.." && pwd)"     # springgraph repo root
 CORPUS="${CORPUS:-/tmp/springgraph-corpus}"
 REPO="$CORPUS/$NAME"
-PKG="@colbymchenry/springgraph"
+PKG="@jinglonglong/springgraph"
 
 echo "==================== Springgraph audit ===================="
 echo "version=$VERSION  repo=$NAME  mode=$MODE  corpus=$CORPUS"

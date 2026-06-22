@@ -7,7 +7,7 @@
  * Read-only — no writes to spring_symbols or spring_edges.
  */
 
-import type { SpringKg } from '@colbymchenry/springkg-core';
+import type { SpringKg } from '@jinglonglong/springkg-core';
 import { textResult, notFoundResult, parseMeta, fmtLocation } from '../lib/format.js';
 
 interface FindEntryArgs {

@@ -19,7 +19,7 @@ import * as fs from 'fs';
 // -----------------------------------------------------------------------------
 
 export async function runInspectEndpoint(projectPath: string, url: string): Promise<void> {
-  const { SpringKg } = await import('@colbymchenry/springkg-core');
+  const { SpringKg } = await import('@jinglonglong/springkg-core');
   const sk = await SpringKg.open({ projectPath });
   try {
     const db = sk.db.getDb();
@@ -60,7 +60,7 @@ export async function runInspectEndpoint(projectPath: string, url: string): Prom
 // -----------------------------------------------------------------------------
 
 export async function runInspectFeign(projectPath: string, name: string): Promise<void> {
-  const { SpringKg } = await import('@colbymchenry/springkg-core');
+  const { SpringKg } = await import('@jinglonglong/springkg-core');
   const sk = await SpringKg.open({ projectPath });
   try {
     const db = sk.db.getDb();
@@ -99,7 +99,7 @@ export async function runInspectFeign(projectPath: string, name: string): Promis
 // -----------------------------------------------------------------------------
 
 export async function runInspectMapper(projectPath: string, namespace: string): Promise<void> {
-  const { SpringKg } = await import('@colbymchenry/springkg-core');
+  const { SpringKg } = await import('@jinglonglong/springkg-core');
   const sk = await SpringKg.open({ projectPath });
   try {
     const db = sk.db.getDb();
@@ -164,7 +164,7 @@ export async function runInspectMapper(projectPath: string, namespace: string): 
 // -----------------------------------------------------------------------------
 
 export async function runInspectConfig(projectPath: string, key: string): Promise<void> {
-  const { SpringKg } = await import('@colbymchenry/springkg-core');
+  const { SpringKg } = await import('@jinglonglong/springkg-core');
   const sk = await SpringKg.open({ projectPath });
   try {
     const db = sk.db.getDb();

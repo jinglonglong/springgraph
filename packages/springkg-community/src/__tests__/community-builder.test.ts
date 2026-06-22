@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { SpringKgEdge, SpringKgNode } from '@colbymchenry/springkg-shared';
+import type { SpringKgEdge, SpringKgNode } from '@jinglonglong/springkg-shared';
 
 import { CommunityBuilder } from '../community-builder.js';
 

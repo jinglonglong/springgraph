@@ -119,11 +119,11 @@ export async function runInstallerWithOptions(opts: RunInstallerOptions): Promis
       const s = clack.spinner();
       s.start('Installing springgraph CLI...');
       try {
-        execSync('npm install -g @colbymchenry/springgraph', { stdio: 'pipe', windowsHide: true });
+        execSync('npm install -g @jinglonglong/springgraph', { stdio: 'pipe', windowsHide: true });
         s.stop('Installed springgraph CLI on PATH');
       } catch {
         s.stop('Could not install (permission denied)');
-        clack.log.warn('Try: sudo npm install -g @colbymchenry/springgraph');
+        clack.log.warn('Try: sudo npm install -g @jinglonglong/springgraph');
       }
     } else {
       clack.log.info('Skipped CLI install — agents will not be able to launch the MCP server without it');

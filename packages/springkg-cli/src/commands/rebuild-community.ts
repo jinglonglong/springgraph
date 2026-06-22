@@ -13,7 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 export async function runRebuildCommunity(projectPath: string): Promise<void> {
-  const { SpringKg } = await import('@colbymchenry/springkg-core');
+  const { SpringKg } = await import('@jinglonglong/springkg-core');
   console.log(`Rebuilding feature community summaries for: ${projectPath}`);
   const sk = await SpringKg.open({ projectPath });
   try {

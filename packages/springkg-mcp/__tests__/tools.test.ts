@@ -11,7 +11,7 @@ import { handleAssetsOverview } from '../src/tools/assets-overview.js';
 import { handleTraceFlow } from '../src/tools/trace-flow.js';
 
 let mockSk: ReturnType<typeof createMockSpringKg>;
-const sk = () => mockSk as unknown as import('@colbymchenry/springkg-core').SpringKg;
+const sk = () => mockSk as unknown as import('@jinglonglong/springkg-core').SpringKg;
 
 beforeEach(() => {
   mockSk = createMockSpringKg();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MapperBindingResolver } from '../src/mapper-binding-resolver';
-import type { SpringKgNode } from '@colbymchenry/springkg-shared';
+import type { SpringKgNode } from '@jinglonglong/springkg-shared';
 
 const makeInterface = (id: string, fqn: string, methods: string[]): { interfaceNode: SpringKgNode; methods: SpringKgNode[] } => ({
   interfaceNode: { id, kind: 'class', qualifiedName: fqn, name: fqn.split('.').pop(), filePath: 'UserDao.java', startLine: 1, endLine: 10, metadata: { decorators: ['@Mapper'] }, confidence: 1, createdAt: 0, updatedAt: 0 },

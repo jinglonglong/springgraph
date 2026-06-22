@@ -1,4 +1,4 @@
-import { SPRINGKG_CONFIG } from '@colbymchenry/springkg-shared';
+import { SPRINGKG_CONFIG } from '@jinglonglong/springkg-shared';
 import type { SpringDatabase } from '../db/spring-db.js';
 
 type SummarizeHook = (community: { id: string; label: string; memberCount: number }) => string;

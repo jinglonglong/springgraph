@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { JPAEntityResolver } from '../src/jpa-entity-resolver';
-import type { SpringKgNode } from '@colbymchenry/springkg-shared';
+import type { SpringKgNode } from '@jinglonglong/springkg-shared';
 
 const makeEntity = (id: string, name: string, decorators: string[]): SpringKgNode => ({
   id, kind: 'class', name, qualifiedName: `com.demo.${name}`, filePath: `${name}.java`,

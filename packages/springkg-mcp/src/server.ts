@@ -2,8 +2,8 @@ import * as readline from 'readline';
 import * as path from 'path';
 import * as fs from 'fs';
 import { createRequire } from 'module';
-import { SpringkgSeeder } from '@colbymchenry/springkg-core';
-import type { SpringKg } from '@colbymchenry/springkg-core';
+import { SpringkgSeeder } from '@jinglonglong/springkg-core';
+import type { SpringKg } from '@jinglonglong/springkg-core';
 import { notIndexedResult } from './lib/format.js';
 import { SPRINGKG_SERVER_INSTRUCTIONS } from './server-instructions.js';
 import { handleMethodImpact } from './tools/method-impact.js';
@@ -360,7 +360,7 @@ export class SpringKgMcpServer {
     }
 
     try {
-      const cgModule = await import('@colbymchenry/springgraph');
+      const cgModule = await import('@jinglonglong/springgraph');
       const Springgraph = (cgModule as any).Springgraph || (cgModule as any).default?.Springgraph || (cgModule as any).default;
       this.springgraph = Springgraph.isInitialized(this.projectPath)
         ? await Springgraph.open(this.projectPath)

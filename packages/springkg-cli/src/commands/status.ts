@@ -11,7 +11,7 @@
  */
 
 export async function runStatus(projectPath: string): Promise<void> {
-  const { SpringKg } = await import('@colbymchenry/springkg-core');
+  const { SpringKg } = await import('@jinglonglong/springkg-core');
   const sk = await SpringKg.open({ projectPath });
   try {
     const db = sk.db.getDb();

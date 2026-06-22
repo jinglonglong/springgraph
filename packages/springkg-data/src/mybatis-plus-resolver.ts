@@ -1,4 +1,4 @@
-import type { SpringKgNode, SpringKgEdge, SpringKgEnhanceOutput } from '@colbymchenry/springkg-shared';
+import type { SpringKgNode, SpringKgEdge, SpringKgEnhanceOutput } from '@jinglonglong/springkg-shared';
 
 function toSnakeCase(name: string): string {
   return name

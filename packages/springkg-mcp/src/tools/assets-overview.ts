@@ -12,7 +12,7 @@
  * Read-only — no writes.
  */
 
-import type { SpringKg } from '@colbymchenry/springkg-core';
+import type { SpringKg } from '@jinglonglong/springkg-core';
 import { textResult, fmtLocation } from '../lib/format.js';
 
 export async function handleAssetsOverview(

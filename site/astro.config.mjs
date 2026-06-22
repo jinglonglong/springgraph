@@ -2,10 +2,10 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
-// Project page on GitHub Pages: https://colbymchenry.github.io/springgraph/
+// Project page on GitHub Pages: https://jinglonglong.github.io/springgraph/
 // `site` + `base` make every internal link resolve under the /springgraph/ prefix.
 export default defineConfig({
-	site: 'https://colbymchenry.github.io',
+	site: 'https://jinglonglong.github.io',
 	base: '/springgraph',
 	integrations: [
 		starlight({
@@ -26,7 +26,7 @@ export default defineConfig({
 				{
 					icon: 'github',
 					label: 'GitHub',
-					href: 'https://github.com/colbymchenry/springgraph',
+					href: 'https://github.com/jinglonglong/springgraph',
 				},
 			],
 			customCss: [

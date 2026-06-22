@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import type { SpringKgEdge, SpringKgNode } from '@colbymchenry/springkg-shared';
+import type { SpringKgEdge, SpringKgNode } from '@jinglonglong/springkg-shared';
 
 import type { BuildOptions, FeatureCommunity, FeatureCommunityMember } from './types.js';
 

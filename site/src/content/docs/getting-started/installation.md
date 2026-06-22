@@ -6,7 +6,7 @@ description: Install Springgraph and configure your AI coding agents.
 ## 1. Run the installer
 
 ```bash
-npx @colbymchenry/springgraph
+npx @jinglonglong/springgraph
 ```
 
 The installer will:

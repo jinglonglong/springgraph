@@ -6,7 +6,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import type { SpringKgNode, SpringKgEdge } from '@colbymchenry/springkg-shared';
+import type { SpringKgNode, SpringKgEdge } from '@jinglonglong/springkg-shared';
 
 export interface AnnotationSqlExtractorResult {
   symbols: SpringKgNode[];

@@ -3,7 +3,7 @@ import type {
   FeatureCommunityMember as SharedFeatureCommunityMember,
   SpringKgEdge,
   SpringKgNode,
-} from '@colbymchenry/springkg-shared';
+} from '@jinglonglong/springkg-shared';
 
 export interface FeatureCommunity extends SharedFeatureCommunity {
   dominantPackage: string;

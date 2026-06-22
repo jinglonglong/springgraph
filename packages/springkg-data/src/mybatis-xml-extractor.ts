@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import type { SpringKgEdge, SpringKgNode, SpringKgSqlStatement } from '@colbymchenry/springkg-shared';
+import type { SpringKgEdge, SpringKgNode, SpringKgSqlStatement } from '@jinglonglong/springkg-shared';
 
 import { SqlTableColumnExtractor } from './sql-table-column';
 

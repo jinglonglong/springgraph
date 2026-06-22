@@ -1,4 +1,4 @@
-import type { SpringKgEnhanceOutput } from '@colbymchenry/springkg-shared';
+import type { SpringKgEnhanceOutput } from '@jinglonglong/springkg-shared';
 import type { SqlTableColumnResult } from './sql-table-column';
 
 export interface SqlWriterInput {

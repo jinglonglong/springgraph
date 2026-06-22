@@ -12,16 +12,16 @@
 
 | Package | Purpose | Ready for |
 |---|---|---|
-| `@colbymchenry/springkg-shared` | TypeScript interfaces (`Resolver`, `SpringKgNode`, `SpringKgEdge`, `SPRINGKG_CONFIG`) | Teams B/C/D/F import from here |
-| `@colbymchenry/springkg-core` | `SpringKg` orchestrator, `SpringDatabase`, migration runner, `SummaryGenerator` | Teams B/C/D/F register resolvers here |
-| `@colbymchenry/springkg-installer` | `springkg install` / `springkg uninstall` CLI for Claude/Cursor/opencode | Team E extends with real implementations |
-| `@colbymchenry/springkg-cli` | CLI binary (`springkg` command) | Team E adds `init`/`index`/`status` commands |
+| `@jinglonglong/springkg-shared` | TypeScript interfaces (`Resolver`, `SpringKgNode`, `SpringKgEdge`, `SPRINGKG_CONFIG`) | Teams B/C/D/F import from here |
+| `@jinglonglong/springkg-core` | `SpringKg` orchestrator, `SpringDatabase`, migration runner, `SummaryGenerator` | Teams B/C/D/F register resolvers here |
+| `@jinglonglong/springkg-installer` | `springkg install` / `springkg uninstall` CLI for Claude/Cursor/opencode | Team E extends with real implementations |
+| `@jinglonglong/springkg-cli` | CLI binary (`springkg` command) | Team E adds `init`/`index`/`status` commands |
 
 ### How to register a resolver
 
 ```typescript
-import { SpringKg } from '@colbymchenry/springkg-core';
-import type { Resolver } from '@colbymchenry/springkg-shared';
+import { SpringKg } from '@jinglonglong/springkg-core';
+import type { Resolver } from '@jinglonglong/springkg-shared';
 
 const sk = await SpringKg.init({ projectPath: '/path/to/project' });
 sk.registerResolver({

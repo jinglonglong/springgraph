@@ -263,7 +263,7 @@ function cleanupLegacyLocalMcp(): WriteResult['files'][number] | null {
  * a pre-0.8 install wrote. Those installers added
  * `PostToolUse(Edit|Write) → springgraph mark-dirty` and
  * `Stop → springgraph sync-if-dirty` (local builds used the
- * `npx @colbymchenry/springgraph …` form, which still contains the
+ * `npx @jinglonglong/springgraph …` form, which still contains the
  * `springgraph <subcommand>` substring). Both subcommands were later
  * removed from the CLI, so the Stop hook fails every turn with
  * "unknown command 'sync-if-dirty'". Matching on the springgraph-scoped

@@ -1,5 +1,5 @@
 {
-  "name": "@colbymchenry/springkg-shared",
+  "name": "@jinglonglong/springkg-shared",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",

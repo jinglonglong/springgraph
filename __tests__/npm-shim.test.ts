@@ -39,12 +39,12 @@ function mkTmp(label: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), `cg-shim-${label}-`));
 }
 
-// A temp dir standing in for the installed @colbymchenry/springgraph main package.
+// A temp dir standing in for the installed @jinglonglong/springgraph main package.
 function makePkg(version = '9.9.9-test'): string {
   const dir = mkTmp('pkg');
   fs.copyFileSync(SHIM_SRC, path.join(dir, 'npm-shim.js'));
   fs.writeFileSync(path.join(dir, 'package.json'),
-    JSON.stringify({ name: '@colbymchenry/springgraph', version }) + '\n');
+    JSON.stringify({ name: '@jinglonglong/springgraph', version }) + '\n');
   return dir;
 }
 
@@ -74,10 +74,10 @@ function runShim(pkgDir: string, args: string[], env: Record<string, string>) {
 describe.skipIf(isWindows)('npm-shim launcher', () => {
   it('runs the installed optional-dependency bundle without any download', async () => {
     const pkg = makePkg();
-    const platformPkg = path.join(pkg, 'node_modules', '@colbymchenry', `springgraph-${target}`);
+    const platformPkg = path.join(pkg, 'node_modules', '@jinglonglong', `springgraph-${target}`);
     writeLauncher(path.join(platformPkg, 'bin'));
     fs.writeFileSync(path.join(platformPkg, 'package.json'),
-      JSON.stringify({ name: `@colbymchenry/springgraph-${target}`, version: '9.9.9-test' }) + '\n');
+      JSON.stringify({ name: `@jinglonglong/springgraph-${target}`, version: '9.9.9-test' }) + '\n');
     const cache = mkTmp('cache');
     const r = await runShim(pkg, ['--probe-abc'], { SPRINGGRAPH_INSTALL_DIR: cache });
 
@@ -112,7 +112,7 @@ describe.skipIf(isWindows)('npm-shim launcher', () => {
 
     expect(r.status).toBe(1);
     expect(r.stderr).toContain(`no prebuilt bundle for ${target}`);
-    expect(r.stderr).toContain(`@colbymchenry/springgraph-${target}`);
+    expect(r.stderr).toContain(`@jinglonglong/springgraph-${target}`);
     expect(r.stderr).toContain('--registry=https://registry.npmjs.org');
     expect(r.stderr).toContain('install.sh');
   });

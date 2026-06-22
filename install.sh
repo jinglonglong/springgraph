@@ -6,7 +6,7 @@
 # GitHub Releases. No Node.js, no build tools, no npm required — ideal for a
 # fresh Linux VPS over SSH.
 #
-#   curl -fsSL https://raw.githubusercontent.com/colbymchenry/springgraph/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/jinglonglong/springgraph/main/install.sh | sh
 #
 # Upgrade:   run `springgraph upgrade` (or just re-run the same command).
 # Uninstall: curl -fsSL .../install.sh | sh -s -- --uninstall
@@ -17,7 +17,7 @@
 #   SPRINGGRAPH_BIN_DIR      symlink location  (default: ~/.local/bin)
 set -eu
 
-REPO="colbymchenry/springgraph"
+REPO="jinglonglong/springgraph"
 INSTALL_DIR="${SPRINGGRAPH_INSTALL_DIR:-$HOME/.springgraph}"
 BIN_DIR="${SPRINGGRAPH_BIN_DIR:-$HOME/.local/bin}"
 

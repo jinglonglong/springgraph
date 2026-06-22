@@ -37,7 +37,7 @@ describe('buildNode25BlockBanner', () => {
 
   it('links to issue #81 for the root-cause writeup', () => {
     expect(buildNode25BlockBanner('25.7.0')).toContain(
-      'github.com/colbymchenry/springgraph/issues/81'
+      'github.com/jinglonglong/springgraph/issues/81'
     );
   });
 });

@@ -6,7 +6,7 @@ description: Use Springgraph as a TypeScript library.
 Springgraph ships a TypeScript API. The public surface is the `Springgraph` class.
 
 ```typescript
-import Springgraph from '@colbymchenry/springgraph';
+import Springgraph from '@jinglonglong/springgraph';
 
 const cg = await Springgraph.init('/path/to/project');
 // Or open an existing index:

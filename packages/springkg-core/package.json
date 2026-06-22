@@ -1,5 +1,5 @@
 {
-  "name": "@colbymchenry/springkg-core",
+  "name": "@jinglonglong/springkg-core",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
@@ -9,14 +9,14 @@
     "copy-assets": "node -e \"const fs=require('fs'),path=require('path');fs.mkdirSync('dist/db',{recursive:true});fs.mkdirSync('dist/community',{recursive:true});fs.copyFileSync('src/db/schema.sql','dist/db/schema.sql');fs.mkdirSync('dist/db/migrations',{recursive:true});fs.readdirSync('src/db/migrations').forEach(f=>fs.copyFileSync(path.join('src/db/migrations',f),path.join('dist/db/migrations',f)));fs.readdirSync('src/community').forEach(f=>fs.copyFileSync(path.join('src/community',f),path.join('dist/community',f)))\""
   },
   "dependencies": {
-    "@colbymchenry/springkg-community": "0.1.0",
-    "@colbymchenry/springkg-shared": "0.1.0",
-    "@colbymchenry/springkg-semantic": "0.1.0",
-    "@colbymchenry/springkg-data": "0.1.0",
+    "@jinglonglong/springkg-community": "0.1.0",
+    "@jinglonglong/springkg-shared": "0.1.0",
+    "@jinglonglong/springkg-semantic": "0.1.0",
+    "@jinglonglong/springkg-data": "0.1.0",
     "@springkg/runtime": "0.1.0"
   },
   "peerDependencies": {
-    "@colbymchenry/springgraph": "*"
+    "@jinglonglong/springgraph": "*"
   },
   "publishConfig": {
     "access": "public"

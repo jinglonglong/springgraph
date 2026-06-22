@@ -23,9 +23,9 @@ const LABEL_RE = /^[A-Za-z0-9_.:+/ @()-]+$/;
 const INFO_TEXT = `springgraph anonymous-telemetry ingest.
 
 What gets collected (and what never does) is documented field-by-field:
-https://github.com/colbymchenry/springgraph/blob/main/docs/design/telemetry.md
+https://github.com/jinglonglong/springgraph/blob/main/docs/design/telemetry.md
 This endpoint's full source:
-https://github.com/colbymchenry/springgraph/tree/main/telemetry-worker
+https://github.com/jinglonglong/springgraph/tree/main/telemetry-worker
 
 Disable any time: springgraph telemetry off  |  SPRINGGRAPH_TELEMETRY=0  |  DO_NOT_TRACK=1
 `;

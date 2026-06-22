@@ -1,5 +1,5 @@
-import { ALL_TARGETS, resolveTargetFlag } from '@colbymchenry/springkg-installer';
-import type { Location, InstallOptions } from '@colbymchenry/springkg-installer';
+import { ALL_TARGETS, resolveTargetFlag } from '@jinglonglong/springkg-installer';
+import type { Location, InstallOptions } from '@jinglonglong/springkg-installer';
 
 export interface InstallCommandOptions {
   target: string;

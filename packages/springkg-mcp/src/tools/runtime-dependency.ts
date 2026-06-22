@@ -1,4 +1,4 @@
-import type { SpringKg } from '@colbymchenry/springkg-core';
+import type { SpringKg } from '@jinglonglong/springkg-core';
 import { fmtLocation, notFoundResult, parseMeta, textResult } from '../lib/format.js';
 
 interface RuntimeSymbolRow {

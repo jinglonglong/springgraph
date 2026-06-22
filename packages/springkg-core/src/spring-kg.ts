@@ -10,8 +10,8 @@
  */
 
 import * as path from 'path';
-import type { Resolver, SpringKgEnhanceInput, SpringKgEnhanceOutput } from '@colbymchenry/springkg-shared';
-import { SPRINGKG_CONFIG } from '@colbymchenry/springkg-shared';
+import type { Resolver, SpringKgEnhanceInput, SpringKgEnhanceOutput } from '@jinglonglong/springkg-shared';
+import { SPRINGKG_CONFIG } from '@jinglonglong/springkg-shared';
 import { SpringDatabase } from './db/spring-db.js';
 import { SummaryGenerator } from './community/summary-generator.js';
 
@@ -77,7 +77,7 @@ export class SpringKg {
    */
   static async init(options: SpringKgOptions): Promise<SpringKg> {
     // Dynamic import of Springgraph (peer dependency)
-    const cgModule = await import('@colbymchenry/springgraph');
+    const cgModule = await import('@jinglonglong/springgraph');
     const Springgraph = (cgModule as any).Springgraph || (cgModule as any).default?.Springgraph || (cgModule as any).default;
 
     const cg = Springgraph.isInitialized(options.projectPath)
@@ -101,7 +101,7 @@ export class SpringKg {
    * Open an existing SpringKg — opens Springgraph + SpringDatabase.
    */
   static async open(options: SpringKgOptions): Promise<SpringKg> {
-    const cgModule = await import('@colbymchenry/springgraph');
+    const cgModule = await import('@jinglonglong/springgraph');
     const Springgraph = (cgModule as any).Springgraph || (cgModule as any).default?.Springgraph || (cgModule as any).default;
 
     const cg = await Springgraph.open(options.projectPath);

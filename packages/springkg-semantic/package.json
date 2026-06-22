@@ -1,5 +1,5 @@
 {
-  "name": "@colbymchenry/springkg-semantic",
+  "name": "@jinglonglong/springkg-semantic",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
@@ -8,10 +8,10 @@
     "build": "tsc && node ../springkg-shared/scripts/fix-esm-extensions.mjs dist"
   },
   "dependencies": {
-    "@colbymchenry/springkg-shared": "0.1.0"
+    "@jinglonglong/springkg-shared": "0.1.0"
   },
   "peerDependencies": {
-    "@colbymchenry/springgraph": "*"
+    "@jinglonglong/springgraph": "*"
   },
   "publishConfig": {
     "access": "public"

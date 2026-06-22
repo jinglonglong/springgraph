@@ -1,5 +1,5 @@
 {
-  "name": "@colbymchenry/springkg-cli",
+  "name": "@jinglonglong/springkg-cli",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
@@ -11,13 +11,13 @@
     "build": "tsc && node ../springkg-shared/scripts/fix-esm-extensions.mjs dist"
   },
   "dependencies": {
-    "@colbymchenry/springkg-core": "0.1.0",
-    "@colbymchenry/springkg-installer": "0.1.0",
-    "@colbymchenry/springkg-shared": "0.1.0",
+    "@jinglonglong/springkg-core": "0.1.0",
+    "@jinglonglong/springkg-installer": "0.1.0",
+    "@jinglonglong/springkg-shared": "0.1.0",
     "commander": "^12.1.0"
   },
   "peerDependencies": {
-    "@colbymchenry/springgraph": "*"
+    "@jinglonglong/springgraph": "*"
   },
   "publishConfig": {
     "access": "public"

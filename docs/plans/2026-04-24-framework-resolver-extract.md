@@ -1067,7 +1067,7 @@ git push -u origin feat/framework-extract-wiring
 
 ```bash
 gh pr create \
-  --repo colbymchenry/springgraph \
+  --repo jinglonglong/springgraph \
   --base main \
   --head timomeara:feat/framework-extract-wiring \
   --title "feat: wire up framework route extraction" \

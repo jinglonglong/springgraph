@@ -1,4 +1,4 @@
-export const SPRINGKG_PACKAGE = '@colbymchenry/springkg-community' as const;
+export const SPRINGKG_PACKAGE = '@jinglonglong/springkg-community' as const;
 
 export { CommunityBuilder } from './community-builder.js';
 export { SummaryGenerator } from './summary-generator.js';

@@ -1,6 +1,6 @@
 // packages/springkg-semantic/src/team-b-types.ts
 //
-// Team B-owned extensions on top of the real `@colbymchenry/springkg-shared`
+// Team B-owned extensions on top of the real `@jinglonglong/springkg-shared`
 // package that Team A landed. This file is the ONLY place where Team B adds
 // types beyond what the shared package already exposes.
 //
@@ -28,13 +28,13 @@ import type {
   SpringKgEnhanceOutput as SharedSpringKgEnhanceOutput,
   SpringKgNode as SharedSpringKgNode,
   SpringKgNodeKind as SharedSpringKgNodeKind,
-} from '@colbymchenry/springkg-shared';
+} from '@jinglonglong/springkg-shared';
 
 export {
   SPRINGKG_NODE_KINDS,
   SPRINGKG_EDGE_KINDS,
   SPRINGKG_CONFIG,
-} from '@colbymchenry/springkg-shared';
+} from '@jinglonglong/springkg-shared';
 
 // ---- Team B local extensions ---------------------------------------------
 
@@ -170,4 +170,4 @@ export function makeSpringgraphStub(): SpringgraphCgStub {
  * `./shared-types` — keep that name working by re-exporting the shared
  * `Resolver` interface here.
  */
-export type { Resolver as SharedResolverContract } from '@colbymchenry/springkg-shared';
+export type { Resolver as SharedResolverContract } from '@jinglonglong/springkg-shared';

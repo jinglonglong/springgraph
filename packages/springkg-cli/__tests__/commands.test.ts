@@ -8,9 +8,9 @@ import { createMockSpringKg, seedEndpoint, seedFeignClient, seedSymbol, seedConf
 import { runStatus } from '../src/commands/status.js';
 import { runInspectEndpoint } from '../src/commands/inspect.js';
 
-// Mock @colbymchenry/springkg-core — return our mock SpringKg
+// Mock @jinglonglong/springkg-core — return our mock SpringKg
 let mockSk: ReturnType<typeof createMockSpringKg>;
-vi.mock('@colbymchenry/springkg-core', () => ({
+vi.mock('@jinglonglong/springkg-core', () => ({
   SpringKg: {
     open: async () => mockSk,
     init: async () => mockSk,

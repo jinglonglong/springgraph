@@ -3,7 +3,7 @@
 # Downloads a self-contained bundle (a vendored Node runtime + the app) from
 # GitHub Releases. No Node.js, no build tools required.
 #
-#   irm https://raw.githubusercontent.com/colbymchenry/springgraph/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/jinglonglong/springgraph/main/install.ps1 | iex
 #
 # Upgrade with `springgraph upgrade` (or just re-run this). To uninstall: remove
 # $env:LOCALAPPDATA\springgraph and drop its \current\bin entry from your user PATH.
@@ -13,7 +13,7 @@
 #   SPRINGGRAPH_INSTALL_DIR  install location (default: %LOCALAPPDATA%\springgraph)
 
 $ErrorActionPreference = 'Stop'
-$repo = 'colbymchenry/springgraph'
+$repo = 'jinglonglong/springgraph'
 $installDir = if ($env:SPRINGGRAPH_INSTALL_DIR) { $env:SPRINGGRAPH_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'springgraph' }
 
 # 1. Detect architecture -> target matching the release archives.

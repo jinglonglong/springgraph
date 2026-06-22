@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');
 
-import type { SpringKgEdge, SpringKgNode } from '@colbymchenry/springkg-shared';
+import type { SpringKgEdge, SpringKgNode } from '@jinglonglong/springkg-shared';
 
 import { DirtyQueue } from '../dirty-queue.js';
 import type { SpringDatabase } from '../types.js';

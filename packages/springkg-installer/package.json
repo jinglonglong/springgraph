@@ -1,5 +1,5 @@
 {
-  "name": "@colbymchenry/springkg-installer",
+  "name": "@jinglonglong/springkg-installer",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
@@ -9,7 +9,7 @@
     "copy-assets": "node -e \"const fs=require('fs'),path=require('path');fs.mkdirSync('dist/db',{recursive:true});fs.copyFileSync('src/db/schema.sql','dist/db/springkg-schema.sql')\""
   },
   "dependencies": {
-    "@colbymchenry/springkg-shared": "0.1.0"
+    "@jinglonglong/springkg-shared": "0.1.0"
   },
   "publishConfig": {
     "access": "public"

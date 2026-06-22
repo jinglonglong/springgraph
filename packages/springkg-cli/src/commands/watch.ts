@@ -12,7 +12,7 @@
  */
 
 export async function runWatch(projectPath: string): Promise<void> {
-  const { SpringKg } = await import('@colbymchenry/springkg-core');
+  const { SpringKg } = await import('@jinglonglong/springkg-core');
   console.log(`Watching project at: ${projectPath}`);
   console.log('Press Ctrl+C to stop.');
 

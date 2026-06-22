@@ -6,7 +6,7 @@
 # GitHub Releases. No Node.js, no build tools, no npm required — ideal for a
 # fresh Linux VPS over SSH.
 #
-#   curl -fsSL https://raw.githubusercontent.com/jinglonglong/springgraph/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/jinglonglong/springgraph/master/install.sh | sh
 #
 # Upgrade:   run `springgraph upgrade` (or just re-run the same command).
 # Uninstall: curl -fsSL .../install.sh | sh -s -- --uninstall

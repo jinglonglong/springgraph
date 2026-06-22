@@ -9,10 +9,10 @@ Get up and running with Springgraph in seconds.
 
 ```bash
 # macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/jinglonglong/springgraph/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/jinglonglong/springgraph/master/install.sh | sh
 
 # Windows (PowerShell)
-irm https://raw.githubusercontent.com/jinglonglong/springgraph/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/jinglonglong/springgraph/master/install.ps1 | iex
 ```
 
 ## Already have Node? Use npm instead (works on any version)

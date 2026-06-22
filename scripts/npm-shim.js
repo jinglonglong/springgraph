@@ -240,7 +240,7 @@ function fail(reason) {
     '  - install from the official registry:\n' +
     '      npm i -g @jinglonglong/springgraph --registry=https://registry.npmjs.org\n' +
     '  - or use the standalone installer (no Node required):\n' +
-    '      curl -fsSL https://raw.githubusercontent.com/' + REPO + '/main/install.sh | sh\n'
+    '      curl -fsSL https://raw.githubusercontent.com/' + REPO + '/master/install.sh | sh\n'
   );
   process.exit(1);
 }

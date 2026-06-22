@@ -20,5 +20,13 @@
   },
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jinglonglong/springgraph.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jinglonglong/springgraph/issues"
+  },
+  "homepage": "https://github.com/jinglonglong/springgraph#readme"
 }

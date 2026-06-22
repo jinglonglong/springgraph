@@ -19,7 +19,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="${1:-$(node -p "require('$ROOT/package.json').version")}"
-SCOPE="@colbymchenry"
+SCOPE="@jinglonglong"
 REL="$ROOT/release"
 NPM="$REL/npm"
 
@@ -62,6 +62,14 @@ for archive in "${archives[@]}"; do
         name: `${process.env.SCOPE}/springgraph-${process.env.TARGET}`,
         version: process.env.VERSION,
         description: `Springgraph self-contained bundle for ${process.env.TARGET}`,
+        repository: {
+          type: "git",
+          url: "git+https://github.com/jinglonglong/springgraph.git"
+        },
+        bugs: {
+          url: "https://github.com/jinglonglong/springgraph/issues"
+        },
+        homepage: "https://github.com/jinglonglong/springgraph#readme",
         os: [process.env.OSV], cpu: [process.env.ARCHV],
         files: [process.env.NODEFILE, "lib", "bin"],
         license: "MIT"
@@ -101,7 +109,15 @@ VERSION="$VERSION" SCOPE="$SCOPE" TARGETS="${targets[*]}" \
     fs.writeFileSync(process.argv[1], JSON.stringify({
       name: `${process.env.SCOPE}/springgraph`,
       version: process.env.VERSION,
-      description: "Local-first code intelligence for AI agents (MCP). Self-contained — bundles its own runtime.",
+      description: "为 Spring Cloud 微服务架构量身打造的语义知识图谱与 MCP 服务器",
+      repository: {
+        type: "git",
+        url: "git+https://github.com/jinglonglong/springgraph.git"
+      },
+      bugs: {
+        url: "https://github.com/jinglonglong/springgraph/issues"
+      },
+      homepage: "https://github.com/jinglonglong/springgraph#readme",
       bin: { springgraph: "npm-shim.js" },
       main: "npm-sdk.js",
       types: "dist/index.d.ts",

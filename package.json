@@ -1,12 +1,20 @@
 {
-  "name": "@colbymchenry/springgraph",
+  "name": "@jinglonglong/springgraph",
   "version": "1.0.1",
-  "description": "Supercharge Claude Code with semantic code intelligence. 94% fewer tool calls • 77% faster exploration • 100% local.",
+  "description": "为 Spring Cloud 微服务架构量身打造的语义知识图谱与 MCP 服务器",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "springgraph": "./dist/bin/springgraph.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jinglonglong/springgraph.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jinglonglong/springgraph/issues"
+  },
+  "homepage": "https://github.com/jinglonglong/springgraph#readme",
   "files": [
     "dist",
     "scripts",

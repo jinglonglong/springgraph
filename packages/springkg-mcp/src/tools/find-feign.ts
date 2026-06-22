@@ -56,12 +56,12 @@ export async function handleFindFeign(
     const needle = `%${a.interface}%`;
     const matchingIds = new Set(
       (db.prepare(
-        "SELECT codegraph_node_id FROM spring_symbols WHERE kind = 'feign_client' AND (qualified_name LIKE ? OR name LIKE ?)"
-      ).all(needle, needle) as Array<{ codegraph_node_id: string | null }>)
-        .map((r) => r.codegraph_node_id)
+        "SELECT springgraph_node_id FROM spring_symbols WHERE kind = 'feign_client' AND (qualified_name LIKE ? OR name LIKE ?)"
+      ).all(needle, needle) as Array<{ springgraph_node_id: string | null }>)
+        .map((r) => r.springgraph_node_id)
         .filter((id): id is string => typeof id === 'string')
     );
-    // Map codegraph_node_id back to feign_clients.id (feign client id == spring_symbols.id)
+    // Map springgraph_node_id back to feign_clients.id (feign client id == spring_symbols.id)
     const symIds = new Set(
       (db.prepare(
         "SELECT id FROM spring_symbols WHERE kind = 'feign_client' AND (qualified_name LIKE ? OR name LIKE ?)"

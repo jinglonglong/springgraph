@@ -5,7 +5,7 @@
  * through a small better-sqlite3-shaped interface so the rest of the codebase
  * is storage-agnostic.
  *
- * CodeGraph ships with a bundled Node runtime, so `node:sqlite` (real SQLite,
+ * Springgraph ships with a bundled Node runtime, so `node:sqlite` (real SQLite,
  * with WAL + FTS5) is always available — there is no native build step and no
  * wasm fallback. When run from source instead, it requires Node >= 22.5.
  */
@@ -34,7 +34,7 @@ export interface SqliteDatabase {
 
 /**
  * The active SQLite backend. Only one now (`node:sqlite`); kept as a named type
- * so `codegraph status` and the per-instance reporting have a stable shape.
+ * so `springgraph status` and the per-instance reporting have a stable shape.
  */
 export type SqliteBackend = 'node-sqlite';
 
@@ -141,8 +141,8 @@ export function createDatabase(dbPath: string): { db: SqliteDatabase; backend: S
     const msg = error instanceof Error ? error.message : String(error);
     throw new Error(
       'Failed to open SQLite via the built-in node:sqlite module.\n' +
-      'CodeGraph requires node:sqlite (Node.js 22.5+). Install the self-contained\n' +
-      'CodeGraph release (it bundles a compatible Node), or run on Node 22.5+.\n' +
+      'Springgraph requires node:sqlite (Node.js 22.5+). Install the self-contained\n' +
+      'Springgraph release (it bundles a compatible Node), or run on Node 22.5+.\n' +
       `Underlying error: ${msg}`
     );
   }

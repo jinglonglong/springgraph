@@ -8,7 +8,7 @@
  * etc.) changes; ordinary file syncs update only the facets for the changed
  * files and evict facets for deleted files.
  */
-import type { CodeGraph } from '../index';
+import type { Springgraph } from '../index';
 import type { Node } from '../types';
 import type { DatabaseConnection } from '../db';
 import { Mutex } from '../utils';
@@ -37,15 +37,15 @@ function isGlobalProfileFile(filePath: string): boolean {
   return GLOBAL_PROFILE_REDETECT_FILES.has(base);
 }
 
-function getCgDb(cg: CodeGraph): DatabaseConnection {
+function getCgDb(cg: Springgraph): DatabaseConnection {
   return (cg as any).db as DatabaseConnection;
 }
 
-function collectArchitectureNodes(cg: CodeGraph): Node[] {
+function collectArchitectureNodes(cg: Springgraph): Node[] {
   return cg.getNodesByKind('class').concat(cg.getNodesByKind('interface'));
 }
 
-function buildFullState(cg: CodeGraph): CachedArchitectureState {
+function buildFullState(cg: Springgraph): CachedArchitectureState {
   const nodes = collectArchitectureNodes(cg);
   const db = getCgDb(cg);
   const result = detectArchitectureProfile(nodes, db);
@@ -67,7 +67,7 @@ function buildFullState(cg: CodeGraph): CachedArchitectureState {
 }
 
 function computeFacetsForNodes(
-  cg: CodeGraph,
+  cg: Springgraph,
   profile: ArchitectureProfile,
   nodes: Node[]
 ): NodeArchitectureFacet[] {
@@ -94,16 +94,16 @@ export interface SnapshotResult {
 
 /**
  * ArchitectureFacetCache keeps the latest architecture profile and per-node
- * facet results in memory. It is updated by CodeGraph.indexAll/sync and read
+ * facet results in memory. It is updated by Springgraph.indexAll/sync and read
  * by the architecture REST API and WebUI.
  */
 export class ArchitectureFacetCache {
-  private cg: CodeGraph;
+  private cg: Springgraph;
   private mutex = new Mutex();
   private state: CachedArchitectureState | null = null;
   private generation = 0;
 
-  constructor(cg: CodeGraph) {
+  constructor(cg: Springgraph) {
     this.cg = cg;
   }
 

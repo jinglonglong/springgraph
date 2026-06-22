@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Quick-start the CodeGraph Web UI for a project.
+ * Quick-start the Springgraph Web UI for a project.
  * Usage: node start-webui.js <project-path> [port]
  */
-import { CodeGraph } from './src/index.ts';
+import { Springgraph } from './src/index.ts';
 import { startWebServer } from './src/web/server.ts';
 import * as path from 'path';
 
@@ -12,8 +12,8 @@ const port = parseInt(process.argv[3] || '4000', 10);
 const publicDir = path.resolve('./dist/web/public');
 
 async function main() {
-  console.log(`[start-webui] Opening CodeGraph for: ${path.resolve(projectPath)}`);
-  const cg = await CodeGraph.open(path.resolve(projectPath));
+  console.log(`[start-webui] Opening Springgraph for: ${path.resolve(projectPath)}`);
+  const cg = await Springgraph.open(path.resolve(projectPath));
   const { url, close } = await startWebServer(cg, { port, publicDir, open: true });
   console.log(`[start-webui] Web UI ready at: ${url}`);
 

@@ -1,9 +1,9 @@
 ---
 title: Framework Routes
-description: CodeGraph links URL patterns to the handlers that serve them.
+description: Springgraph links URL patterns to the handlers that serve them.
 ---
 
-CodeGraph detects web-framework routing files and emits `route` nodes linked by `references` edges to their handler classes or functions. Querying the callers of a view or controller then surfaces the URL pattern that binds it.
+Springgraph detects web-framework routing files and emits `route` nodes linked by `references` edges to their handler classes or functions. Querying the callers of a view or controller then surfaces the URL pattern that binds it.
 
 | Framework | Shapes recognized |
 |---|---|

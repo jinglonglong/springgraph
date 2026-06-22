@@ -25,7 +25,7 @@ export interface EvalResult {
 export interface EvalReport {
   timestamp: string;
   codebasePath: string;
-  codegraphSha: string;
+  springgraphSha: string;
   summary: {
     total: number;
     passed: number;

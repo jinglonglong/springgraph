@@ -27,7 +27,7 @@ export type InstallLocation = 'global' | 'local';
  * full multi-file install lives in `claudeTarget.install()` which the
  * new orchestrator uses.
  *
- * There is no `writeClaudeMd` shim anymore: codegraph stopped writing a
+ * There is no `writeClaudeMd` shim anymore: springgraph stopped writing a
  * CLAUDE.md instructions block (issue #529) now that the MCP server's
  * `initialize` instructions are the single source of truth.
  */
@@ -46,7 +46,7 @@ export function hasMcpConfig(location: InstallLocation): boolean {
     ? path.join(os.homedir(), '.claude.json')
     : path.join(process.cwd(), '.mcp.json');
   const config = readJsonFile(file);
-  return !!config.mcpServers?.codegraph;
+  return !!config.mcpServers?.springgraph;
 }
 
 export function hasPermissions(location: InstallLocation): boolean {
@@ -56,5 +56,5 @@ export function hasPermissions(location: InstallLocation): boolean {
   const settings = readJsonFile(file);
   const allow = settings.permissions?.allow;
   if (!Array.isArray(allow)) return false;
-  return allow.some((p: string) => p.startsWith('mcp__codegraph__'));
+  return allow.some((p: string) => p.startsWith('mcp__springgraph__'));
 }

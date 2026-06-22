@@ -70,7 +70,7 @@ export const svelteResolver: FrameworkResolver = {
     // Pattern 1: Svelte runes ($state, $derived, $effect, etc.)
     if (isRuneReference(ref.referenceName)) {
       // Runes are compiler-provided — return a high-confidence "framework" resolution
-      // so CodeGraph doesn't waste time searching for user-defined symbols.
+      // so Springgraph doesn't waste time searching for user-defined symbols.
       // We use the fromNodeId as targetNodeId since runes don't have real targets.
       return {
         original: ref,

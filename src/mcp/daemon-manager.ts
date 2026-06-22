@@ -1,5 +1,5 @@
 /**
- * Interactive daemon manager — the logic behind `codegraph daemon` / `daemons`.
+ * Interactive daemon manager — the logic behind `springgraph daemon` / `daemons`.
  *
  * Kept separate from the CLI (which owns the @clack/prompts wiring) so the
  * selection/stop loop is unit-testable with a fake `select`: no TTY, no clack,

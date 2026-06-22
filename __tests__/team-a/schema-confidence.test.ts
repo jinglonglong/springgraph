@@ -45,7 +45,7 @@ describe('confidence column', () => {
     try {
       const db = SpringDatabase.initialize(tmp);
       try {
-        db.getDb().prepare("INSERT INTO spring_symbols (id, kind, codegraph_node_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run('s:test:1', 'controller', 'cg:1', Date.now(), Date.now());
+        db.getDb().prepare("INSERT INTO spring_symbols (id, kind, springgraph_node_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run('s:test:1', 'controller', 'cg:1', Date.now(), Date.now());
         const row = db.getDb().prepare("SELECT confidence FROM spring_symbols WHERE id = ?").get('s:test:1') as { confidence: number };
         expect(row.confidence).toBe(1.0);
       } finally {

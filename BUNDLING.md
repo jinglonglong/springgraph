@@ -1,6 +1,6 @@
 # Distribution: self-contained bundles
 
-CodeGraph ships a **vendored Node runtime** alongside the app. Because Node 22.5+
+Springgraph ships a **vendored Node runtime** alongside the app. Because Node 22.5+
 has a built-in real SQLite (`node:sqlite`, with WAL + FTS5), bundling Node means:
 
 - **No native build** — `better-sqlite3` is gone, so there are zero native addons
@@ -15,13 +15,13 @@ Built by [`scripts/build-bundle.sh`](scripts/build-bundle.sh) — one archive pe
 platform, identical recipe (only the Node download differs):
 
 ```
-codegraph-<target>/
+springgraph-<target>/
   node | node.exe          # official Node runtime for <target>
   lib/
     dist/                  # compiled app (+ tree-sitter .wasm grammars, schema.sql)
     node_modules/          # production deps only (pure JS / wasm — portable)
   bin/
-    codegraph | codegraph.cmd   # launcher → runs the bundled Node with the app
+    springgraph | springgraph.cmd   # launcher → runs the bundled Node with the app
 ```
 
 Targets: `darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`, `win32-x64`,
@@ -29,8 +29,8 @@ Targets: `darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`, `win32-x64`,
 `.zip` (`node.exe` + a `.cmd` launcher).
 
 ```bash
-scripts/build-bundle.sh linux-x64            # -> release/codegraph-linux-x64.tar.gz
-scripts/build-bundle.sh win32-x64            # -> release/codegraph-win32-x64.zip
+scripts/build-bundle.sh linux-x64            # -> release/springgraph-linux-x64.tar.gz
+scripts/build-bundle.sh win32-x64            # -> release/springgraph-win32-x64.zip
 ```
 
 Because dropping better-sqlite3 left **zero native addons**, building a bundle is
@@ -43,12 +43,12 @@ linux/amd64`).
 
 1. **`curl | sh`** ([`install.sh`](install.sh)) — no Node required; ideal for a
    fresh Linux VPS over SSH. Detects os/arch, pulls the archive from GitHub
-   Releases, symlinks `codegraph` onto PATH. Re-run to upgrade; `--uninstall` to
+   Releases, symlinks `springgraph` onto PATH. Re-run to upgrade; `--uninstall` to
    remove.
 2. **npm** ([`scripts/npm-shim.js`](scripts/npm-shim.js)) — preserves
-   `npm i -g @colbymchenry/codegraph`. The main package is a tiny shim; the
+   `npm i -g @colbymchenry/springgraph`. The main package is a tiny shim; the
    bundles ship as per-platform `optionalDependencies`
-   (`@colbymchenry/codegraph-<target>` with `os`/`cpu`), so npm installs only the
+   (`@colbymchenry/springgraph-<target>` with `os`/`cpu`), so npm installs only the
    matching one. The shim — run by the user's Node — execs the bundle, so the
    real work runs on the bundled Node 24. Works even on old Node. On Windows it
    invokes the bundled `node.exe` against the app entry directly (not the `.cmd`
@@ -68,7 +68,7 @@ Still TODO:
 - **Code signing** — the main gap for "download & run": macOS Gatekeeper needs a
   Developer ID + notarization; Windows needs Authenticode. Homebrew softens the
   macOS case (handles quarantine).
-- Retire the now-vestigial Node-version gate in `src/bin/codegraph.ts` — the
+- Retire the now-vestigial Node-version gate in `src/bin/springgraph.ts` — the
   bundle always runs Node 24, and the npm shim does no tree-sitter work.
 - Re-wire `npm uninstall` cleanup (the agent-config `preuninstall`) through the
   shim — the generated main package doesn't carry it.

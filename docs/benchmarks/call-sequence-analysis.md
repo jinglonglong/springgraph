@@ -6,7 +6,7 @@ stream-json logs from the A/B matrix (`/tmp/ab-matrix/<Cell>/run-headless-{with,
 
 ## Why this exists
 
-The [A/B matrix](codegraph-ab-matrix.md) showed codegraph cuts **reads 75%** but **wall-clock only
+The [A/B matrix](springgraph-ab-matrix.md) showed springgraph cuts **reads 75%** but **wall-clock only
 ~16%**, and 63% of the wall-clock win comes from just 3 large-repo cells. Reads are at the floor
 (~0), so the remaining wall-clock is **round-trips + the synthesis turn** — neither of which read
 count can explain. The matrix records tool *counts*, not the call **sequence** or per-call
@@ -24,11 +24,11 @@ count can explain. The matrix records tool *counts*, not the call **sequence** o
 3. **Small repos still get bloated payloads** because of the explore-default: a **6-file** repo
    (`flutter_module_books`) pulls **17.4K**; a 10-file repo pulls 18.0K. This is precisely the
    "too much context on small codebases" failure mode — happening right now, via explore.
-4. **Round-trips are 25% fewer with codegraph (283 vs 375 turns)** but wall-clock is only 16%
+4. **Round-trips are 25% fewer with springgraph (283 vs 375 turns)** but wall-clock is only 16%
    faster — because the with-arm's turns each carry a ~18K explore payload, inflating TTFT and
    eroding the turn savings.
-5. **Root cause:** `src/mcp/server-instructions.ts` leads with *"answer directly … `codegraph_context`
-   first, then ONE `codegraph_explore`"* as the headline pattern. The trace-first guidance is buried
+5. **Root cause:** `src/mcp/server-instructions.ts` leads with *"answer directly … `springgraph_context`
+   first, then ONE `springgraph_explore`"* as the headline pattern. The trace-first guidance is buried
    in a table + a chain list below it. Agents anchor on the prominent headline → context→explore.
 
 **Decision:** the next experiment is **trace-first steering / adoption**, not enriching trace. We
@@ -40,7 +40,7 @@ whether the residual `node`/`explore` follow-ups need a richer trace.
 | metric | value |
 |---|---|
 | flow-question cells | 37 (all of them) |
-| cells that called `codegraph_trace` | **3** (`cpp-leveldb`, `excalidraw`, `c-redis`) |
+| cells that called `springgraph_trace` | **3** (`cpp-leveldb`, `excalidraw`, `c-redis`) |
 | dominant pattern instead | `context` → `search`×N → `explore` |
 
 The 3 trace cells, and what followed the trace call:
@@ -57,7 +57,7 @@ follow-ups. But that's step 2.
 
 ## Finding 2 — payload size: path-scoped trace (0.8K) vs breadth-scoped explore (17.9K)
 
-Across all cells, per codegraph tool — call count and **average payload per call**:
+Across all cells, per springgraph tool — call count and **average payload per call**:
 
 | tool | calls | avg/call | total |
 |---|--:|--:|--:|
@@ -75,7 +75,7 @@ breadth-scoped (returns the neighborhood), trace is path-scoped (returns the lin
 
 ## Finding 3 — payload grows with repo size, and over-returns on small repos
 
-With-arm **total** codegraph payload by repo-size tier:
+With-arm **total** springgraph payload by repo-size tier:
 
 | tier | cells | avg total payload | range |
 |---|--:|--:|--:|
@@ -104,8 +104,8 @@ isn't choosing the path-scoped tool — it's choosing breadth.
 
 25% fewer turns, but only ~16% faster wall-clock — the gap is the per-turn cost of the big explore
 payloads. Also: **every with-arm run opens with a `ToolSearch` round-trip** (MCP tools are deferred
-in this harness), a fixed 1-turn tax before any codegraph call. Worth confirming whether the
-production install defers codegraph tools the same way.
+in this harness), a fixed 1-turn tax before any springgraph call. Worth confirming whether the
+production install defers springgraph tools the same way.
 
 ## Conclusion → the experiment to run next
 
@@ -114,8 +114,8 @@ The data says trace is **used 3/37 times**, so completeness is moot until adopti
 
 **Experiment: trace-first steering A/B.**
 - **Change:** rewrite the `server-instructions.ts` headline so a *flow* question (how does X reach Y
-  / trace / from→to) routes to `codegraph_trace` **first**, demoting the context→explore pattern to
-  non-flow/onboarding questions. Mirror into `instructions-template.ts` + `.cursor/rules/codegraph.mdc`.
+  / trace / from→to) routes to `springgraph_trace` **first**, demoting the context→explore pattern to
+  non-flow/onboarding questions. Mirror into `instructions-template.ts` + `.cursor/rules/springgraph.mdc`.
 - **Metric:** trace-adoption rate (target ≫ 3/37), with-arm total payload (expect ↓ sharply,
   especially small repos), turns (expect ↓), wall-clock (expect the 16% gap to widen toward the
   25% turn gap as 18K explore payloads are replaced by <1K traces).
@@ -136,7 +136,7 @@ node scripts/agent-eval/seq-matrix.mjs            # regenerates every table abov
 # Ablation experiment — do `context`, `explore`, and `trace` compete? Is `trace` enough?
 
 **Date:** 2026-05-23 · 52 runs, ~$20. Tool surface trimmed **server-side** via the new
-`CODEGRAPH_MCP_TOOLS` allowlist (so an ablated tool is genuinely absent from ListTools, not
+`SPRINGGRAPH_MCP_TOOLS` allowlist (so an ablated tool is genuinely absent from ListTools, not
 denied-on-call); trace-first steering injected with `--append-system-prompt`. 6 repos (2 S / 2 M /
 2 L) × 2 runs; arm E is a **non-flow** survey question on 2 repos. Driver `arms-matrix.sh`,
 analysis `parse-arms.mjs`.
@@ -249,7 +249,7 @@ spring-halo, the connecting repos, are 2/2 trace in both B and F.)
 2. **Strengthen the steering.** Arm A (shipped server-instructions, which *already* say "trace first
    for flow") adopted trace only 2/12 — the guidance is too buried. The explicit
    `--append-system-prompt` used in B–F lifted it. Port that into `server-instructions.ts` +
-   `instructions-template.ts` + `.cursor/rules/codegraph.mdc` (house rule: all three together),
+   `instructions-template.ts` + `.cursor/rules/springgraph.mdc` (house rule: all three together),
    flow-gated so non-flow survey questions still go context/explore (arm E proved they must).
 3. **Next frontier to widen F's reach:** bridge more dynamic dispatch (MediatR/.NET, Vapor routing) —
    every newly-connected flow converts an F≈B repo into an F-win repo.
@@ -317,7 +317,7 @@ lead-with-and-stop-after-trace steering we cannot deliver through any production
 (append-prompt salience ≫ server-instructions / tool-descriptions; G failed three times). On its own
 (H) it regresses. So:
 
-- **SHIP: the `CODEGRAPH_MCP_TOOLS` allowlist** — independent, clean, validated.
+- **SHIP: the `SPRINGGRAPH_MCP_TOOLS` allowlist** — independent, clean, validated.
 - **DON'T ship the body-inlining trace or the steering as-is** — measured neutral-to-negative
   without a steering channel we don't have.
 - **The real lever is connectivity, not steering** — trace earns its keep only when flows connect
@@ -373,7 +373,7 @@ ships and needs no steering.
 
 - **SHIP: body-inlining trace + destination callees** (arm I) — ≥ A on all axes, no steering, no
   regression; makes the self-sufficient-trace property real (one trace call answers the flow).
-- **SHIP: the `CODEGRAPH_MCP_TOOLS` allowlist** — independent, validated.
+- **SHIP: the `SPRINGGRAPH_MCP_TOOLS` allowlist** — independent, validated.
 - **DON'T ship steering** (instructions or tool descriptions) — three variants regressed; MCP can't
   deliver append-prompt salience, and forcing trace where it doesn't connect backfires.
 - **Connectivity is the multiplier** — arm I helps most where the trace connects; MediatR/.NET,
@@ -392,7 +392,7 @@ node scripts/agent-eval/parse-arms.mjs
 # Current-build with/without A/B — the 7 README repos (2026-05-24)
 
 Re-ran the published README benchmark on the **current build** (all 7 repos freshly reindexed),
-same queries, **median of 4 runs/arm** (headless: codegraph-only MCP vs empty MCP):
+same queries, **median of 4 runs/arm** (headless: springgraph-only MCP vs empty MCP):
 
 | repo | time with→without | tools w→wo | tokens w→wo (saved) | cost w→wo (saved) |
 |---|---|--:|--:|--:|
@@ -408,7 +408,7 @@ same queries, **median of 4 runs/arm** (headless: codegraph-only MCP vs empty MC
 README headline (35% / 59% / 49% / 70%); the current build holds the benchmark with no regression.
 
 **Cost is lower, not "flat"** (corrects the earlier note). But the **mechanism is volume, not
-cache-ability**: codegraph answers in far fewer turns over a much smaller accumulated context, while
+cache-ability**: springgraph answers in far fewer turns over a much smaller accumulated context, while
 the without-arm fans out across many more turns (55–79 tool calls on the big repos), each
 re-processing a large, growing context. The without-arm's token volume is *mostly* cheap cache-reads,
 which is why **token-count savings (57%) look bigger than cost savings (35%)**. Per-repo margin tracks

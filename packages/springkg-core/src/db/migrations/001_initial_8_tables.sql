@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS spring_symbols (
     id TEXT PRIMARY KEY,                          -- deterministic: `${kind}:${sha256(...).slice(0,32)}`
     kind TEXT NOT NULL,
-    codegraph_node_id TEXT UNIQUE NOT NULL,       -- FK into CodeGraph's nodes table
+    springgraph_node_id TEXT UNIQUE NOT NULL,       -- FK into Springgraph's nodes table
     name TEXT,
     qualified_name TEXT,
     file_path TEXT,
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS feature_community_members (
 CREATE INDEX IF NOT EXISTS idx_spring_symbols_kind ON spring_symbols(kind);
 CREATE INDEX IF NOT EXISTS idx_spring_symbols_file_path ON spring_symbols(file_path);
 CREATE INDEX IF NOT EXISTS idx_spring_symbols_confidence ON spring_symbols(confidence);
-CREATE INDEX IF NOT EXISTS idx_spring_symbols_codegraph_node_id ON spring_symbols(codegraph_node_id);
+CREATE INDEX IF NOT EXISTS idx_spring_symbols_springgraph_node_id ON spring_symbols(springgraph_node_id);
 
 CREATE INDEX IF NOT EXISTS idx_spring_edges_source_id ON spring_edges(source_id);
 CREATE INDEX IF NOT EXISTS idx_spring_edges_target_id ON spring_edges(target_id);

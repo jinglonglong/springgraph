@@ -11,14 +11,14 @@ import { Daemon, parseClientHelloLine, peerIsDead } from '../src/mcp/daemon';
 
 describe('parseClientHelloLine', () => {
   it('parses a well-formed client-hello', () => {
-    expect(parseClientHelloLine('{"codegraph_client":1,"pid":1234,"hostPid":56}'))
+    expect(parseClientHelloLine('{"springgraph_client":1,"pid":1234,"hostPid":56}'))
       .toEqual({ pid: 1234, hostPid: 56 });
   });
 
   it('accepts a null host pid and a missing host pid', () => {
-    expect(parseClientHelloLine('{"codegraph_client":1,"pid":1234,"hostPid":null}'))
+    expect(parseClientHelloLine('{"springgraph_client":1,"pid":1234,"hostPid":null}'))
       .toEqual({ pid: 1234, hostPid: null });
-    expect(parseClientHelloLine('{"codegraph_client":1,"pid":1234}'))
+    expect(parseClientHelloLine('{"springgraph_client":1,"pid":1234}'))
       .toEqual({ pid: 1234, hostPid: null });
   });
 
@@ -27,9 +27,9 @@ describe('parseClientHelloLine', () => {
   });
 
   it('rejects a wrong-typed marker, a non-numeric pid, and a non-integer marker', () => {
-    expect(parseClientHelloLine('{"codegraph_client":true,"pid":1}')).toBeNull();
-    expect(parseClientHelloLine('{"codegraph_client":2,"pid":1}')).toBeNull();
-    expect(parseClientHelloLine('{"codegraph_client":1,"pid":"1"}')).toBeNull();
+    expect(parseClientHelloLine('{"springgraph_client":true,"pid":1}')).toBeNull();
+    expect(parseClientHelloLine('{"springgraph_client":2,"pid":1}')).toBeNull();
+    expect(parseClientHelloLine('{"springgraph_client":1,"pid":"1"}')).toBeNull();
   });
 
   it('returns null for invalid / empty / non-object JSON', () => {
@@ -71,7 +71,7 @@ describe('peerIsDead', () => {
 describe('Daemon.reapDeadClients', () => {
   // Construct with idleTimeoutMs:0 so dropping the last client doesn't arm a real
   // idle timer. The constructor opens no sockets/DB, so this stays a fast unit test.
-  const makeDaemon = () => new Daemon('/tmp/codegraph-reap-unit-test', { idleTimeoutMs: 0 }) as any;
+  const makeDaemon = () => new Daemon('/tmp/springgraph-reap-unit-test', { idleTimeoutMs: 0 }) as any;
   const fakeSession = () => ({ stopped: false, stop() { this.stopped = true; } });
 
   it('drops clients with a dead peer and leaves live ones attached', () => {

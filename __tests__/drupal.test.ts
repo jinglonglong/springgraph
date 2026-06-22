@@ -2,14 +2,14 @@
  * Tests for Drupal framework resolver.
  *
  * Unit tests cover drupalResolver.detect(), extract() (routes + hooks), and resolve().
- * Integration tests use a real CodeGraph instance with a temporary Drupal project layout.
+ * Integration tests use a real Springgraph instance with a temporary Drupal project layout.
  */
 
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 import { initGrammars, loadAllGrammars } from '../src/extraction/grammars';
 import { drupalResolver } from '../src/resolution/frameworks/drupal';
 import type { ResolutionContext } from '../src/resolution/types';
@@ -586,7 +586,7 @@ describe('Drupal end-to-end — route node linked to controller method', () => {
       ].join('\n') + '\n',
     );
 
-    const cg = CodeGraph.initSync(tmpDir);
+    const cg = Springgraph.initSync(tmpDir);
     await cg.indexAll();
 
     // Route node must exist

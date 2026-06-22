@@ -10,7 +10,7 @@
  * below the running engine's, the data on disk is structurally fine but
  * *stale*: it's missing whatever a newer extractor would now produce. A schema
  * migration can't backfill that — only a re-index can. So this is the signal
- * `codegraph status` uses to recommend a re-index, and the reason `codegraph
+ * `springgraph status` uses to recommend a re-index, and the reason `springgraph
  * upgrade` reminds users to refresh their projects.
  *
  * BUMP THIS when a release changes extraction output enough that existing

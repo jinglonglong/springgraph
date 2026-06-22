@@ -332,14 +332,14 @@ export class SpringKgMcpServer {
   private rl: readline.Interface | null = null;
   private projectPath: string;
   private db: SqliteDatabase | null = null;
-  private codegraph: any = null;
+  private springgraph: any = null;
 
   constructor(projectPath: string) {
     this.projectPath = projectPath;
   }
 
   start(): void {
-    const dbPath = path.join(this.projectPath, '.codegraph', 'springkg.db');
+    const dbPath = path.join(this.projectPath, '.springgraph', 'springkg.db');
     if (!fs.existsSync(dbPath)) {
       process.stderr.write(`[springkg-mcp] Database not found: ${dbPath}\n`);
       process.stderr.write('[springkg-mcp] Please run "springkg init" and "springkg index" first.\n');
@@ -597,14 +597,14 @@ export class SpringKgMcpServer {
     }
 
     try {
-      const cgModule = await import('@colbymchenry/codegraph');
-      const CodeGraph = (cgModule as any).CodeGraph || (cgModule as any).default?.CodeGraph || (cgModule as any).default;
-      this.codegraph = CodeGraph.isInitialized(this.projectPath)
-        ? await CodeGraph.open(this.projectPath)
-        : await CodeGraph.init(this.projectPath);
+      const cgModule = await import('@colbymchenry/springgraph');
+      const Springgraph = (cgModule as any).Springgraph || (cgModule as any).default?.Springgraph || (cgModule as any).default;
+      this.springgraph = Springgraph.isInitialized(this.projectPath)
+        ? await Springgraph.open(this.projectPath)
+        : await Springgraph.init(this.projectPath);
 
       const seeder = new SpringkgSeeder();
-      const result = await seeder.seed(this.db, this.codegraph);
+      const result = await seeder.seed(this.db, this.springgraph);
       process.stderr.write(
         `[springkg-mcp] Seeded springkg.db (symbols=${result.symbols}, endpoints=${result.endpoints}, feign=${result.feignClients}, sql=${result.sqlStatements}, config=${result.configProperties})\n`,
       );

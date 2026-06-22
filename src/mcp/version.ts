@@ -33,4 +33,4 @@ function readPackageVersion(): string {
   return '0.0.0-unknown';
 }
 
-export const CodeGraphPackageVersion = readPackageVersion();
+export const SpringgraphPackageVersion = readPackageVersion();

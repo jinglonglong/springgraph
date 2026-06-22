@@ -1,12 +1,12 @@
 /**
  * SpringDatabase — wrapper around the springkg SQLite database.
  *
- * Mirrors the CodeGraph DatabaseConnection pattern: static factory methods,
+ * Mirrors the Springgraph DatabaseConnection pattern: static factory methods,
  * configureConnection with exact PRAGMA order, transaction wrapper, and
  * schema-version bookkeeping via schema_versions.
  *
  * Uses node:sqlite directly (available in Node 22.5+) instead of
- * deep-importing CodeGraph's internal adapter, which is blocked by exports.
+ * deep-importing Springgraph's internal adapter, which is blocked by exports.
  */
 
 import * as fs from 'fs';
@@ -85,7 +85,7 @@ function configureConnection(db: SqliteDatabase): void {
 }
 
 function getSpringDatabasePath(projectPath: string): string {
-  return path.join(projectPath, '.codegraph', 'springkg.db');
+  return path.join(projectPath, '.springgraph', 'springkg.db');
 }
 
 function ensureDatabaseDirectory(dbPath: string): void {

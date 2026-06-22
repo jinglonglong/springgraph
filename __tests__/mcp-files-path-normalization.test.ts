@@ -1,5 +1,5 @@
 /**
- * codegraph_files path-filter normalization (#426)
+ * springgraph_files path-filter normalization (#426)
  *
  * Stored file paths are project-relative POSIX (e.g. "src/foo.ts"). Some
  * agents pass project-root variants like "/", ".", "./" or "" when they want
@@ -14,16 +14,16 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import CodeGraph from '../src/index';
+import Springgraph from '../src/index';
 import { ToolHandler } from '../src/mcp/tools';
 
-describe('codegraph_files path normalization', () => {
+describe('springgraph_files path normalization', () => {
   let tempDir: string;
-  let cg: CodeGraph;
+  let cg: Springgraph;
   let handler: ToolHandler;
 
   beforeEach(async () => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-files-paths-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-files-paths-'));
     fs.mkdirSync(path.join(tempDir, 'src', 'components'), { recursive: true });
     fs.mkdirSync(path.join(tempDir, 'tests'), { recursive: true });
     fs.writeFileSync(path.join(tempDir, 'src', 'index.ts'), `export const x = 1;\n`);
@@ -32,7 +32,7 @@ describe('codegraph_files path normalization', () => {
       `export const Button = () => 1;\n`
     );
     fs.writeFileSync(path.join(tempDir, 'tests', 'a.test.ts'), `export const t = 1;\n`);
-    cg = await CodeGraph.init(tempDir, {
+    cg = await Springgraph.init(tempDir, {
       config: { include: ['**/*.ts'], exclude: [] },
     });
     await cg.indexAll();
@@ -47,7 +47,7 @@ describe('codegraph_files path normalization', () => {
   });
 
   async function listed(pathFilter: string | undefined): Promise<string> {
-    const result = await handler.execute('codegraph_files', {
+    const result = await handler.execute('springgraph_files', {
       ...(pathFilter !== undefined ? { path: pathFilter } : {}),
       format: 'flat',
       includeMetadata: false,

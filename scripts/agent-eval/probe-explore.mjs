@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // One-shot probe: run handleExplore against an existing index using the built
 // dist, print the output + a few stats. Lets us verify explore's coverage fix
-// without a full agent run. Usage: node probe-explore.mjs <repo-with-.codegraph> "<query>"
+// without a full agent run. Usage: node probe-explore.mjs <repo-with-.springgraph> "<query>"
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 
@@ -16,11 +16,11 @@ const idx = await load('dist/index.js');
 const tools = await load('dist/mcp/tools.js');
 
 // esModuleInterop: dynamic import of CJS yields { default: module.exports, ...named }
-const CodeGraph = idx.default?.default ?? idx.default ?? idx.CodeGraph;
+const Springgraph = idx.default?.default ?? idx.default ?? idx.Springgraph;
 const ToolHandler = tools.ToolHandler ?? tools.default?.ToolHandler;
 
-if (typeof CodeGraph?.openSync !== 'function') {
-  console.error('could not resolve CodeGraph.openSync; index keys:', Object.keys(idx), 'default keys:', idx.default && Object.keys(idx.default));
+if (typeof Springgraph?.openSync !== 'function') {
+  console.error('could not resolve Springgraph.openSync; index keys:', Object.keys(idx), 'default keys:', idx.default && Object.keys(idx.default));
   process.exit(2);
 }
 if (typeof ToolHandler !== 'function') {
@@ -28,9 +28,9 @@ if (typeof ToolHandler !== 'function') {
   process.exit(2);
 }
 
-const cg = CodeGraph.openSync(repo);
+const cg = Springgraph.openSync(repo);
 const h = new ToolHandler(cg);
-const res = await h.execute('codegraph_explore', { query });
+const res = await h.execute('springgraph_explore', { query });
 const text = res.content?.[0]?.text ?? '(no text)';
 console.log(text);
 console.error('\n--- PROBE STATS ---');

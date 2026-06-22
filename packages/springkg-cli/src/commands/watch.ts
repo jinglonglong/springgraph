@@ -1,7 +1,7 @@
 /**
  * `springkg watch` — watch the project for file changes and auto-sync.
  *
- * Wraps SpringKg.watch(), which delegates to CodeGraph's native file watcher
+ * Wraps SpringKg.watch(), which delegates to Springgraph's native file watcher
  * (FSEvents / inotify / ReadDirectoryChangesW). On every sync, runs the
  * registered resolvers via enhanceOnSync().
  *

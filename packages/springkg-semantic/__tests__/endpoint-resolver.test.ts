@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { EndpointResolver } from '../src/endpoint-resolver';
-import type { CodegraphEdgeLike, CodegraphNodeLike, SpringKgEdge, SpringKgNode } from '../src/shared-types';
-import { makeCodegraphStub } from '../src/shared-types';
+import type { SpringgraphEdgeLike, SpringgraphNodeLike, SpringKgEdge, SpringKgNode } from '../src/shared-types';
+import { makeSpringgraphStub } from '../src/shared-types';
 
-function makeClassNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
+function makeClassNode(overrides: Partial<SpringgraphNodeLike> = {}): SpringgraphNodeLike {
   const id = overrides.id ?? 'controller-1';
   const name = overrides.name ?? 'UserController';
 
@@ -29,7 +29,7 @@ function makeClassNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNod
   };
 }
 
-function makeMethodNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
+function makeMethodNode(overrides: Partial<SpringgraphNodeLike> = {}): SpringgraphNodeLike {
   const id = overrides.id ?? 'method-1';
   const name = overrides.name ?? 'getUser';
 
@@ -54,7 +54,7 @@ function makeMethodNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNo
   };
 }
 
-function makeParameterNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
+function makeParameterNode(overrides: Partial<SpringgraphNodeLike> = {}): SpringgraphNodeLike {
   const id = overrides.id ?? 'param-1';
   const name = overrides.name ?? 'value';
 
@@ -79,9 +79,9 @@ function makeParameterNode(overrides: Partial<CodegraphNodeLike> = {}): Codegrap
   };
 }
 
-async function enhance(nodes: CodegraphNodeLike[], edges: CodegraphEdgeLike[] = []) {
+async function enhance(nodes: SpringgraphNodeLike[], edges: SpringgraphEdgeLike[] = []) {
   const resolver = new EndpointResolver();
-  return resolver.enhance({ codegraphNodes: nodes, codegraphEdges: edges, changedFiles: [], cg: makeCodegraphStub() });
+  return resolver.enhance({ springgraphNodes: nodes, springgraphEdges: edges, changedFiles: [], cg: makeSpringgraphStub() });
 }
 
 function findHandledBy(edges: readonly SpringKgEdge[]) {
@@ -133,8 +133,8 @@ describe('EndpointResolver', () => {
     expect(endpoint.metadata).toMatchObject({
       httpMethod: 'GET',
       methodPath: '/users/{id}',
-      controllerCodegraphNodeId: controller.id,
-      responseDtoCodegraphNodeId: 'dto-user',
+      controllerSpringgraphNodeId: controller.id,
+      responseDtoSpringgraphNodeId: 'dto-user',
     });
     expect(findHandledBy(result.edges)).toHaveLength(1);
     expect(findHandledBy(result.edges)[0]).toMatchObject({
@@ -220,7 +220,7 @@ describe('EndpointResolver', () => {
     expect(endpoint.metadata).toMatchObject({
       httpMethod: 'GET',
       methodPath: '/search',
-      responseDtoCodegraphNodeId: 'dto-user-list',
+      responseDtoSpringgraphNodeId: 'dto-user-list',
     });
     expect(endpoint.metadata?.params).toEqual([
       { name: 'q', kind: 'RequestParam', typeName: 'String', required: true },

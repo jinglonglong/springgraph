@@ -1,7 +1,7 @@
 /**
- * Tests for the CI/scripting fields `codegraph status --json` exposes (issue
+ * Tests for the CI/scripting fields `springgraph status --json` exposes (issue
  * #329): the `version`, `indexPath`, and `lastIndexed` fields, plus the
- * matching `CodeGraph.getLastIndexedAt()` library method.
+ * matching `Springgraph.getLastIndexedAt()` library method.
  *
  * The CLI itself is exercised end-to-end against the built binary so the JSON
  * field names survive future refactors of the underlying plumbing.
@@ -12,9 +12,9 @@ import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 
-const BIN = path.resolve(__dirname, '../dist/bin/codegraph.js');
+const BIN = path.resolve(__dirname, '../dist/bin/springgraph.js');
 const PKG_VERSION = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf-8'),
 ).version as string;
@@ -23,7 +23,7 @@ function runStatusJson(cwd: string): Record<string, unknown> {
   const stdout = execFileSync(process.execPath, [BIN, 'status', '--json'], {
     cwd,
     encoding: 'utf-8',
-    env: { ...process.env, CODEGRAPH_NO_DAEMON: '1' },
+    env: { ...process.env, SPRINGGRAPH_NO_DAEMON: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   // JSON mode prints exactly one line to stdout; be defensive about any stray
@@ -32,18 +32,18 @@ function runStatusJson(cwd: string): Record<string, unknown> {
   return JSON.parse(line);
 }
 
-describe('codegraph status --json — CI fields (#329)', () => {
+describe('springgraph status --json — CI fields (#329)', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-status-json-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-status-json-'));
   });
   afterEach(() => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
   it('getLastIndexedAt() is null before indexing and a recent ms timestamp after', async () => {
-    const cg = CodeGraph.initSync(tempDir);
+    const cg = Springgraph.initSync(tempDir);
     expect(cg.getLastIndexedAt()).toBeNull();
 
     fs.writeFileSync(path.join(tempDir, 'a.ts'), 'export const x = 1;\n');
@@ -64,14 +64,14 @@ describe('codegraph status --json — CI fields (#329)', () => {
     expect(out.initialized).toBe(false);
     expect(out.version).toBe(PKG_VERSION);
     expect(typeof out.indexPath).toBe('string');
-    expect(out.indexPath as string).toContain('.codegraph');
+    expect(out.indexPath as string).toContain('.springgraph');
     expect(out.lastIndexed).toBeNull();
   });
 
   it('status --json on an INDEXED project reports version + indexPath + a round-trippable lastIndexed', async () => {
     fs.writeFileSync(path.join(tempDir, 'a.ts'), 'export const x = 1;\n');
     const before = Date.now();
-    const cg = CodeGraph.initSync(tempDir);
+    const cg = Springgraph.initSync(tempDir);
     await cg.indexAll();
     const after = Date.now();
     cg.close();
@@ -79,7 +79,7 @@ describe('codegraph status --json — CI fields (#329)', () => {
     const out = runStatusJson(tempDir);
     expect(out.initialized).toBe(true);
     expect(out.version).toBe(PKG_VERSION);
-    expect(out.indexPath as string).toContain('.codegraph');
+    expect(out.indexPath as string).toContain('.springgraph');
     expect(typeof out.lastIndexed).toBe('string');
     // ISO string that round-trips back into the index window.
     const ms = Date.parse(out.lastIndexed as string);

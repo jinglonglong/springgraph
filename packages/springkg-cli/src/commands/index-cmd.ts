@@ -1,7 +1,7 @@
 /**
  * `springkg index` — run the indexer to build the knowledge graph.
  *
- * Opens the existing springkg.db, runs CodeGraph.indexAll(), then runs all
+ * Opens the existing springkg.db, runs Springgraph.indexAll(), then runs all
  * registered resolvers via enhanceOnSync(). Reports indexed file count and
  * the number of resolver stages that produced output.
  */

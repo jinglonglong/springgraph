@@ -11,20 +11,20 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  CODEGRAPH_INSTRUCTIONS_BLOCK,
-  CODEGRAPH_SECTION_START,
-  CODEGRAPH_SECTION_END,
+  SPRINGGRAPH_INSTRUCTIONS_BLOCK,
+  SPRINGGRAPH_SECTION_START,
+  SPRINGGRAPH_SECTION_END,
 } from '../instructions-template';
 
 /**
- * The MCP-server config block codegraph injects. Same shape across
+ * The MCP-server config block springgraph injects. Same shape across
  * all JSON-shaped agent configs (Claude, Cursor, opencode), only the
  * surrounding wrapper differs. Codex (TOML) builds its own block.
  */
 export function getMcpServerConfig(): { type: string; command: string; args: string[] } {
   return {
     type: 'stdio',
-    command: 'codegraph',
+    command: 'springgraph',
     args: ['serve', '--mcp'],
   };
 }
@@ -34,16 +34,16 @@ export function getMcpServerConfig(): { type: string; command: string; args: str
  * have a permissions concept can compose this list directly. The
  * permission strings follow Claude's `mcp__<server>__<tool>` format.
  */
-export function getCodeGraphPermissions(): string[] {
+export function getSpringgraphPermissions(): string[] {
   return [
-    'mcp__codegraph__codegraph_explore',
-    'mcp__codegraph__codegraph_search',
-    'mcp__codegraph__codegraph_node',
-    'mcp__codegraph__codegraph_callers',
-    'mcp__codegraph__codegraph_callees',
-    'mcp__codegraph__codegraph_impact',
-    'mcp__codegraph__codegraph_files',
-    'mcp__codegraph__codegraph_status',
+    'mcp__springgraph__springgraph_explore',
+    'mcp__springgraph__springgraph_search',
+    'mcp__springgraph__springgraph_node',
+    'mcp__springgraph__springgraph_callers',
+    'mcp__springgraph__springgraph_callees',
+    'mcp__springgraph__springgraph_impact',
+    'mcp__springgraph__springgraph_files',
+    'mcp__springgraph__springgraph_status',
   ];
 }
 
@@ -129,8 +129,8 @@ export function jsonDeepEqual(a: unknown, b: unknown): boolean {
 /**
  * Replace or append a marker-delimited section in a markdown-ish file.
  *
- * Used by Claude / Codex for the `<!-- CODEGRAPH_START --> ... <!--
- * CODEGRAPH_END -->` block. Preserves all content outside the
+ * Used by Claude / Codex for the `<!-- SPRINGGRAPH_START --> ... <!--
+ * SPRINGGRAPH_END -->` block. Preserves all content outside the
  * markers verbatim.
  *
  * Returns `created` when the file didn't exist; `updated` when
@@ -173,7 +173,7 @@ export function replaceOrAppendMarkedSection(
 }
 
 /**
- * Upsert the CodeGraph instructions block into an agent instructions
+ * Upsert the Springgraph instructions block into an agent instructions
  * file (CLAUDE.md / AGENTS.md / GEMINI.md). The one write shared by
  * every target: self-heals a stale pre-#529 long block (markers match →
  * replaced by the current short one), appends after existing user
@@ -185,9 +185,9 @@ export function replaceOrAppendMarkedSection(
 export function upsertInstructionsEntry(file: string): { path: string; action: 'created' | 'updated' | 'unchanged' } {
   const action = replaceOrAppendMarkedSection(
     file,
-    CODEGRAPH_INSTRUCTIONS_BLOCK,
-    CODEGRAPH_SECTION_START,
-    CODEGRAPH_SECTION_END,
+    SPRINGGRAPH_INSTRUCTIONS_BLOCK,
+    SPRINGGRAPH_SECTION_START,
+    SPRINGGRAPH_SECTION_END,
   );
   return { path: file, action: action === 'appended' ? 'updated' : action };
 }

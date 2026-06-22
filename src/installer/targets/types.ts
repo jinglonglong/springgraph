@@ -30,7 +30,7 @@ export type TargetId = 'claude' | 'cursor' | 'codex' | 'opencode' | 'hermes' | '
  * acceptable (we still write); false negatives just mean the user
  * has to opt in manually.
  *
- * `alreadyConfigured` reports whether codegraph has already been
+ * `alreadyConfigured` reports whether springgraph has already been
  * wired into this target at this location — drives the
  * "Updated"-vs-"Added" log line and lets `--check` exit 0/1.
  */
@@ -97,7 +97,7 @@ export interface AgentTarget {
   uninstall(loc: Location): WriteResult;
   /**
    * Print the MCP-server snippet a user would paste manually for this
-   * target. Used by `codegraph install --print-config <id>` and by
+   * target. Used by `springgraph install --print-config <id>` and by
    * the README. Must NOT touch the filesystem.
    */
   printConfig(loc: Location): string;

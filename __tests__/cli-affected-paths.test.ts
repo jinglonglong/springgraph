@@ -1,5 +1,5 @@
 /**
- * `codegraph affected` input-path normalization (#825).
+ * `springgraph affected` input-path normalization (#825).
  *
  * The index stores project-relative, forward-slash paths. A user (or a wrapping
  * script) may pass a `./`-prefixed path or an absolute path; before #825 those
@@ -14,24 +14,24 @@ import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 
-const BIN = path.resolve(__dirname, '../dist/bin/codegraph.js');
+const BIN = path.resolve(__dirname, '../dist/bin/springgraph.js');
 
 function affected(cwd: string, arg: string): string[] {
   const out = execFileSync(process.execPath, [BIN, 'affected', arg, '--quiet', '-p', cwd], {
     encoding: 'utf-8',
-    env: { ...process.env, CODEGRAPH_NO_DAEMON: '1', CODEGRAPH_WASM_RELAUNCHED: '1' },
+    env: { ...process.env, SPRINGGRAPH_NO_DAEMON: '1', SPRINGGRAPH_WASM_RELAUNCHED: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   return out.split('\n').map((s) => s.trim()).filter(Boolean);
 }
 
-describe('codegraph affected — input path normalization (#825)', () => {
+describe('springgraph affected — input path normalization (#825)', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-affected-paths-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-affected-paths-'));
     fs.mkdirSync(path.join(tempDir, 'src'));
     // util.ts <- helper.ts <- helper.test.ts (transitive test dependency)
     fs.writeFileSync(path.join(tempDir, 'src/util.ts'), 'export function util(x: number){ return x + 1; }\n');
@@ -43,7 +43,7 @@ describe('codegraph affected — input path normalization (#825)', () => {
       path.join(tempDir, 'src/helper.test.ts'),
       "import { helper } from './helper';\ntest('t', () => helper());\n",
     );
-    const cg = CodeGraph.initSync(tempDir);
+    const cg = Springgraph.initSync(tempDir);
     await cg.indexAll();
     cg.close();
   });

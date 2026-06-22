@@ -1,17 +1,17 @@
 /**
  * MCP Tool Definitions
  *
- * Defines the tools exposed by the CodeGraph MCP server.
+ * Defines the tools exposed by the Springgraph MCP server.
  */
 
-import type CodeGraph from '../index';
-import { findNearestCodeGraphRoot } from '../directory';
-// Lazy-load the heavy CodeGraph chain off the MCP startup path — see the same
+import type Springgraph from '../index';
+import { findNearestSpringgraphRoot } from '../directory';
+// Lazy-load the heavy Springgraph chain off the MCP startup path — see the same
 // helper in engine.ts. ToolHandler must load to answer tools/list (static
 // schemas), but it must NOT drag in sqlite/query layers before the daemon binds;
-// CodeGraph is pulled in only when a tool actually opens a project. require() is
+// Springgraph is pulled in only when a tool actually opens a project. require() is
 // sync + cached (CommonJS build).
-const loadCodeGraph = (): typeof import('../index').default =>
+const loadSpringgraph = (): typeof import('../index').default =>
   (require('../index') as typeof import('../index')).default;
 import {
   detectWorktreeIndexMismatch,
@@ -31,11 +31,11 @@ import { isGeneratedFile } from '../extraction/generated-detection';
 import { scanDynamicDispatch } from './dynamic-boundaries';
 
 /**
- * An expected, recoverable "codegraph can't serve this" condition — most
+ * An expected, recoverable "springgraph can't serve this" condition — most
  * importantly a project with no index. The dispatch catch converts these to
  * SUCCESS-shaped responses (guidance text, NO isError): an `isError: true`
  * early in a session teaches the agent the toolset is broken and it stops
- * calling codegraph entirely (observed repeatedly), which is exactly wrong
+ * calling springgraph entirely (observed repeatedly), which is exactly wrong
  * for conditions the agent can simply work around (use built-in tools for
  * that codebase / pass projectPath). isError is reserved for "stop trying"
  * cases: security refusals ({@link PathRefusalError}) and genuine
@@ -79,7 +79,7 @@ const MAX_PATH_LENGTH = 4_096;
 const RUST_PATH_PREFIXES = new Set(['crate', 'super', 'self']);
 
 /**
- * Node kinds that contain other symbols. For these, `codegraph_node` with
+ * Node kinds that contain other symbols. For these, `springgraph_node` with
  * `includeCode=true` returns a structural outline (member names + signatures
  * + line numbers) instead of the full body, which for a large class is a
  * multi-thousand-character wall of source that bloats the agent's context.
@@ -95,7 +95,7 @@ function lastQualifierPart(symbol: string): string {
 }
 
 /**
- * Calculate the recommended number of codegraph_explore calls based on project size.
+ * Calculate the recommended number of springgraph_explore calls based on project size.
  * Larger codebases need more exploration calls to cover their surface area,
  * but smaller ones should use fewer to avoid unnecessary overhead.
  */
@@ -108,7 +108,7 @@ export function getExploreBudget(fileCount: number): number {
 }
 
 /**
- * Adaptive output budget for `codegraph_explore`, scaled to project size.
+ * Adaptive output budget for `springgraph_explore`, scaled to project size.
  *
  * Smaller codebases get a tighter total cap, fewer default files, smaller
  * per-file cap, and tighter clustering — so a focused query on a 100-file
@@ -258,22 +258,22 @@ export function getExploreOutputBudget(fileCount: number): ExploreOutputBudget {
 }
 
 /**
- * Whether `codegraph_explore` should prefix source lines with their line
+ * Whether `springgraph_explore` should prefix source lines with their line
  * numbers (cat -n style: `<num>\t<code>`).
  *
  * Line numbers let the agent cite `file:line` straight from the explore
  * payload instead of re-Reading the file just to find a line number — the
  * dominant residual cost on precise-tracing questions (#185 follow-up).
  *
- * Defaults ON. Set `CODEGRAPH_EXPLORE_LINENUMS=0` to disable (used by the
+ * Defaults ON. Set `SPRINGGRAPH_EXPLORE_LINENUMS=0` to disable (used by the
  * A/B harness to measure the payload-cost vs. read-savings tradeoff).
  */
 function exploreLineNumbersEnabled(): boolean {
-  return process.env.CODEGRAPH_EXPLORE_LINENUMS !== '0';
+  return process.env.SPRINGGRAPH_EXPLORE_LINENUMS !== '0';
 }
 
 /**
- * Adaptive explore sizing (default ON). `codegraph_explore` skeletonizes OFF-SPINE
+ * Adaptive explore sizing (default ON). `springgraph_explore` skeletonizes OFF-SPINE
  * polymorphic-sibling files — a file whose class is one of ≥3 interchangeable
  * implementations of a shared interface (e.g. OkHttp's `: Interceptor` classes) —
  * to class + member signatures (bodies elided), keeping the on-spine exemplar full.
@@ -282,10 +282,10 @@ function exploreLineNumbersEnabled(): boolean {
  * search, reads flat). It is PROVABLY INERT elsewhere: distinct pipeline steps (no
  * ≥3-implementer supertype, e.g. Excalidraw's `renderStaticScene`) and on-spine
  * files keep full source — output is byte-identical to shipped on excalidraw /
- * tokio / django / vscode / gin. Set `CODEGRAPH_ADAPTIVE_EXPLORE=0` to disable.
+ * tokio / django / vscode / gin. Set `SPRINGGRAPH_ADAPTIVE_EXPLORE=0` to disable.
  */
 function adaptiveExploreEnabled(): boolean {
-  return process.env.CODEGRAPH_ADAPTIVE_EXPLORE !== '0' && process.env.CODEGRAPH_ADAPTIVE_EXPLORE !== 'false';
+  return process.env.SPRINGGRAPH_ADAPTIVE_EXPLORE !== '0' && process.env.SPRINGGRAPH_ADAPTIVE_EXPLORE !== 'false';
 }
 
 /**
@@ -320,7 +320,7 @@ export function formatStaleBanner(stale: PendingFile[]): string {
   });
   return (
     '⚠️ Some files referenced below were edited since the last index sync — ' +
-    'their codegraph entries may be stale:\n' +
+    'their springgraph entries may be stale:\n' +
     lines.join('\n') +
     '\nFor accurate content of those specific files, Read them directly. ' +
     'The rest of this response is fresh.'
@@ -353,11 +353,11 @@ export function formatStaleFooter(stale: PendingFile[]): string {
  * `getPendingFiles()` is empty, so the per-file banner above can't fire even
  * though the index is now FROZEN and silently drifting stale. Leads with the
  * agent-actionable instruction (Read directly) and carries the reason, which
- * already names the operator remedy (`codegraph sync` / git hooks).
+ * already names the operator remedy (`springgraph sync` / git hooks).
  */
 export function formatDegradedBanner(reason: string | null): string {
   return (
-    '⚠️ CodeGraph auto-sync is DISABLED — live file watching stopped, so the index is ' +
+    '⚠️ Springgraph auto-sync is DISABLED — live file watching stopped, so the index is ' +
     'frozen and any file edited since then is stale here. Read files directly to confirm ' +
     'current content before relying on it.' +
     (reason ? `\n  Reason: ${reason}` : '')
@@ -400,13 +400,13 @@ export interface ToolResult {
  */
 const projectPathProperty: PropertySchema = {
   type: 'string',
-  description: 'Path to a different project with .codegraph/ initialized. If omitted, uses current project. Use this to query other codebases.',
+  description: 'Path to a different project with .springgraph/ initialized. If omitted, uses current project. Use this to query other codebases.',
 };
 
 /**
- * All CodeGraph MCP tools
+ * All Springgraph MCP tools
  *
- * Designed for minimal context usage - use codegraph_explore as the primary tool
+ * Designed for minimal context usage - use springgraph_explore as the primary tool
  * (one call usually answers the whole question), and only use other tools for
  * targeted follow-up queries.
  *
@@ -414,8 +414,8 @@ const projectPathProperty: PropertySchema = {
  */
 export const tools: ToolDefinition[] = [
   {
-    name: 'codegraph_search',
-    description: 'Quick symbol search by name. Returns locations only (no code). Use codegraph_explore instead to get the actual source / understand an area in one call.',
+    name: 'springgraph_search',
+    description: 'Quick symbol search by name. Returns locations only (no code). Use springgraph_explore instead to get the actual source / understand an area in one call.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -439,8 +439,8 @@ export const tools: ToolDefinition[] = [
     },
   },
   {
-    name: 'codegraph_callers',
-    description: 'List functions that call <symbol>. For the full flow, use codegraph_explore.',
+    name: 'springgraph_callers',
+    description: 'List functions that call <symbol>. For the full flow, use springgraph_explore.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -463,8 +463,8 @@ export const tools: ToolDefinition[] = [
     },
   },
   {
-    name: 'codegraph_callees',
-    description: 'List functions that <symbol> calls. For the full flow, use codegraph_explore.',
+    name: 'springgraph_callees',
+    description: 'List functions that <symbol> calls. For the full flow, use springgraph_explore.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -487,7 +487,7 @@ export const tools: ToolDefinition[] = [
     },
   },
   {
-    name: 'codegraph_impact',
+    name: 'springgraph_impact',
     description: 'List symbols affected by changing <symbol>. Use before a refactor.',
     inputSchema: {
       type: 'object',
@@ -511,8 +511,8 @@ export const tools: ToolDefinition[] = [
     },
   },
   {
-    name: 'codegraph_node',
-    description: 'Two modes. (1) READ A FILE — use INSTEAD of the Read tool: pass `file` (a path or basename) with no `symbol` and it returns that file\'s current on-disk source with line numbers, exactly the shape Read gives you (`<n>\\t<line>`, safe to Edit from), narrowable with `offset`/`limit` just like Read — PLUS a one-line note of which files depend on it. Same bytes as Read, faster (served from the index), with the blast radius attached. Use it whenever you would Read a source file. (2) ONE SYMBOL you can name — its location, signature, verbatim source (includeCode=true) and caller/callee trail in one call, so before changing it you see what calls it and what your edit would break. For an AMBIGUOUS name it returns EVERY matching definition\'s body in one call (so you never Read a file to find the right overload); pass `file`/`line` to pin one. Use codegraph_explore for several related symbols or the full flow.',
+    name: 'springgraph_node',
+    description: 'Two modes. (1) READ A FILE — use INSTEAD of the Read tool: pass `file` (a path or basename) with no `symbol` and it returns that file\'s current on-disk source with line numbers, exactly the shape Read gives you (`<n>\\t<line>`, safe to Edit from), narrowable with `offset`/`limit` just like Read — PLUS a one-line note of which files depend on it. Same bytes as Read, faster (served from the index), with the blast radius attached. Use it whenever you would Read a source file. (2) ONE SYMBOL you can name — its location, signature, verbatim source (includeCode=true) and caller/callee trail in one call, so before changing it you see what calls it and what your edit would break. For an AMBIGUOUS name it returns EVERY matching definition\'s body in one call (so you never Read a file to find the right overload); pass `file`/`line` to pin one. Use springgraph_explore for several related symbols or the full flow.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -552,14 +552,14 @@ export const tools: ToolDefinition[] = [
     },
   },
   {
-    name: 'codegraph_explore',
+    name: 'springgraph_explore',
     description: 'PRIMARY TOOL — call FIRST for almost any question OR before an edit: how does X work, architecture, a bug, where/what is X, surveying an area, or the symbols you are about to change. Returns the verbatim source of the relevant symbols grouped by file in ONE capped call (Read-equivalent — treat the shown source as already Read; do NOT re-open those files), plus the call path among them. Query can be a natural-language question OR a bag of symbol/file names. Usually the ONLY call you need — more accurate context, in far fewer tokens and round-trips than a search/Read/Grep loop.',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Symbol names, file names, or short code terms to explore (e.g., "AuthService loginUser session-manager", "GraphTraverser BFS impact traversal.ts"). For a flow question, name the symbols spanning the flow (e.g. "mutateElement renderScene"). A natural-language question works too — no prior codegraph_search needed.',
+          description: 'Symbol names, file names, or short code terms to explore (e.g., "AuthService loginUser session-manager", "GraphTraverser BFS impact traversal.ts"). For a flow question, name the symbols spanning the flow (e.g. "mutateElement renderScene"). A natural-language question works too — no prior springgraph_search needed.',
         },
         maxFiles: {
           type: 'number',
@@ -572,7 +572,7 @@ export const tools: ToolDefinition[] = [
     },
   },
   {
-    name: 'codegraph_status',
+    name: 'springgraph_status',
     description: 'Index health check (files / nodes / edges). Skip unless debugging.',
     inputSchema: {
       type: 'object',
@@ -582,7 +582,7 @@ export const tools: ToolDefinition[] = [
     },
   },
   {
-    name: 'codegraph_files',
+    name: 'springgraph_files',
     description: 'Indexed file tree with language + symbol counts. Faster than Glob for project layout.',
     inputSchema: {
       type: 'object',
@@ -619,57 +619,57 @@ export const tools: ToolDefinition[] = [
 /**
  * Allowlist-filtered tool definitions WITHOUT an engine — the static surface the
  * proxy answers `tools/list` with before any project is open. Mirrors
- * `ToolHandler.getTools()` in the no-CodeGraph case (the dynamic per-repo budget
+ * `ToolHandler.getTools()` in the no-Springgraph case (the dynamic per-repo budget
  * note in a description only adds once `cg` is loaded; the schemas are static).
  */
 export function getStaticTools(): ToolDefinition[] {
-  const raw = process.env.CODEGRAPH_MCP_TOOLS;
+  const raw = process.env.SPRINGGRAPH_MCP_TOOLS;
   if (!raw || !raw.trim()) {
-    return tools.filter(t => DEFAULT_MCP_TOOLS.has(t.name.replace(/^codegraph_/, '')));
+    return tools.filter(t => DEFAULT_MCP_TOOLS.has(t.name.replace(/^springgraph_/, '')));
   }
-  const allow = new Set(raw.split(',').map(s => s.trim().replace(/^codegraph_/, '')).filter(Boolean));
-  return allow.size ? tools.filter(t => allow.has(t.name.replace(/^codegraph_/, ''))) : tools;
+  const allow = new Set(raw.split(',').map(s => s.trim().replace(/^springgraph_/, '')).filter(Boolean));
+  return allow.size ? tools.filter(t => allow.has(t.name.replace(/^springgraph_/, ''))) : tools;
 }
 
 /**
  * The MCP tools served by DEFAULT (short names). The other defined tools
  * (callees, impact, files, status) remain fully functional — handlers stay,
- * the library API and CLI are untouched, and `CODEGRAPH_MCP_TOOLS` re-enables
+ * the library API and CLI are untouched, and `SPRINGGRAPH_MCP_TOOLS` re-enables
  * any of them — they just aren't LISTED to agents anymore.
  *
  * Evidence for the cut (the "adapt the tool to the agent" principle —
  * fewer tools = fewer mis-picks, and presence itself steers):
- * - `codegraph_impact` appears in ZERO recorded eval runs ever — its
+ * - `springgraph_impact` appears in ZERO recorded eval runs ever — its
  *   blast-radius info already arrives inline on explore (the "Blast radius"
  *   section) and node (the dependents note), so agents never need the
  *   standalone tool.
- * - `codegraph_callees` is redundant by construction: a symbol's body (which
+ * - `springgraph_callees` is redundant by construction: a symbol's body (which
  *   node returns) IS its callee list, plus the caller/callee trail.
- * - `codegraph_files` / `codegraph_status`: the tiny-repo audit (see
+ * - `springgraph_files` / `springgraph_status`: the tiny-repo audit (see
  *   getTools) found they "reduce to one grep"; staleness banners already
  *   inline the pending-sync info on every read tool, and the CLI covers
  *   diagnostics.
- * - `codegraph_callers` stays: exhaustive call-site enumeration (every
+ * - `springgraph_callers` stays: exhaustive call-site enumeration (every
  *   caller with file:line, callback registrations labeled, one section per
  *   same-named definition) is the one job explore/node don't replicate.
  */
 const DEFAULT_MCP_TOOLS = new Set(['explore', 'node', 'search', 'callers']);
 
 /**
- * Tool handler that executes tools against a CodeGraph instance
+ * Tool handler that executes tools against a Springgraph instance
  *
  * Supports cross-project queries via the projectPath parameter.
  * Other projects are opened on-demand and cached for performance.
  */
 export class ToolHandler {
-  // Cache of opened CodeGraph instances for cross-project queries
-  private projectCache: Map<string, CodeGraph> = new Map();
+  // Cache of opened Springgraph instances for cross-project queries
+  private projectCache: Map<string, Springgraph> = new Map();
   // The directory the server last searched for a default project. Surfaced in
   // the "not initialized" error so users can see why detection missed.
   private defaultProjectHint: string | null = null;
   // Per-start-path cache of the git worktree/index mismatch (issue #155). The
   // mismatch is a fixed property of (where the request came from → which
-  // .codegraph/ it resolves to), so the up-to-two `git rev-parse` spawns run
+  // .springgraph/ it resolves to), so the up-to-two `git rev-parse` spawns run
   // once and every later tool call reuses the result — never shelling out to
   // git on the hot path. `undefined` = not computed yet; `null` = no mismatch.
   private worktreeMismatchCache: Map<string, WorktreeIndexMismatch | null> = new Map();
@@ -682,12 +682,12 @@ export class ToolHandler {
   // subsequent calls don't pay any cost.
   private catchUpGate: Promise<void> | null = null;
 
-  constructor(private cg: CodeGraph | null) {}
+  constructor(private cg: Springgraph | null) {}
 
   /**
-   * Update the default CodeGraph instance (e.g. after lazy initialization)
+   * Update the default Springgraph instance (e.g. after lazy initialization)
    */
-  setDefaultCodeGraph(cg: CodeGraph): void {
+  setDefaultSpringgraph(cg: Springgraph): void {
     this.cg = cg;
   }
 
@@ -711,38 +711,38 @@ export class ToolHandler {
   }
 
   /**
-   * Whether a default CodeGraph instance is available
+   * Whether a default Springgraph instance is available
    */
-  hasDefaultCodeGraph(): boolean {
+  hasDefaultSpringgraph(): boolean {
     return this.cg !== null;
   }
 
   /**
-   * Optional allowlist of exposed tools, parsed from the CODEGRAPH_MCP_TOOLS
+   * Optional allowlist of exposed tools, parsed from the SPRINGGRAPH_MCP_TOOLS
    * env var (comma-separated short names, e.g. "trace,search,node,context").
    * Unset/empty → every tool is exposed. Lets an operator (or an A/B harness)
    * trim the tool surface without rebuilding the client config; the ablated
    * tool is then truly absent from ListTools rather than merely denied on call.
-   * Matching is on the short form, so "node" and "codegraph_node" both work.
+   * Matching is on the short form, so "node" and "springgraph_node" both work.
    */
   private toolAllowlist(): Set<string> | null {
-    const raw = process.env.CODEGRAPH_MCP_TOOLS;
+    const raw = process.env.SPRINGGRAPH_MCP_TOOLS;
     if (!raw || !raw.trim()) return null;
-    const short = (s: string) => s.trim().replace(/^codegraph_/, '');
+    const short = (s: string) => s.trim().replace(/^springgraph_/, '');
     const set = new Set(raw.split(',').map(short).filter(Boolean));
     return set.size ? set : null;
   }
 
-  /** Whether a tool name passes the CODEGRAPH_MCP_TOOLS allowlist (if any). */
+  /** Whether a tool name passes the SPRINGGRAPH_MCP_TOOLS allowlist (if any). */
   private isToolAllowed(name: string): boolean {
     const allow = this.toolAllowlist();
-    return !allow || allow.has(name.replace(/^codegraph_/, ''));
+    return !allow || allow.has(name.replace(/^springgraph_/, ''));
   }
 
   /**
    * Get tool definitions with dynamic descriptions based on project size.
-   * The codegraph_explore tool description includes a budget recommendation
-   * scaled to the number of indexed files. Honors the CODEGRAPH_MCP_TOOLS
+   * The springgraph_explore tool description includes a budget recommendation
+   * scaled to the number of indexed files. Honors the SPRINGGRAPH_MCP_TOOLS
    * allowlist so a trimmed surface is reflected in ListTools.
    */
   getTools(): ToolDefinition[] {
@@ -751,8 +751,8 @@ export class ToolHandler {
     // DEFAULT_MCP_TOOLS for the evidence). An allowlist replaces the
     // default entirely, so any defined tool can be re-enabled.
     let visible = allow
-      ? tools.filter(t => allow.has(t.name.replace(/^codegraph_/, '')))
-      : tools.filter(t => DEFAULT_MCP_TOOLS.has(t.name.replace(/^codegraph_/, '')));
+      ? tools.filter(t => allow.has(t.name.replace(/^springgraph_/, '')))
+      : tools.filter(t => DEFAULT_MCP_TOOLS.has(t.name.replace(/^springgraph_/, '')));
     if (!this.cg) return visible;
 
     try {
@@ -768,7 +768,7 @@ export class ToolHandler {
       // n=2 audits ruled out cutting below 5 tools:
       // - 3-tool gate (search + context + trace): cost regressed on
       //   cobra/ky/sinatra. The agent fell back to raw Reads to cover
-      //   what codegraph_node + codegraph_explore would have answered.
+      //   what springgraph_node + springgraph_explore would have answered.
       // - 1-tool gate (search only): catastrophic regression — express
       //   went from -43% WIN to +107% LOSS. With only search, the agent
       //   can't navigate the call graph structurally and reads everything.
@@ -784,16 +784,16 @@ export class ToolHandler {
       // so it deserves the same gating.
       const TINY_REPO_FILE_THRESHOLD = 500;
       const TINY_REPO_CORE_TOOLS = new Set([
-        'codegraph_explore',
-        'codegraph_search',
-        'codegraph_node',
+        'springgraph_explore',
+        'springgraph_search',
+        'springgraph_node',
       ]);
       if (stats.fileCount < TINY_REPO_FILE_THRESHOLD) {
         visible = visible.filter(t => TINY_REPO_CORE_TOOLS.has(t.name));
       }
 
       return visible.map(tool => {
-        if (tool.name === 'codegraph_explore') {
+        if (tool.name === 'springgraph_explore') {
           return {
             ...tool,
             description: `${tool.description} Budget: make at most ${budget} calls for this project (${stats.fileCount.toLocaleString()} files indexed).`,
@@ -807,28 +807,28 @@ export class ToolHandler {
   }
 
   /**
-   * Get CodeGraph instance for a project
+   * Get Springgraph instance for a project
    *
-   * If projectPath is provided, opens that project's CodeGraph (cached).
-   * Otherwise returns the default CodeGraph instance.
+   * If projectPath is provided, opens that project's Springgraph (cached).
+   * Otherwise returns the default Springgraph instance.
    *
-   * Walks up parent directories to find the nearest .codegraph/ folder,
+   * Walks up parent directories to find the nearest .springgraph/ folder,
    * similar to how git finds .git/ directories.
    */
-  private getCodeGraph(projectPath?: string): CodeGraph {
+  private getSpringgraph(projectPath?: string): Springgraph {
     if (!projectPath) {
       if (!this.cg) {
         const searched = this.defaultProjectHint ?? process.cwd();
         throw new NotIndexedError(
-          'No CodeGraph project is loaded for this session.\n' +
-          `Searched for a .codegraph/ directory starting from: ${searched}\n` +
+          'No Springgraph project is loaded for this session.\n' +
+          `Searched for a .springgraph/ directory starting from: ${searched}\n` +
           'If this project IS indexed, this is a working-directory detection issue: ' +
           "the MCP client launched the server outside your project and didn't report the " +
           'workspace root. Fix it either way:\n' +
           '  • Pass projectPath to the tool call, e.g. projectPath: "/absolute/path/to/your/project"\n' +
           '  • Or add --path to the server\'s MCP config args: ["serve", "--mcp", "--path", "/absolute/path/to/your/project"]\n' +
           'If the project simply has no index, continue with your built-in tools (Read/Grep/Glob) ' +
-          "and don't call codegraph again this session — the user can run 'codegraph init' to enable it."
+          "and don't call springgraph again this session — the user can run 'springgraph init' to enable it."
         );
       }
       return this.cg;
@@ -841,7 +841,7 @@ export class ToolHandler {
 
     // Reject sensitive system directories before opening. Only validate a
     // path that actually exists — a nested or not-yet-created sub-path of a
-    // real project must still be allowed to resolve UP to its .codegraph/
+    // real project must still be allowed to resolve UP to its .springgraph/
     // root below (issue #238), so we don't run the existence-checking
     // validator on paths that are meant to walk up.
     if (existsSync(projectPath)) {
@@ -851,15 +851,15 @@ export class ToolHandler {
       }
     }
 
-    // Walk up parent directories to find nearest .codegraph/
-    const resolvedRoot = findNearestCodeGraphRoot(projectPath);
+    // Walk up parent directories to find nearest .springgraph/
+    const resolvedRoot = findNearestSpringgraphRoot(projectPath);
 
     if (!resolvedRoot) {
       throw new NotIndexedError(
-        `The project at ${projectPath} isn't indexed with codegraph (no .codegraph/ directory found ` +
-        'walking up from it), so codegraph cannot query it. Use your built-in tools (Read/Grep/Glob) ' +
-        "for that codebase instead, and don't call codegraph for it again this session. " +
-        "Indexing is the user's decision — they can run 'codegraph init' in that project to enable it."
+        `The project at ${projectPath} isn't indexed with springgraph (no .springgraph/ directory found ` +
+        'walking up from it), so springgraph cannot query it. Use your built-in tools (Read/Grep/Glob) ' +
+        "for that codebase instead, and don't call springgraph for it again this session. " +
+        "Indexing is the user's decision — they can run 'springgraph init' in that project to enable it."
       );
     }
 
@@ -883,7 +883,7 @@ export class ToolHandler {
     }
 
     // Open and cache under both paths
-    const cg = loadCodeGraph().openSync(resolvedRoot);
+    const cg = loadSpringgraph().openSync(resolvedRoot);
     this.projectCache.set(resolvedRoot, cg);
     if (projectPath !== resolvedRoot) {
       this.projectCache.set(projectPath, cg);
@@ -963,7 +963,7 @@ export class ToolHandler {
 
     let mismatch: WorktreeIndexMismatch | null = null;
     try {
-      mismatch = detectWorktreeIndexMismatch(startPath, this.getCodeGraph(projectPath).getProjectRoot());
+      mismatch = detectWorktreeIndexMismatch(startPath, this.getSpringgraph(projectPath).getProjectRoot());
     } catch {
       // No resolvable project (or any other resolution error) → nothing to warn.
       mismatch = null;
@@ -977,7 +977,7 @@ export class ToolHandler {
    * notice when the resolved index belongs to a different git working tree than
    * the caller's (issue #155). Without this, an agent in a nested worktree
    * silently trusts main-branch results. No-op on error results and when there
-   * is no mismatch. `codegraph_status` is excluded — it embeds its own verbose
+   * is no mismatch. `springgraph_status` is excluded — it embeds its own verbose
    * warning — so it stays out of this path.
    */
   private withWorktreeNotice(result: ToolResult, projectPath?: string): ToolResult {
@@ -1009,14 +1009,14 @@ export class ToolHandler {
   private withStalenessNotice(result: ToolResult, projectPath?: string): ToolResult {
     if (result.isError) return result;
 
-    let cg: CodeGraph;
+    let cg: Springgraph;
     try {
-      cg = this.getCodeGraph(projectPath);
+      cg = this.getSpringgraph(projectPath);
     } catch {
       return result; // no default project — leave as is
     }
 
-    // Cross-project `projectPath` calls open a cached CodeGraph WITHOUT a
+    // Cross-project `projectPath` calls open a cached Springgraph WITHOUT a
     // watcher (watchers are only attached to the default session project).
     // When the cross-project path happens to be the same project as the
     // default cg, the cached instance is the wrong one — its pendingFiles is
@@ -1038,7 +1038,7 @@ export class ToolHandler {
     // fire — but the index is now FROZEN and silently drifting stale. Surface
     // one global notice instead, so the agent Reads for current content rather
     // than trusting a response off a no-longer-updating index. (Cross-project
-    // calls open a watcher-less CodeGraph, so this is false there — correct: we
+    // calls open a watcher-less Springgraph, so this is false there — correct: we
     // only know degraded state for the default session project.)
     let degraded = false;
     try {
@@ -1059,7 +1059,7 @@ export class ToolHandler {
       return { ...result, content: [{ type: 'text', text: composed }, ...tail] };
     }
 
-    // Defensive: some test fakes inject a partial CodeGraph stub without the
+    // Defensive: some test fakes inject a partial Springgraph stub without the
     // newer pending-files API. Treat missing/throwing as "no pending files."
     let pending: PendingFile[] = [];
     try {
@@ -1077,7 +1077,7 @@ export class ToolHandler {
     const elsewhere: PendingFile[] = [];
     for (const p of pending) {
       // Substring match against the project-relative POSIX path — that's
-      // exactly the format both the watcher and every codegraph response
+      // exactly the format both the watcher and every springgraph response
       // emit, so a plain includes() is sufficient and avoids regex pitfalls.
       if (text.includes(p.path)) inResponse.push(p);
       else elsewhere.push(p);
@@ -1112,10 +1112,10 @@ export class ToolHandler {
         this.catchUpGate = null;
         try { await gate; } catch { /* engine already logged */ }
       }
-      // Honor the optional tool allowlist (CODEGRAPH_MCP_TOOLS): a trimmed
+      // Honor the optional tool allowlist (SPRINGGRAPH_MCP_TOOLS): a trimmed
       // surface rejects ablated tools defensively even if a client cached them.
       if (!this.isToolAllowed(toolName)) {
-        return this.errorResult(`Tool ${toolName} is disabled via CODEGRAPH_MCP_TOOLS`);
+        return this.errorResult(`Tool ${toolName} is disabled via SPRINGGRAPH_MCP_TOOLS`);
       }
       // Cross-cutting input validation. All tools accept an optional
       // `projectPath` and most accept either `query`, `task`, or
@@ -1125,7 +1125,7 @@ export class ToolHandler {
       if (typeof pathCheck === 'object' && pathCheck !== undefined) {
         return pathCheck;
       }
-      // The `path` and `pattern` properties used by codegraph_files are
+      // The `path` and `pattern` properties used by springgraph_files are
       // also path-shaped — apply the same cap.
       if (args.path !== undefined) {
         const check = this.validateOptionalPath(args.path, 'path');
@@ -1144,24 +1144,24 @@ export class ToolHandler {
       // with what the read tools surface.
       let result: ToolResult;
       switch (toolName) {
-        case 'codegraph_search':
+        case 'springgraph_search':
           result = await this.handleSearch(args); break;
-        case 'codegraph_callers':
+        case 'springgraph_callers':
           result = await this.handleCallers(args); break;
-        case 'codegraph_callees':
+        case 'springgraph_callees':
           result = await this.handleCallees(args); break;
-        case 'codegraph_impact':
+        case 'springgraph_impact':
           result = await this.handleImpact(args); break;
-        case 'codegraph_explore':
+        case 'springgraph_explore':
           result = await this.handleExplore(args); break;
-        case 'codegraph_node':
+        case 'springgraph_node':
           result = await this.handleNode(args); break;
-        case 'codegraph_status':
+        case 'springgraph_status':
           // status embeds the pending-files list as a first-class section
           // (see handleStatus), so we skip the auto-banner wrapper here to
           // avoid duplicating the same info at the top of the response.
           return await this.handleStatus(args);
-        case 'codegraph_files':
+        case 'springgraph_files':
           result = await this.handleFiles(args); break;
         default:
           return this.errorResult(`Unknown tool: ${toolName}`);
@@ -1181,20 +1181,20 @@ export class ToolHandler {
       }
       return this.errorResult(
         `Tool execution failed: ${err instanceof Error ? err.message : String(err)}. ` +
-        'This is an internal codegraph error — retry the call once; if it persists, ' +
-        'continue without codegraph for this task.'
+        'This is an internal springgraph error — retry the call once; if it persists, ' +
+        'continue without springgraph for this task.'
       );
     }
   }
 
   /**
-   * Handle codegraph_search
+   * Handle springgraph_search
    */
   private async handleSearch(args: Record<string, unknown>): Promise<ToolResult> {
     const query = this.validateString(args.query, 'query');
     if (typeof query !== 'string') return query;
 
-    const cg = this.getCodeGraph(args.projectPath as string | undefined);
+    const cg = this.getSpringgraph(args.projectPath as string | undefined);
     const rawKind = args.kind as string | undefined;
     // The schema enum says 'type' (what agents naturally reach for); the
     // NodeKind is 'type_alias'. Without the mapping, kind: "type" silently
@@ -1267,13 +1267,13 @@ export class ToolHandler {
   }
 
   /**
-   * Handle codegraph_callers
+   * Handle springgraph_callers
    */
   private async handleCallers(args: Record<string, unknown>): Promise<ToolResult> {
     const symbol = this.validateString(args.symbol, 'symbol');
     if (typeof symbol !== 'string') return symbol;
 
-    const cg = this.getCodeGraph(args.projectPath as string | undefined);
+    const cg = this.getSpringgraph(args.projectPath as string | undefined);
     const limit = clamp((args.limit as number) || 20, 1, 100);
     const fileFilter = typeof args.file === 'string' ? args.file : undefined;
 
@@ -1340,13 +1340,13 @@ export class ToolHandler {
   }
 
   /**
-   * Handle codegraph_callees
+   * Handle springgraph_callees
    */
   private async handleCallees(args: Record<string, unknown>): Promise<ToolResult> {
     const symbol = this.validateString(args.symbol, 'symbol');
     if (typeof symbol !== 'string') return symbol;
 
-    const cg = this.getCodeGraph(args.projectPath as string | undefined);
+    const cg = this.getSpringgraph(args.projectPath as string | undefined);
     const limit = clamp((args.limit as number) || 20, 1, 100);
     const fileFilter = typeof args.file === 'string' ? args.file : undefined;
 
@@ -1410,13 +1410,13 @@ export class ToolHandler {
   }
 
   /**
-   * Handle codegraph_impact
+   * Handle springgraph_impact
    */
   private async handleImpact(args: Record<string, unknown>): Promise<ToolResult> {
     const symbol = this.validateString(args.symbol, 'symbol');
     if (typeof symbol !== 'string') return symbol;
 
-    const cg = this.getCodeGraph(args.projectPath as string | undefined);
+    const cg = this.getSpringgraph(args.projectPath as string | undefined);
     const depth = clamp((args.depth as number) || 2, 1, 10);
     const fileFilter = typeof args.file === 'string' ? args.file : undefined;
 
@@ -1543,7 +1543,7 @@ export class ToolHandler {
   }
 
   /**
-   * Flow-from-named-symbols: an agent's codegraph_explore query is a bag of
+   * Flow-from-named-symbols: an agent's springgraph_explore query is a bag of
    * symbol names that usually spans the flow it's investigating (e.g.
    * "PmsProductController getList PmsProductService list PmsProductServiceImpl").
    * Surface the longest call chain AMONG those named symbols — scoped to what the
@@ -1556,7 +1556,7 @@ export class ToolHandler {
    * whose qualifiedName contains another named token (`PmsProductServiceImpl::list`),
    * dropping unrelated `OmsOrderService::list`.
    */
-  private buildFlowFromNamedSymbols(cg: CodeGraph, query: string): { text: string; pathNodeIds: Set<string>; namedNodeIds: Set<string>; uniqueNamedNodeIds: Set<string> } {
+  private buildFlowFromNamedSymbols(cg: Springgraph, query: string): { text: string; pathNodeIds: Set<string>; namedNodeIds: Set<string>; uniqueNamedNodeIds: Set<string> } {
     const EMPTY = { text: '', pathNodeIds: new Set<string>(), namedNodeIds: new Set<string>(), uniqueNamedNodeIds: new Set<string>() };
     try {
       const CALLABLE = new Set(['method', 'function', 'component', 'constructor']);
@@ -1757,7 +1757,7 @@ export class ToolHandler {
    * at runtime. Query-time, deterministic, zero graph mutation; a fully
    * connected flow never reaches this method.
    */
-  private buildDynamicBoundaries(cg: CodeGraph, scanList: Node[], named: Map<string, Node>): string {
+  private buildDynamicBoundaries(cg: Springgraph, scanList: Node[], named: Map<string, Node>): string {
     const MAX_NOTES = 4;       // boundary bullets per explore
     const MAX_SCAN = 8;        // bodies scanned
     const MAX_TOTAL_CHARS = 200_000;
@@ -1797,7 +1797,7 @@ export class ToolHandler {
       '',
       ...notes,
       '',
-      '> These sites choose their call target at runtime (registry / bus / reflection) — the site shown IS where the flow continues. To follow it, run codegraph_explore or codegraph_node on a candidate; source for the sites above is included below.',
+      '> These sites choose their call target at runtime (registry / bus / reflection) — the site shown IS where the flow continues. To follow it, run springgraph_explore or springgraph_node on a candidate; source for the sites above is included below.',
       '',
     ].join('\n');
   }
@@ -1810,7 +1810,7 @@ export class ToolHandler {
    * candidate list should be). Symbols the agent already named sort first and
    * are marked — that's the "you were right, here's the wiring" case.
    */
-  private boundaryCandidates(cg: CodeGraph, key: string, keyIsType: boolean, named: Map<string, Node>, selfId: string): string {
+  private boundaryCandidates(cg: Springgraph, key: string, keyIsType: boolean, named: Map<string, Node>, selfId: string): string {
     const CALLABLE = new Set(['method', 'function', 'component', 'constructor', 'class']);
     const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
     const keyNorm = norm(key);
@@ -1877,7 +1877,7 @@ export class ToolHandler {
    * that have no dependents (nothing to warn about), and returns '' when none
    * qualify so a leaf-only exploration stays clean.
    */
-  private buildBlastRadiusSection(cg: CodeGraph, subgraph: Subgraph): string {
+  private buildBlastRadiusSection(cg: Springgraph, subgraph: Subgraph): string {
     const ROOT_CAP = 5; // only the symbols the query actually targeted
     const FILE_CAP = 4; // caller files listed per symbol before "+N more"
     const MEANINGFUL = new Set<string>([
@@ -1934,7 +1934,7 @@ export class ToolHandler {
    * PageRank) from the query's matched SEED nodes over the call/reference graph.
    *
    * This is the ranking signal text search (FTS/bm25) CANNOT provide, and it's
-   * codegraph's home turf: relevance by STRUCTURE, not words. A file whose
+   * springgraph's home turf: relevance by STRUCTURE, not words. A file whose
    * symbols are call-connected to the matched cluster accrues walk mass and
    * ranks high; a lone TEXT match — e.g. `LensSwitcher.swift` matched the word
    * "switch" from `switchOrganization`, but calls none of `setUser`/`fetchUser`
@@ -2001,11 +2001,11 @@ export class ToolHandler {
   }
 
   /**
-   * Handle codegraph_explore — deep exploration in a single call
+   * Handle springgraph_explore — deep exploration in a single call
    *
    * Strategy: find relevant symbols via graph traversal, group by file,
    * then read contiguous file sections covering all symbols per file.
-   * This replaces multiple codegraph_node + Read calls.
+   * This replaces multiple springgraph_node + Read calls.
    *
    * Output size is adaptive to project file count via
    * `getExploreOutputBudget` — see #185 for why a fixed 35k cap was a
@@ -2015,7 +2015,7 @@ export class ToolHandler {
     const query = this.validateString(args.query, 'query');
     if (typeof query !== 'string') return query;
 
-    const cg = this.getCodeGraph(args.projectPath as string | undefined);
+    const cg = this.getSpringgraph(args.projectPath as string | undefined);
     const projectRoot = cg.getProjectRoot();
 
     // Resolve adaptive output budget from project size. Falls back to the
@@ -2118,7 +2118,7 @@ export class ToolHandler {
         // 50+-overload name (tokio `poll`) ranks the wanted def (`Harness::poll`)
         // below the FTS cut, so findAllSymbols would never see it and the
         // type-token bias below couldn't pick the harness.rs one. (Same fix as
-        // codegraph_node's findSymbolMatches.) Qualified tokens keep findAllSymbols.
+        // springgraph_node's findSymbolMatches.) Qualified tokens keep findAllSymbols.
         const isQual = /[.\/]|::/.test(t);
         const raw = isQual ? this.findAllSymbols(cg, t).nodes : cg.getNodesByName(t);
         const cands = raw
@@ -2129,7 +2129,7 @@ export class ToolHandler {
         // only: the overloads whose file/class the query ALSO names (the agent
         // told us which one it wants — DataRequest's, not Validation.swift's),
         // capped; else fall back to the single most-substantive def. This is the
-        // explore-side mirror of codegraph_node's overload disambiguation.
+        // explore-side mirror of springgraph_node's overload disambiguation.
         let picks: Node[];
         if (cands.length <= 3) {
           picks = cands;
@@ -2505,7 +2505,7 @@ export class ToolHandler {
       const fileLines = fileContent.split('\n');
       const lang = group.nodes[0]?.language || '';
 
-      // Adaptive sizing (CODEGRAPH_ADAPTIVE_EXPLORE, default on): collapse a file
+      // Adaptive sizing (SPRINGGRAPH_ADAPTIVE_EXPLORE, default on): collapse a file
       // to a per-symbol view when it's a redundant member of a polymorphic family.
       // Engages iff ALL hold:
       //   1. a flow spine exists,
@@ -2606,15 +2606,15 @@ export class ToolHandler {
         if (skel.length > 0) {
           const names = [...new Set(group.nodes.filter(n => n.kind !== 'import' && n.kind !== 'export').map(n => n.name))]
             .slice(0, budget.maxSymbolsInFileHeader).join(', ');
-          // Steer the agent to codegraph_explore for an elided body — NEVER to
+          // Steer the agent to springgraph_explore for an elided body — NEVER to
           // Read. The old "Read for more" / "Read for a full body" tags invited
           // a Read of the very file just skeletonized; on a central, wanted file
           // (Session.swift, DataRequest.swift) that fired an over-investigation
           // spiral (the agent Read the skeletonized file, then kept digging).
           // CLAUDE.md: explore output must never tell the agent to Read.
           const tag = bodyIds.size > 0
-            ? 'focused (the methods you named in full, the rest as signatures — codegraph_explore a signature by name for its body; do NOT Read)'
-            : 'skeleton (signatures only — codegraph_explore a name for its full body; do NOT Read)';
+            ? 'focused (the methods you named in full, the rest as signatures — springgraph_explore a signature by name for its body; do NOT Read)'
+            : 'skeleton (signatures only — springgraph_explore a name for its full body; do NOT Read)';
           lines.push(`#### ${filePath} — ${names} · ${tag}`, '', '```' + lang, skel.join('\n'), '```', '');
           totalChars += skel.join('\n').length + 120;
           filesIncluded++;
@@ -2933,10 +2933,10 @@ export class ToolHandler {
     if (budget.includeCompletenessSignal) {
       lines.push('');
       lines.push('---');
-      lines.push(`> **Complete source for ${filesIncluded} files is included above — do NOT re-read them.** If your question also needs files/symbols listed under "Not shown above" (or any area this call didn't cover), make ANOTHER codegraph_explore targeting those names — it returns the same source with line numbers and is cheaper and more complete than reading. Reserve Read for a single specific line range explore can't surface.`);
+      lines.push(`> **Complete source for ${filesIncluded} files is included above — do NOT re-read them.** If your question also needs files/symbols listed under "Not shown above" (or any area this call didn't cover), make ANOTHER springgraph_explore targeting those names — it returns the same source with line numbers and is cheaper and more complete than reading. Reserve Read for a single specific line range explore can't surface.`);
     } else if (anyFileTrimmed) {
       lines.push('');
-      lines.push(`> Some file sections were trimmed for size. For a specific symbol you still need, run another \`codegraph_explore\` (or \`codegraph_node\`) with its exact name — line-numbered source, cheaper and more complete than Read.`);
+      lines.push(`> Some file sections were trimmed for size. For a specific symbol you still need, run another \`springgraph_explore\` (or \`springgraph_node\`) with its exact name — line-numbered source, cheaper and more complete than Read.`);
     }
 
     // Add explore budget note based on project size
@@ -2971,16 +2971,16 @@ export class ToolHandler {
       const lastSection = cut.lastIndexOf('\n#### ');
       const boundary = lastSection > hardCeiling * 0.5 ? lastSection : cut.lastIndexOf('\n');
       const safe = boundary > 0 ? cut.slice(0, boundary) : cut;
-      return this.textResult(safe + '\n\n... (output truncated to budget; the source above is complete and verbatim — treat it as already Read. For any area not covered, run another codegraph_explore with the specific names — do NOT Read these files.)');
+      return this.textResult(safe + '\n\n... (output truncated to budget; the source above is complete and verbatim — treat it as already Read. For any area not covered, run another springgraph_explore with the specific names — do NOT Read these files.)');
     }
     return this.textResult(output);
   }
 
   /**
-   * Handle codegraph_node
+   * Handle springgraph_node
    */
   private async handleNode(args: Record<string, unknown>): Promise<ToolResult> {
-    const cg = this.getCodeGraph(args.projectPath as string | undefined);
+    const cg = this.getSpringgraph(args.projectPath as string | undefined);
     // Default to false to minimize context usage
     const includeCode = args.includeCode === true;
     const fileHint = typeof args.file === 'string' && args.file.trim() ? args.file.trim() : undefined;
@@ -3039,7 +3039,7 @@ export class ToolHandler {
     // different types (Alamofire `didCompleteTask`/`task`/`validate`, gin
     // `reset`). Returning ONE forces the agent to guess, and when it guesses
     // wrong it READS the file to find the right overload — the dominant
-    // codegraph_node read cause on Swift/Go. So return them ALL: pack as many
+    // springgraph_node read cause on Swift/Go. So return them ALL: pack as many
     // FULL bodies as fit a char budget (the agent gets the one it needs in this
     // one call, no follow-up parameter to learn), and list any remainder by
     // file:line so a large overload set can't overflow the per-tool cap.
@@ -3089,7 +3089,7 @@ export class ToolHandler {
       if (listed.length > LIST_CAP) out.push(`- … +${listed.length - LIST_CAP} more`);
       out.push(
         '',
-        `> Need one of these in full? Call codegraph_node again with \`file\` (e.g. \`"${listed[0]!.filePath.split('/').pop()}"\`) or \`line\` — do NOT Read it.`,
+        `> Need one of these in full? Call springgraph_node again with \`file\` (e.g. \`"${listed[0]!.filePath.split('/').pop()}"\`) or \`line\` — do NOT Read it.`,
       );
     }
     return this.textResult(this.truncateOutput(out.join('\n')));
@@ -3109,14 +3109,14 @@ export class ToolHandler {
    * through validatePathWithinRoot (#527).
    */
   private async handleFileView(
-    cg: CodeGraph,
+    cg: Springgraph,
     fileArg: string,
     opts: { offset?: number; limit?: number; symbolsOnly?: boolean } = {},
   ): Promise<ToolResult> {
     const normalize = (p: string) => p.replace(/\\/g, '/').replace(/^(?:\.?\/+)+/, '').replace(/\/+$/, '');
     const wantLower = normalize(fileArg).toLowerCase();
     const allFiles = cg.getFiles();
-    if (allFiles.length === 0) return this.textResult('No files indexed. Run `codegraph index` first.');
+    if (allFiles.length === 0) return this.textResult('No files indexed. Run `springgraph index` first.');
 
     let resolved = allFiles.find((f) => f.path.toLowerCase() === wantLower);
     let candidates: typeof allFiles = [];
@@ -3136,7 +3136,7 @@ export class ToolHandler {
     }
     if (!resolved) {
       return this.textResult(
-        `No indexed file matches "${fileArg}". Codegraph indexes source files; configs/docs it doesn't parse won't appear — Read those directly.`,
+        `No indexed file matches "${fileArg}". Springgraph indexes source files; configs/docs it doesn't parse won't appear — Read those directly.`,
       );
     }
 
@@ -3146,7 +3146,7 @@ export class ToolHandler {
       .sort((a, b) => a.startLine - b.startLine);
     const dependents = cg.getFileDependents(filePath);
 
-    // Compact, one-line blast radius (codegraph's value-add over a plain Read).
+    // Compact, one-line blast radius (springgraph's value-add over a plain Read).
     const depSummary = dependents.length
       ? `used by ${dependents.length} file${dependents.length === 1 ? '' : 's'}: ${dependents.slice(0, 8).join(', ')}${dependents.length > 8 ? `, +${dependents.length - 8} more` : ''}`
       : 'no other indexed file depends on it';
@@ -3176,7 +3176,7 @@ export class ToolHandler {
     if (CONFIG_LEAF_LANGUAGES.has(resolved.language)) {
       const out = [`**${filePath}** — configuration/data file, ${depSummary}`, ''];
       if (nodes.length) out.push(...symbolMap('### Keys (values withheld for safety)'));
-      out.push('', '> Values may be secrets, so codegraph indexes keys only. Read the file directly if you need a value.');
+      out.push('', '> Values may be secrets, so springgraph indexes keys only. Read the file directly if you need a value.');
       return this.textResult(this.truncateOutput(out.join('\n')));
     }
 
@@ -3231,7 +3231,7 @@ export class ToolHandler {
     if (!complete) {
       out.push(
         '',
-        `(lines ${offset}–${shownEnd} of ${total} — pass \`offset\`/\`limit\` for another range, or \`codegraph_node <symbol>\` for one symbol in full)`,
+        `(lines ${offset}–${shownEnd} of ${total} — pass \`offset\`/\`limit\` for another range, or \`springgraph_node <symbol>\` for one symbol in full)`,
       );
     }
     // Self-bounded to CHAR_BUDGET — do NOT route through truncateOutput (15k).
@@ -3239,7 +3239,7 @@ export class ToolHandler {
   }
 
   /** Render one symbol: details + (optional) body/outline + its caller/callee trail. */
-  private async renderNodeSection(cg: CodeGraph, node: Node, includeCode: boolean): Promise<string> {
+  private async renderNodeSection(cg: Springgraph, node: Node, includeCode: boolean): Promise<string> {
     let code: string | null = null;
     let outline: string | null = null;
     if (includeCode) {
@@ -3259,14 +3259,14 @@ export class ToolHandler {
 
   /**
    * Build the "trail" for a symbol: its direct callees (what it calls) and
-   * callers (what calls it), each with file:line — so codegraph_node doubles as
+   * callers (what calls it), each with file:line — so springgraph_node doubles as
    * the structural Grep→Read→expand primitive: a spot PLUS where to go next.
-   * Capped to stay cheap. Walk the graph by calling codegraph_node on a trail
+   * Capped to stay cheap. Walk the graph by calling springgraph_node on a trail
    * entry; no Read needed for covered hops. Empty edges on a non-leaf often mean
    * dynamic dispatch the static graph couldn't resolve — that absence is itself
    * a signal (read that one hop) rather than a dead end.
    */
-  private formatTrail(cg: CodeGraph, node: Node): string {
+  private formatTrail(cg: Springgraph, node: Node): string {
     const TRAIL_CAP = 12;
     const fmt = (e: { node: Node; edge: Edge }) => {
       const base = `${e.node.name} (${e.node.filePath}:${e.node.startLine})`;
@@ -3286,7 +3286,7 @@ export class ToolHandler {
     const callees = collect(cg.getCallees(node.id));
     const callers = collect(cg.getCallers(node.id));
     if (callees.length === 0 && callers.length === 0) return '';
-    const lines: string[] = ['', '### Trail — codegraph_node any of these to follow it (no Read needed)'];
+    const lines: string[] = ['', '### Trail — springgraph_node any of these to follow it (no Read needed)'];
     if (callees.length > 0) {
       lines.push(`**Calls →** ${callees.slice(0, TRAIL_CAP).map(fmt).join(', ')}${callees.length > TRAIL_CAP ? `, +${callees.length - TRAIL_CAP} more` : ''}`);
     }
@@ -3297,10 +3297,10 @@ export class ToolHandler {
   }
 
   /**
-   * Handle codegraph_status
+   * Handle springgraph_status
    */
   private async handleStatus(args: Record<string, unknown>): Promise<ToolResult> {
-    let cg = this.getCodeGraph(args.projectPath as string | undefined);
+    let cg = this.getSpringgraph(args.projectPath as string | undefined);
     // Same trick as withStalenessNotice — when an explicit projectPath
     // resolves to the same project as the default session cg, prefer the
     // default so getPendingFiles() (only populated by the default's watcher)
@@ -3322,7 +3322,7 @@ export class ToolHandler {
     const mismatch = this.worktreeMismatchFor(args.projectPath as string | undefined);
 
     const lines: string[] = [
-      '## CodeGraph Status',
+      '## Springgraph Status',
       '',
     ];
     if (mismatch) {
@@ -3400,10 +3400,10 @@ export class ToolHandler {
   }
 
   /**
-   * Handle codegraph_files - get project file structure from the index
+   * Handle springgraph_files - get project file structure from the index
    */
   private async handleFiles(args: Record<string, unknown>): Promise<ToolResult> {
-    const cg = this.getCodeGraph(args.projectPath as string | undefined);
+    const cg = this.getSpringgraph(args.projectPath as string | undefined);
     const pathFilter = args.path as string | undefined;
     const pattern = args.pattern as string | undefined;
     const format = (args.format as 'tree' | 'flat' | 'grouped') || 'tree';
@@ -3414,7 +3414,7 @@ export class ToolHandler {
     const allFiles = cg.getFiles();
 
     if (allFiles.length === 0) {
-      return this.textResult('No files indexed. Run `codegraph index` first.');
+      return this.textResult('No files indexed. Run `springgraph index` first.');
     }
 
     // Filter by path prefix. Stored paths are project-relative POSIX (e.g.
@@ -3662,14 +3662,14 @@ export class ToolHandler {
   }
 
   /**
-   * Find ALL definitions matching a name, ranked, so codegraph_node can return
+   * Find ALL definitions matching a name, ranked, so springgraph_node can return
    * every overload instead of guessing one (the wrong guess → a Read). Keepers
    * rank before generated stubs (.pb.go etc.); stable within a group preserves
    * FTS order. Returns [] when nothing matches; a qualified lookup that finds no
    * exact match returns [] rather than a misleading fuzzy file hit (#173); a
    * bare name with no exact match falls back to the single top fuzzy result.
    */
-  private findSymbolMatches(cg: CodeGraph, symbol: string): Node[] {
+  private findSymbolMatches(cg: Springgraph, symbol: string): Node[] {
     const isQualified = /[.\/]|::/.test(symbol);
 
     // For a bare name, enumerate EVERY exact-name definition via the direct index
@@ -3720,7 +3720,7 @@ export class ToolHandler {
    * Find ALL symbols matching a name. Used by callers/callees/impact to aggregate
    * results across all matching symbols (e.g., multiple classes with an `execute` method).
    */
-  private findAllSymbols(cg: CodeGraph, symbol: string): { nodes: Node[]; note: string } {
+  private findAllSymbols(cg: Springgraph, symbol: string): { nodes: Node[]; note: string } {
     let results = cg.searchNodes(symbol, { limit: 50 });
 
     // Mirror the fallback in `findSymbol` for qualified queries — FTS
@@ -3855,7 +3855,7 @@ export class ToolHandler {
    * without the full source of every method. Returns '' when the container
    * has no indexed children, so the caller can fall back to full source.
    */
-  private buildContainerOutline(cg: CodeGraph, node: Node): string {
+  private buildContainerOutline(cg: Springgraph, node: Node): string {
     const children = cg.getChildren(node.id)
       .filter(c => c.kind !== 'import' && c.kind !== 'export')
       .sort((a, b) => (a.startLine ?? 0) - (b.startLine ?? 0));
@@ -3889,9 +3889,9 @@ export class ToolHandler {
 
     if (outline) {
       lines.push('', outline, '',
-        `> Structural outline only. Read \`${node.filePath}\` or call codegraph_node on a specific member for its body.`);
+        `> Structural outline only. Read \`${node.filePath}\` or call springgraph_node on a specific member for its body.`);
     } else if (code) {
-      // Line-numbered (cat -n style, like codegraph_explore and Read) so the
+      // Line-numbered (cat -n style, like springgraph_explore and Read) so the
       // agent can cite/edit exact lines without re-Reading the file for them.
       const numbered = node.startLine ? numberSourceLines(code, node.startLine) : code;
       lines.push('', '```' + node.language, numbered, '```');

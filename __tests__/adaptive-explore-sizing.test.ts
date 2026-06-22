@@ -1,15 +1,15 @@
 /**
- * Regression test for adaptive `codegraph_explore` sizing — sibling
+ * Regression test for adaptive `springgraph_explore` sizing — sibling
  * skeletonization (branch `feat/adaptive-explore-sizing`, commit d6d059f).
  *
  * Feature: when a file is BOTH (1) off the synthesized flow spine AND (2) a
  * polymorphic sibling — its class implements/extends a supertype shared by
- * >= MIN_SIBLINGS (3) implementers — `codegraph_explore` renders it as a
+ * >= MIN_SIBLINGS (3) implementers — `springgraph_explore` renders it as a
  * class + member *signature* skeleton (bodies elided) instead of full source,
  * keeping the on-spine exemplar and the mechanism full. This sizes the
  * response to the answer rather than the budget cap on sibling-heavy flows
  * (OkHttp's interceptor chain) without starving diffuse ones (distinct
- * pipeline steps stay full). Default ON; CODEGRAPH_ADAPTIVE_EXPLORE=0 disables.
+ * pipeline steps stay full). Default ON; SPRINGGRAPH_ADAPTIVE_EXPLORE=0 disables.
  *
  * The fixture is OkHttp's interceptor chain in miniature:
  *   - `Interceptor` interface with FOUR implementers (>= 3 => a sibling family)
@@ -29,7 +29,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { ToolHandler } from '../src/mcp/tools';
-import CodeGraph from '../src/index';
+import Springgraph from '../src/index';
 
 // Stable marker — assert the `· skeleton` tag, not its exact trailing wording
 // (the steer-to-explore phrasing changed when the Read invitation was removed).
@@ -51,9 +51,9 @@ function sectionFor(text: string, basename: string): string {
   return lines.slice(start, end).join('\n');
 }
 
-describe('adaptive codegraph_explore sizing — sibling skeletonization', () => {
+describe('adaptive springgraph_explore sizing — sibling skeletonization', () => {
   let testDir: string;
-  let cg: CodeGraph;
+  let cg: Springgraph;
   let handler: ToolHandler;
 
   // Names the spine (dispatch/proceed/handleLogging), the on-spine exemplar,
@@ -64,7 +64,7 @@ describe('adaptive codegraph_explore sizing — sibling skeletonization', () => 
     'dispatch proceed handleLogging LoggingInterceptor BridgeInterceptor CacheInterceptor RetryInterceptor ResponseFormatter';
 
   beforeAll(async () => {
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-adaptive-explore-'));
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-adaptive-explore-'));
     const srcDir = path.join(testDir, 'src');
     fs.mkdirSync(srcDir);
 
@@ -243,7 +243,7 @@ export class YamlCodec extends Codec {
 `
     );
 
-    cg = CodeGraph.initSync(testDir, { config: { include: ['**/*.ts'], exclude: [] } });
+    cg = Springgraph.initSync(testDir, { config: { include: ['**/*.ts'], exclude: [] } });
     await cg.indexAll();
     handler = new ToolHandler(cg);
   });
@@ -257,7 +257,7 @@ export class YamlCodec extends Codec {
 
   beforeEach(() => {
     // Each test asserts against the default (ON) behaviour unless it opts out.
-    delete process.env.CODEGRAPH_ADAPTIVE_EXPLORE;
+    delete process.env.SPRINGGRAPH_ADAPTIVE_EXPLORE;
   });
 
   it('fixture sanity: Interceptor has >=3 implementers, Formatter has <3', () => {
@@ -280,7 +280,7 @@ export class YamlCodec extends Codec {
   });
 
   it('skeletonizes off-spine polymorphic siblings (bodies elided, signatures kept)', async () => {
-    const result = await handler.execute('codegraph_explore', { query: QUERY, maxFiles: 12 });
+    const result = await handler.execute('springgraph_explore', { query: QUERY, maxFiles: 12 });
     const text = result.content?.[0]?.text ?? '';
 
     // Precondition: the spine must have formed, or nothing skeletonizes.
@@ -301,7 +301,7 @@ export class YamlCodec extends Codec {
   });
 
   it('keeps the on-spine exemplar full even though it is a sibling', async () => {
-    const result = await handler.execute('codegraph_explore', { query: QUERY, maxFiles: 12 });
+    const result = await handler.execute('springgraph_explore', { query: QUERY, maxFiles: 12 });
     const text = result.content?.[0]?.text ?? '';
 
     const section = sectionFor(text, 'logging-interceptor.ts');
@@ -312,7 +312,7 @@ export class YamlCodec extends Codec {
   });
 
   it('keeps a distinct step full (off-spine but supertype has < 3 implementers)', async () => {
-    const result = await handler.execute('codegraph_explore', { query: QUERY, maxFiles: 12 });
+    const result = await handler.execute('springgraph_explore', { query: QUERY, maxFiles: 12 });
     const text = result.content?.[0]?.text ?? '';
 
     const section = sectionFor(text, 'response-formatter.ts');
@@ -321,10 +321,10 @@ export class YamlCodec extends Codec {
     expect(section).toContain('FORMATTER_BODY_MARKER');
   });
 
-  it('CODEGRAPH_ADAPTIVE_EXPLORE=0 disables skeletonization (siblings render full)', async () => {
-    process.env.CODEGRAPH_ADAPTIVE_EXPLORE = '0';
+  it('SPRINGGRAPH_ADAPTIVE_EXPLORE=0 disables skeletonization (siblings render full)', async () => {
+    process.env.SPRINGGRAPH_ADAPTIVE_EXPLORE = '0';
     try {
-      const result = await handler.execute('codegraph_explore', { query: QUERY, maxFiles: 12 });
+      const result = await handler.execute('springgraph_explore', { query: QUERY, maxFiles: 12 });
       const text = result.content?.[0]?.text ?? '';
 
       expect(text, 'no file should be skeletonized with the flag off').not.toContain(SKELETON_MARK);
@@ -333,7 +333,7 @@ export class YamlCodec extends Codec {
       expect(section).not.toBe('');
       expect(section).toContain('BRIDGE_BODY_MARKER');
     } finally {
-      delete process.env.CODEGRAPH_ADAPTIVE_EXPLORE;
+      delete process.env.SPRINGGRAPH_ADAPTIVE_EXPLORE;
     }
   });
 
@@ -343,7 +343,7 @@ export class YamlCodec extends Codec {
   const SPARE_QUERY = `${QUERY} authenticate encode AuthInterceptor Codec JsonCodec`;
 
   it('spares an off-spine sibling when the agent NAMED a callable in it (RealCall fix)', async () => {
-    const result = await handler.execute('codegraph_explore', { query: SPARE_QUERY, maxFiles: 15 });
+    const result = await handler.execute('springgraph_explore', { query: SPARE_QUERY, maxFiles: 15 });
     const text = result.content?.[0]?.text ?? '';
     expect(text).toContain('## Flow (call path among the symbols you queried)');
 
@@ -361,7 +361,7 @@ export class YamlCodec extends Codec {
   });
 
   it('collapses a base+subclasses family file to a FOCUSED view — base method body kept, non-named subclasses signature-only (compiler.py)', async () => {
-    const result = await handler.execute('codegraph_explore', { query: SPARE_QUERY, maxFiles: 15 });
+    const result = await handler.execute('springgraph_explore', { query: SPARE_QUERY, maxFiles: 15 });
     const text = result.content?.[0]?.text ?? '';
 
     // codec.ts defines the base Codec (>=3 subclasses extend it) and co-locates the
@@ -383,7 +383,7 @@ export class YamlCodec extends Codec {
     // not a unique one. Naming it must NOT keep all five full (that floods the budget
     // — Django's `as_sql`×110). The off-spine siblings still collapse, and since none
     // defines the supertype, `intercept` doesn't even earn a body — pure skeleton.
-    const result = await handler.execute('codegraph_explore', { query: `${QUERY} intercept`, maxFiles: 12 });
+    const result = await handler.execute('springgraph_explore', { query: `${QUERY} intercept`, maxFiles: 12 });
     const text = result.content?.[0]?.text ?? '';
 
     const bridge = sectionFor(text, 'bridge-interceptor.ts');

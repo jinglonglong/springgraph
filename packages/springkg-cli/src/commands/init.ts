@@ -1,9 +1,9 @@
 /**
  * `springkg init` — initialize the springkg.db for a project.
  *
- * Creates .codegraph/springkg.db and applies the schema. Does NOT run the
+ * Creates .springgraph/springkg.db and applies the schema. Does NOT run the
  * indexer — that is a separate `springkg index` step (matches upstream
- * codegraph CLI behavior).
+ * springgraph CLI behavior).
  */
 
 export async function runInit(projectPath: string): Promise<void> {

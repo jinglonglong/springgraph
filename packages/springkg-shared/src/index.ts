@@ -37,7 +37,7 @@ export type SpringKgEdgeKind = (typeof SPRINGKG_EDGE_KINDS)[number];
 export interface SpringKgNode {
   id: string;                         // deterministic: `${kind}:${sha256(...).slice(0,32)}`
   kind: SpringKgNodeKind;
-  codegraphNodeId: string;            // FK into CodeGraph's nodes table
+  springgraphNodeId: string;            // FK into Springgraph's nodes table
   name?: string;
   qualifiedName?: string;
   filePath?: string;
@@ -118,11 +118,11 @@ export interface FeatureCommunityMember {
 // -----------------------------------------------------------------------------
 
 export interface SpringKgEnhanceInput {
-  codegraphNodes: ReadonlyArray<{ id: string; kind: string; name: string; filePath: string; [k: string]: unknown }>;
-  codegraphEdges: ReadonlyArray<{ id: string; source: string; target: string; kind: string; [k: string]: unknown }>;
+  springgraphNodes: ReadonlyArray<{ id: string; kind: string; name: string; filePath: string; [k: string]: unknown }>;
+  springgraphEdges: ReadonlyArray<{ id: string; source: string; target: string; kind: string; [k: string]: unknown }>;
   /** Absolute file paths that changed since the last enhance call. */
   changedFiles: ReadonlyArray<string>;
-  /** Active CodeGraph instance (use for ad-hoc queries). */
+  /** Active Springgraph instance (use for ad-hoc queries). */
   cg: { getNode(id: string): unknown; getOutgoingEdges(id: string): unknown[]; getIncomingEdges(id: string): unknown[]; getNodesInFile(path: string): unknown[]; [k: string]: unknown };
 }
 
@@ -148,7 +148,7 @@ export interface Resolver {
 export const SPRINGKG_CONFIG = {
   version: '0.1.0',
   db: {
-    filename: 'springkg.db',         // always inside .codegraph/
+    filename: 'springkg.db',         // always inside .springgraph/
     journalMode: 'wal' as const,
     busyTimeoutMs: 5000,
     synchronous: 'NORMAL' as const,

@@ -1,10 +1,10 @@
-# Design + status: adaptive `codegraph_explore` sizing (sibling skeletonization)
+# Design + status: adaptive `springgraph_explore` sizing (sibling skeletonization)
 
 **Status:** Implemented & validated, **default-on**, on branch
 `feat/adaptive-explore-sizing` (initial commit `d6d059f`; **refined 2026-05-29**
 after a real-agent A/B exposed a read-back regression — see
-"Refinement" below). Escape hatch: `CODEGRAPH_ADAPTIVE_EXPLORE=0`.
-**Motivation:** make `codegraph_explore` size its output to the *answer* rather
+"Refinement" below). Escape hatch: `SPRINGGRAPH_ADAPTIVE_EXPLORE=0`.
+**Motivation:** make `springgraph_explore` size its output to the *answer* rather
 than always filling the budget cap — so a "sibling-heavy" flow (many
 interchangeable implementations of one interface) stops costing *more* than
 plain grep/read, without starving "diffuse" flows that genuinely need broad
@@ -60,12 +60,12 @@ source.
 
 ## TL;DR
 
-`codegraph_explore` returned full source for **every** relevant file up to its
+`springgraph_explore` returned full source for **every** relevant file up to its
 char budget. On a question whose answer spans many *same-shaped* classes — e.g.
 "how does OkHttp process a request through its interceptor chain?", which touches
 ~14 `class … : Interceptor` implementations — that meant ~28 KB of mostly
 **redundant full bodies**. Because those bodies ride in the context window for
-the rest of the session, the WITH-CodeGraph arm cost *more* than the WITHOUT arm
+the rest of the session, the WITH-Springgraph arm cost *more* than the WITHOUT arm
 (which answers the well-named interceptor question in ~10 cheap greps). OkHttp
 was the benchmark's cost outlier (−3% — i.e. *costlier* than native search).
 
@@ -118,7 +118,7 @@ step," cheaply.**
 
 ## The gate (refined)
 
-A file is skeletonized iff **all** hold (and `CODEGRAPH_ADAPTIVE_EXPLORE != 0`):
+A file is skeletonized iff **all** hold (and `SPRINGGRAPH_ADAPTIVE_EXPLORE != 0`):
 
 1. **A spine exists.** `buildFlowFromNamedSymbols` returns its path node set
    (`pathNodeIds`) and the full set of agent-named callables (`namedNodeIds`). If
@@ -198,7 +198,7 @@ agent can pull one specific implementation if it truly needs it.
 
 ## Validation (refined gate)
 
-Headless `claude -p`, Opus 4.8, **WITH vs WITHOUT** CodeGraph (the real benchmark
+Headless `claude -p`, Opus 4.8, **WITH vs WITHOUT** Springgraph (the real benchmark
 arm, not the on/off probe the first cut used). Cost = median `total_cost_usd`.
 
 | Repo | WITH→WITHOUT cost | WITH reads | WITHOUT reads | RealCall/compiler read-back |

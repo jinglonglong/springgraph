@@ -27,7 +27,7 @@ export interface SupervisionState {
   currentPpid: number;
   /**
    * The MCP host pid threaded past an intermediate launcher
-   * (`CODEGRAPH_HOST_PPID`), or null when unknown — e.g. the standalone bundle,
+   * (`SPRINGGRAPH_HOST_PPID`), or null when unknown — e.g. the standalone bundle,
    * which pre-bakes `--liftoff-only` and so never runs the relaunch that sets it.
    */
   hostPpid: number | null;

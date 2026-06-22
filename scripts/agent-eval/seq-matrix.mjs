@@ -3,7 +3,7 @@
 // for what the aggregate matrix can't see: the call SEQUENCE and per-call output SIZE.
 //
 // Answers three questions:
-//   1. Trace adoption — on a flow question, does the with-arm actually call codegraph_trace?
+//   1. Trace adoption — on a flow question, does the with-arm actually call springgraph_trace?
 //   2. Payload size vs repo size — is trace path-scoped (tiny, size-independent) while
 //      explore is breadth-scoped (grows with the repo / over-returns on small repos)?
 //   3. Round-trips — num_turns with vs without (the real wall-clock driver).
@@ -13,7 +13,7 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 
 const AB = process.argv[2] || '/tmp/ab-matrix';
-const MD = new URL('../../docs/benchmarks/codegraph-ab-matrix.md', import.meta.url).pathname;
+const MD = new URL('../../docs/benchmarks/springgraph-ab-matrix.md', import.meta.url).pathname;
 
 // repo -> {lang,size,files} from the published matrix table
 const repoMeta = {};
@@ -22,10 +22,10 @@ if (existsSync(MD)) for (const line of readFileSync(MD, 'utf8').split('\n')) {
   if (m) repoMeta[m[3]] = { lang: m[1].trim(), size: m[2], files: +m[4] };
 }
 
-const cgShort = (n) => n.replace('mcp__codegraph__codegraph_', '').replace('mcp__codegraph__', '');
+const cgShort = (n) => n.replace('mcp__springgraph__springgraph_', '').replace('mcp__springgraph__', '');
 const tag = (n) => n === 'Read' ? 'R' : n === 'Grep' ? 'G' : n === 'Glob' ? 'Gl'
   : n === 'Bash' ? 'B' : n === 'Task' ? 'Ag' : n === 'ToolSearch' ? 'TS'
-  : n.includes('codegraph') ? cgShort(n) : n;
+  : n.includes('springgraph') ? cgShort(n) : n;
 
 function parse(file) {
   if (!existsSync(file)) return null;
@@ -33,7 +33,7 @@ function parse(file) {
   const calls = []; let result = null, initCg = 0;
   for (const l of lines) {
     let ev; try { ev = JSON.parse(l); } catch { continue; }
-    if (ev.type === 'system' && ev.subtype === 'init') initCg = (ev.tools || []).filter(t => /codegraph/.test(t)).length;
+    if (ev.type === 'system' && ev.subtype === 'init') initCg = (ev.tools || []).filter(t => /springgraph/.test(t)).length;
     if (ev.type === 'assistant') for (const b of (ev.message?.content || [])) if (b.type === 'tool_use') {
       const i = b.input || {};
       const q = i.query ?? i.symbol ?? i.task ?? (i.from && i.to ? `${i.from}->${i.to}` : (i.file_path || i.command || ''));
@@ -46,7 +46,7 @@ function parse(file) {
     }
     if (ev.type === 'result') result = ev;
   }
-  const cg = calls.filter(c => c.name.includes('codegraph'));
+  const cg = calls.filter(c => c.name.includes('springgraph'));
   const perTool = {};
   for (const c of cg) { const k = cgShort(c.name); (perTool[k] ??= { n: 0, out: 0 }); perTool[k].n++; perTool[k].out += c.out; }
   const traceIdx = cg.findIndex(c => c.name.includes('trace'));
@@ -83,7 +83,7 @@ const k = (n) => (n / 1000).toFixed(1);
 const pad = (s, n) => String(s).padEnd(n);
 
 // ---- per-cell sequence table ----
-console.log('\n=== PER-CELL: with-arm codegraph sequence + payload (sorted by repo size) ===');
+console.log('\n=== PER-CELL: with-arm springgraph sequence + payload (sorted by repo size) ===');
 console.log(pad('repo', 22), pad('files', 6), 'trace', pad('cg-call sequence', 40), pad('cgOutK', 7), 'turns(w/wo)');
 for (const c of cells) {
   const w = c.with;
@@ -108,7 +108,7 @@ if (used.length) console.log('after-trace follow-ups:', used.map(c => `${c.repo}
 const tier = (f) => f < 200 ? 'S(<200)' : f < 2000 ? 'M(<2000)' : 'L(>=2000)';
 const byTier = {};
 for (const c of cells) { (byTier[tier(c.files || 0)] ??= []).push(c.with.cgOut); }
-console.log('\n=== with-arm TOTAL codegraph payload by repo-size tier ===');
+console.log('\n=== with-arm TOTAL springgraph payload by repo-size tier ===');
 for (const t of ['S(<200)', 'M(<2000)', 'L(>=2000)']) {
   const a = byTier[t] || []; if (!a.length) continue;
   const avg = a.reduce((s, x) => s + x, 0) / a.length;
@@ -120,7 +120,7 @@ const tot = {};
 for (const c of cells) for (const [name, v] of Object.entries(c.with.perTool)) {
   (tot[name] ??= { n: 0, out: 0 }); tot[name].n += v.n; tot[name].out += v.out;
 }
-console.log('\n=== codegraph tool usage across all cells (n calls, avg payload/call) ===');
+console.log('\n=== springgraph tool usage across all cells (n calls, avg payload/call) ===');
 for (const [name, v] of Object.entries(tot).sort((a, b) => b[1].n - a[1].n)) {
   console.log(`  ${pad(name, 10)} calls=${pad(v.n, 4)} avg=${k(v.out / v.n)}K/call  total=${k(v.out)}K`);
 }
@@ -133,5 +133,5 @@ const tsAll = cells.every(c => c.with.seq[0] === 'TS');
 console.log('\n=== ROUND-TRIPS ===');
 console.log(`turns: with=${wTurns}  without=${woTurns}  (${((1 - wTurns / woTurns) * 100).toFixed(0)}% fewer with)`);
 console.log(`avg turns/cell: with=${(wTurns / cells.length).toFixed(1)}  without=${(woTurns / cells.length).toFixed(1)}`);
-console.log(`total codegraph calls=${wCalls} (avg ${(wCalls / cells.length).toFixed(1)}/cell)`);
+console.log(`total springgraph calls=${wCalls} (avg ${(wCalls / cells.length).toFixed(1)}/cell)`);
 console.log(`every with-arm opens with a ToolSearch round-trip (deferred tools): ${tsAll ? 'YES — 1 fixed tax/run' : 'no'}`);

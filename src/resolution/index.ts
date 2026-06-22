@@ -53,12 +53,12 @@ const CHAIN_SHAPE = /^(.+)\(\)\.(\w+)$/;
  * stays flat on large codebases (20k+ files). Sizes were chosen to
  * cover the working set for typical resolution batches without
  * exceeding a few hundred MB worst-case. Override via the env var
- * `CODEGRAPH_RESOLVER_CACHE_SIZE` (single integer applied to all
+ * `SPRINGGRAPH_RESOLVER_CACHE_SIZE` (single integer applied to all
  * caches) when tuning for very large or very small projects.
  */
 const DEFAULT_CACHE_LIMIT = 5_000;
 function resolveCacheLimit(): number {
-  const raw = process.env.CODEGRAPH_RESOLVER_CACHE_SIZE;
+  const raw = process.env.SPRINGGRAPH_RESOLVER_CACHE_SIZE;
   if (!raw) return DEFAULT_CACHE_LIMIT;
   const parsed = Number.parseInt(raw, 10);
   if (Number.isFinite(parsed) && parsed > 0) return parsed;

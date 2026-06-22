@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import CodeGraph from '../src/index';
+import Springgraph from '../src/index';
 import { ToolHandler } from '../src/mcp/tools';
 import { facetRegistry } from '../src/architecture/facet-engine';
 import { genericProfile, profileRegistry } from '../src/architecture/profile-registry';
@@ -95,12 +95,12 @@ function registerCatchupArchitectureProfile(): void {
 
 describe('MCP catch-up gate', () => {
   let testDir: string;
-  let cg: CodeGraph;
+  let cg: Springgraph;
   let handler: ToolHandler;
 
   beforeEach(async () => {
     registerCatchupArchitectureProfile();
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-catchup-gate-'));
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-catchup-gate-'));
     fs.mkdirSync(path.join(testDir, 'src'));
     fs.writeFileSync(
       path.join(testDir, 'src', 'survivor.ts'),
@@ -111,7 +111,7 @@ describe('MCP catch-up gate', () => {
       'export function deletedLater() { return 2; }\n',
     );
 
-    cg = CodeGraph.initSync(testDir, { config: { include: ['**/*.ts'], exclude: [] } });
+    cg = Springgraph.initSync(testDir, { config: { include: ['**/*.ts'], exclude: [] } });
     await cg.indexAll();
     handler = new ToolHandler(cg);
   });
@@ -131,7 +131,7 @@ describe('MCP catch-up gate', () => {
     });
     handler.setCatchUpGate(gate);
 
-    const res = await handler.execute('codegraph_search', { query: 'survivor' });
+    const res = await handler.execute('springgraph_search', { query: 'survivor' });
     expect(gateResolved).toBe(true);
     expect(res.isError).toBeFalsy();
     expect(res.content[0].text).toMatch(/survivor/);
@@ -145,9 +145,9 @@ describe('MCP catch-up gate', () => {
     });
     handler.setCatchUpGate(gate);
 
-    await handler.execute('codegraph_search', { query: 'survivor' });
+    await handler.execute('springgraph_search', { query: 'survivor' });
     const before = awaitCount;
-    await handler.execute('codegraph_search', { query: 'survivor' });
+    await handler.execute('springgraph_search', { query: 'survivor' });
     // The promise body runs once when constructed; second execute never
     // resubscribes to a fresh promise because the gate field was nulled.
     expect(awaitCount).toBe(before);
@@ -164,7 +164,7 @@ describe('MCP catch-up gate', () => {
     // uses (`cg.sync()` returns a Promise<SyncResult>, the wrapper voids it).
     handler.setCatchUpGate(cg.sync().then(() => undefined));
 
-    const res = await handler.execute('codegraph_search', { query: 'deletedLater' });
+    const res = await handler.execute('springgraph_search', { query: 'deletedLater' });
     expect(res.isError).toBeFalsy();
     const text = res.content[0].text;
     expect(text).not.toMatch(/src\/deleted-later\.ts/);
@@ -179,7 +179,7 @@ describe('MCP catch-up gate', () => {
 
     handler.setCatchUpGate(cg.sync().then(() => undefined));
 
-    const res = await handler.execute('codegraph_search', { query: 'survivor' });
+    const res = await handler.execute('springgraph_search', { query: 'survivor' });
     expect(res.isError).toBeFalsy();
     expect(cg.getStats().fileCount).toBe(0);
   });
@@ -189,7 +189,7 @@ describe('MCP catch-up gate', () => {
     // not poison tool dispatch — the engine logs it, the handler proceeds.
     handler.setCatchUpGate(Promise.reject(new Error('simulated sync failure')));
 
-    const res = await handler.execute('codegraph_search', { query: 'survivor' });
+    const res = await handler.execute('springgraph_search', { query: 'survivor' });
     expect(res.isError).toBeFalsy();
     expect(res.content[0].text).toMatch(/survivor/);
   });
@@ -207,7 +207,7 @@ describe('MCP catch-up gate', () => {
     );
     handler.setCatchUpGate(cg.sync().then(() => undefined));
 
-    const res = await handler.execute('codegraph_search', { query: 'DeletedLaterService' });
+    const res = await handler.execute('springgraph_search', { query: 'DeletedLaterService' });
     expect(res.isError).toBeFalsy();
 
     const snapshot = await cg.getArchitectureSnapshot();

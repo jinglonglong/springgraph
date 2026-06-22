@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import type {
-  CodegraphNodeLike,
+  SpringgraphNodeLike,
   Resolver,
   SpringKgEdge,
   SpringKgEnhanceInput,
@@ -29,7 +29,7 @@ function hashId(prefix: string, parts: readonly string[]): string {
   return `${prefix}:${digest}`;
 }
 
-function readStringMetadata(node: CodegraphNodeLike, key: string): string | undefined {
+function readStringMetadata(node: SpringgraphNodeLike, key: string): string | undefined {
   const value = node.metadata?.[key];
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
@@ -61,7 +61,7 @@ function parseEndpointName(name: string): { httpMethod?: string; path?: string }
   };
 }
 
-function resolveFeignMethodCandidate(node: CodegraphNodeLike): FeignMethodCandidate | null {
+function resolveFeignMethodCandidate(node: SpringgraphNodeLike): FeignMethodCandidate | null {
   if (node.kind !== 'feign_method') {
     return null;
   }
@@ -79,7 +79,7 @@ function resolveFeignMethodCandidate(node: CodegraphNodeLike): FeignMethodCandid
   };
 }
 
-function resolveEndpointCandidate(node: CodegraphNodeLike): EndpointCandidate | null {
+function resolveEndpointCandidate(node: SpringgraphNodeLike): EndpointCandidate | null {
   if (node.kind !== 'endpoint') {
     return null;
   }
@@ -149,11 +149,11 @@ export class FeignProviderBridge implements Resolver {
 
   async enhance(input: SpringKgEnhanceInput): Promise<SpringKgEnhanceOutput> {
     const timestamp = Date.now();
-    const feignMethods = input.codegraphNodes
+    const feignMethods = input.springgraphNodes
       .map((node) => resolveFeignMethodCandidate(node))
       .filter((candidate): candidate is FeignMethodCandidate => candidate !== null)
       .sort((left, right) => left.id.localeCompare(right.id));
-    const endpoints = input.codegraphNodes
+    const endpoints = input.springgraphNodes
       .map((node) => resolveEndpointCandidate(node))
       .filter((candidate): candidate is EndpointCandidate => candidate !== null)
       .sort((left, right) => left.id.localeCompare(right.id));

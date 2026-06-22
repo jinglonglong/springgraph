@@ -3,9 +3,9 @@
 # Assemble the npm thin-installer packages from built bundles (esbuild pattern).
 #
 # Produces, under release/npm/:
-#   codegraph-<target>/   one per built bundle — the vendored Node + app, tagged
+#   springgraph-<target>/   one per built bundle — the vendored Node + app, tagged
 #                         with os/cpu so npm installs only the matching one.
-#   main/                 the @colbymchenry/codegraph shim package: a tiny bin
+#   main/                 the @colbymchenry/springgraph shim package: a tiny bin
 #                         that execs the matching platform bundle, with every
 #                         platform package in optionalDependencies.
 #
@@ -13,7 +13,7 @@
 # repo's package.json — the dev/from-source path keeps working; the *published*
 # main package's shape is generated here.
 #
-# Prereq: run build-bundle.sh for each target first (release/codegraph-*.tar.gz).
+# Prereq: run build-bundle.sh for each target first (release/springgraph-*.tar.gz).
 # Usage:  scripts/pack-npm.sh [version]    (default: version from package.json)
 set -euo pipefail
 
@@ -27,17 +27,17 @@ rm -rf "$NPM"
 mkdir -p "$NPM/main"
 
 shopt -s nullglob
-archives=("$REL"/codegraph-*.tar.gz "$REL"/codegraph-*.zip)
+archives=("$REL"/springgraph-*.tar.gz "$REL"/springgraph-*.zip)
 [ ${#archives[@]} -gt 0 ] || { echo "[pack-npm] no bundles in $REL — run build-bundle.sh first" >&2; exit 1; }
 
 targets=()
 for archive in "${archives[@]}"; do
   fname="$(basename "$archive")"
   case "$fname" in
-    *.tar.gz) base="${fname%.tar.gz}" ;;   # codegraph-<target>
+    *.tar.gz) base="${fname%.tar.gz}" ;;   # springgraph-<target>
     *.zip)    base="${fname%.zip}" ;;
   esac
-  target="${base#codegraph-}"             # <target>, e.g. darwin-arm64 / win32-x64
+  target="${base#springgraph-}"             # <target>, e.g. darwin-arm64 / win32-x64
   os="${target%-*}"                       # darwin | linux | win32
   arch="${target##*-}"                    # arm64 | x64
   pkgdir="$NPM/$base"
@@ -46,7 +46,7 @@ for archive in "${archives[@]}"; do
     *.zip)
       tmpx="$(mktemp -d)"
       unzip -q "$archive" -d "$tmpx"
-      mv "$tmpx/codegraph-${target}"/* "$pkgdir"/
+      mv "$tmpx/springgraph-${target}"/* "$pkgdir"/
       rm -rf "$tmpx"
       nodefile="node.exe"
       ;;
@@ -59,16 +59,16 @@ for archive in "${archives[@]}"; do
     node -e '
       const fs=require("fs");
       fs.writeFileSync(process.argv[1], JSON.stringify({
-        name: `${process.env.SCOPE}/codegraph-${process.env.TARGET}`,
+        name: `${process.env.SCOPE}/springgraph-${process.env.TARGET}`,
         version: process.env.VERSION,
-        description: `CodeGraph self-contained bundle for ${process.env.TARGET}`,
+        description: `Springgraph self-contained bundle for ${process.env.TARGET}`,
         os: [process.env.OSV], cpu: [process.env.ARCHV],
         files: [process.env.NODEFILE, "lib", "bin"],
         license: "MIT"
       }, null, 2) + "\n");
     ' "$pkgdir/package.json"
   targets+=("$target")
-  echo "[pack-npm] ${SCOPE}/codegraph-${target}@${VERSION}"
+  echo "[pack-npm] ${SCOPE}/springgraph-${target}@${VERSION}"
 done
 
 # Main shim package.
@@ -97,12 +97,12 @@ VERSION="$VERSION" SCOPE="$SCOPE" TARGETS="${targets[*]}" \
     const fs=require("fs");
     const opt={};
     for (const t of process.env.TARGETS.split(/\s+/).filter(Boolean))
-      opt[`${process.env.SCOPE}/codegraph-${t}`]=process.env.VERSION;
+      opt[`${process.env.SCOPE}/springgraph-${t}`]=process.env.VERSION;
     fs.writeFileSync(process.argv[1], JSON.stringify({
-      name: `${process.env.SCOPE}/codegraph`,
+      name: `${process.env.SCOPE}/springgraph`,
       version: process.env.VERSION,
       description: "Local-first code intelligence for AI agents (MCP). Self-contained — bundles its own runtime.",
-      bin: { codegraph: "npm-shim.js" },
+      bin: { springgraph: "npm-shim.js" },
       main: "npm-sdk.js",
       types: "dist/index.d.ts",
       exports: {
@@ -115,5 +115,5 @@ VERSION="$VERSION" SCOPE="$SCOPE" TARGETS="${targets[*]}" \
     }, null, 2) + "\n");
   ' "$NPM/main/package.json"
 
-echo "[pack-npm] ${SCOPE}/codegraph@${VERSION} (${#targets[@]} platform packages in optionalDependencies)"
+echo "[pack-npm] ${SCOPE}/springgraph@${VERSION} (${#targets[@]} platform packages in optionalDependencies)"
 echo "[pack-npm] output: $NPM"

@@ -5,15 +5,15 @@
  * Validates that the frontend HTML contains the required DOM elements
  * and that the backend endpoints the UI depends on return correctly shaped data.
  */
-process.env.CODEGRAPH_WASM_RELAUNCHED = '1';
-process.env.CODEGRAPH_NO_DAEMON = '1';
+process.env.SPRINGGRAPH_WASM_RELAUNCHED = '1';
+process.env.SPRINGGRAPH_NO_DAEMON = '1';
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as http from 'http';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 import { startWebServer } from '../src/web/server';
 import { facetRegistry } from '../src/architecture/facet-engine';
 import { profileRegistry } from '../src/architecture/profile-registry';
@@ -65,7 +65,7 @@ function layerForRole(role: string): string {
 describe('web-architecture-profile (Phase 7)', () => {
   let tempDir: string;
   let publicDir: string;
-  let cg: CodeGraph;
+  let cg: Springgraph;
   let port: number;
   let close: () => Promise<void>;
   const originalProfiles = profileRegistry.getProfiles();
@@ -140,15 +140,15 @@ describe('web-architecture-profile (Phase 7)', () => {
     facetRegistry.register(testFacet);
     profileRegistry.register(testProfile);
 
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-phase7-'));
-    publicDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-phase7-public-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-phase7-'));
+    publicDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-phase7-public-'));
     // Write a minimal HTML that mirrors the real index.html structure
     // so we can validate DOM element presence.
     fs.writeFileSync(
       path.join(publicDir, 'index.html'),
       [
         '<!doctype html><html lang="zh-CN" data-theme="dark"><head>',
-        '<title>CodeGraph</title><link rel="stylesheet" href="style.css">',
+        '<title>Springgraph</title><link rel="stylesheet" href="style.css">',
         '</head><body><div class="app">',
         '<header class="topbar">',
         '<div class="profile-pill" id="profile-pill" hidden>',
@@ -251,7 +251,7 @@ describe('web-architecture-profile (Phase 7)', () => {
       ['public class UserRole {', '  private Long id;', '  private String name;', '}'].join('\n')
     );
 
-    cg = CodeGraph.initSync(tempDir);
+    cg = Springgraph.initSync(tempDir);
     await cg.indexAll();
 
     const handle = await startWebServer(cg, { port: 0, publicDir, silent: true });

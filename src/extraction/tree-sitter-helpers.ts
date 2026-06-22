@@ -45,7 +45,7 @@ export function getChildByField(node: SyntaxNode, fieldName: string): SyntaxNode
 
 /**
  * Node types that *wrap* a declaration so a leading comment is a sibling of the
- * wrapper, not of the emitted (inner) declaration node. CodeGraph emits the
+ * wrapper, not of the emitted (inner) declaration node. Springgraph emits the
  * inner node, so before looking for its preceding comment we climb out through
  * these. Examples: `export class X {}` (export_statement), `@dec\ndef f()`
  * (decorated_definition), `const f = () => {}` (lexical_declaration →

@@ -4,7 +4,7 @@ import type { SqlTableColumnResult } from './sql-table-column';
 export interface SqlWriterInput {
   sqlStatement: {
     id: string;
-    codegraphNodeId: string;
+    springgraphNodeId: string;
     mapperNamespace: string;
     statementId: string;
     operation: string;

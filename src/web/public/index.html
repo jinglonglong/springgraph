@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>SpringKG</title>
+  <title>springgraph</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230f172a'/%3E%3Ccircle cx='6' cy='6' r='2.4' fill='none' stroke='%2322d3ee' stroke-width='1.6'/%3E%3Ccircle cx='18' cy='6' r='2.4' fill='none' stroke='%2322d3ee' stroke-width='1.6'/%3E%3Ccircle cx='12' cy='18' r='2.4' fill='none' stroke='%2322d3ee' stroke-width='1.6'/%3E%3Cpath d='M8 6h8M7.5 7.2 11 16M16.5 7.2 13 16' stroke='%2322d3ee' stroke-width='1.4'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -21,7 +21,7 @@
           <line x1="16.3" y1="7.2" x2="13" y2="16" stroke="currentColor" stroke-width="1.4"/>
           <line x1="8.4" y1="6" x2="15.6" y2="6" stroke="currentColor" stroke-width="1.4"/>
         </svg>
-        <span class="brand-name">SpringKG</span>
+        <span class="brand-name">springgraph</span>
         <span class="brand-sep" aria-hidden="true">/</span>
         <span class="brand-sub">图谱</span>
       </div>
@@ -30,17 +30,17 @@
         <span class="profile-confidence" id="profile-confidence">0%</span>
         <button class="btn btn-mini" id="btn-evidence" type="button" title="查看检测依据">检测依据</button>
       </div>
-      <form class="project-switcher" id="project-form" title="输入项目根目录或 .codegraph 目录后加载">
-        <input class="project" id="project-path" type="text" placeholder="项目根目录或 .codegraph 路径" autocomplete="off" spellcheck="false" aria-label="项目根目录或 .codegraph 路径">
+      <form class="project-switcher" id="project-form" title="输入项目根目录或 .springgraph 目录后加载">
+        <input class="project" id="project-path" type="text" placeholder="项目根目录或 .springgraph 路径" autocomplete="off" spellcheck="false" aria-label="项目根目录或 .springgraph 路径">
         <button class="btn project-browse" id="btn-project-browse" type="button" title="浏览本机目录">浏览</button>
-        <button class="btn project-load" id="btn-project-load" type="submit" title="加载这个 SpringKG 索引">加载</button>
+        <button class="btn project-load" id="btn-project-load" type="submit" title="加载这个 springgraph 索引">加载</button>
       </form>
       <div class="mode-toggle" role="group" aria-label="图谱模式">
         <button class="mode-btn active" data-mode="springcloud" type="button" title="架构视图：按后端检测到的角色 / 分层 / 模块显示图谱">
           <span class="mode-dot mode-dot-spring"></span>
           <span>架构</span>
         </button>
-        <button class="mode-btn" data-mode="generic" type="button" title="通用视图：SpringKG 默认类型着色">
+        <button class="mode-btn" data-mode="generic" type="button" title="通用视图：springgraph 默认类型着色">
           <span class="mode-dot mode-dot-generic"></span>
           <span>通用</span>
         </button>
@@ -282,8 +282,8 @@
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="browse-title">
       <div class="modal-head">
         <div>
-          <h2 id="browse-title">选择 SpringKG 目录</h2>
-          <p>选择项目根目录，或直接选择该项目下的 <code>.codegraph</code> 目录。</p>
+          <h2 id="browse-title">选择 springgraph 目录</h2>
+          <p>选择项目根目录，或直接选择该项目下的 <code>.springgraph</code> 目录。</p>
         </div>
         <button class="btn" id="btn-browse-close" type="button">关闭</button>
       </div>

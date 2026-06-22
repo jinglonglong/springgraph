@@ -48,8 +48,8 @@ describe('policy', () => {
     const policy = new ReusePolicy();
     const seen = new Set<string>();
     const fakeDb = {
-      hasSymbol(kind: SpringKgNodeKind, codegraphNodeId: string): boolean {
-        return seen.has(`${kind}:${codegraphNodeId}`);
+      hasSymbol(kind: SpringKgNodeKind, springgraphNodeId: string): boolean {
+        return seen.has(`${kind}:${springgraphNodeId}`);
       },
     };
 

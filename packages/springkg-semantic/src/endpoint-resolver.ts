@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 
 import type {
-  CodegraphEdgeLike,
-  CodegraphNodeLike,
+  SpringgraphEdgeLike,
+  SpringgraphNodeLike,
   Resolver,
   SpringKgEdge,
   SpringKgEnhanceInput,
@@ -18,26 +18,26 @@ export type SpringParam = {
 };
 
 export type SpringEndpoint = {
-  codegraphNodeId: string;
-  controllerCodegraphNodeId: string;
+  springgraphNodeId: string;
+  controllerSpringgraphNodeId: string;
   httpMethod: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
   path: string;
   classPath?: string;
   methodPath: string;
   params: SpringParam[];
-  requestDtoCodegraphNodeId?: string;
-  responseDtoCodegraphNodeId?: string;
+  requestDtoSpringgraphNodeId?: string;
+  responseDtoSpringgraphNodeId?: string;
 };
 
 type HttpMethod = SpringEndpoint['httpMethod'];
 
 type ClassifiedParameter = SpringParam & {
-  codegraphNodeId: string;
+  springgraphNodeId: string;
   typeNodeId?: string;
 };
 
 type EndpointCandidate = SpringEndpoint & {
-  sourceMethod: CodegraphNodeLike;
+  sourceMethod: SpringgraphNodeLike;
 };
 
 const VERB_DECORATORS: Readonly<Record<string, HttpMethod>> = {
@@ -210,7 +210,7 @@ function extractRequiredFlag(decorator: string): boolean {
   return requiredMatch[1]?.toLowerCase() !== 'false';
 }
 
-function readTypeName(node: CodegraphNodeLike): string | undefined {
+function readTypeName(node: SpringgraphNodeLike): string | undefined {
   const metadataTypeName = typeof node.metadata?.typeName === 'string' ? node.metadata.typeName : undefined;
   if (metadataTypeName) {
     return metadataTypeName;
@@ -227,7 +227,7 @@ function readTypeName(node: CodegraphNodeLike): string | undefined {
   return undefined;
 }
 
-function parseParameter(node: CodegraphNodeLike): ClassifiedParameter | null {
+function parseParameter(node: SpringgraphNodeLike): ClassifiedParameter | null {
   const decorators = node.decorators ?? [];
   const matchedDecorator = PARAM_DECORATORS
     .map((annotation) => {
@@ -249,7 +249,7 @@ function parseParameter(node: CodegraphNodeLike): ClassifiedParameter | null {
   const typeNodeId = typeof node.metadata?.typeNodeId === 'string' ? node.metadata.typeNodeId : undefined;
 
   return {
-    codegraphNodeId: node.id,
+    springgraphNodeId: node.id,
     name: parsedNames[0] ?? node.name,
     kind: matchedDecorator.annotation.slice(1) as SpringParam['kind'],
     typeName: readTypeName(node),
@@ -261,13 +261,13 @@ function parseParameter(node: CodegraphNodeLike): ClassifiedParameter | null {
 function buildEndpointNode(endpoint: EndpointCandidate, timestamp: number): SpringKgNode {
   return {
     id: hashId('endpoint', [
-      endpoint.controllerCodegraphNodeId,
-      endpoint.codegraphNodeId,
+      endpoint.controllerSpringgraphNodeId,
+      endpoint.springgraphNodeId,
       endpoint.httpMethod,
       endpoint.path,
     ]),
     kind: 'endpoint',
-    codegraphNodeId: endpoint.codegraphNodeId,
+    springgraphNodeId: endpoint.springgraphNodeId,
     name: `${endpoint.httpMethod} ${endpoint.path}`,
     qualifiedName: `${endpoint.sourceMethod.qualifiedName}#${endpoint.httpMethod}:${endpoint.path}`,
     filePath: endpoint.sourceMethod.filePath,
@@ -278,9 +278,9 @@ function buildEndpointNode(endpoint: EndpointCandidate, timestamp: number): Spri
       classPath: endpoint.classPath,
       methodPath: endpoint.methodPath,
       params: endpoint.params,
-      requestDtoCodegraphNodeId: endpoint.requestDtoCodegraphNodeId,
-      responseDtoCodegraphNodeId: endpoint.responseDtoCodegraphNodeId,
-      controllerCodegraphNodeId: endpoint.controllerCodegraphNodeId,
+      requestDtoSpringgraphNodeId: endpoint.requestDtoSpringgraphNodeId,
+      responseDtoSpringgraphNodeId: endpoint.responseDtoSpringgraphNodeId,
+      controllerSpringgraphNodeId: endpoint.controllerSpringgraphNodeId,
     },
     confidence: 1,
     createdAt: timestamp,
@@ -299,8 +299,8 @@ function buildHandledByEdge(endpointNodeId: string, methodId: string, timestamp:
   };
 }
 
-function buildCallsEdges(methodId: string, codegraphEdges: readonly CodegraphEdgeLike[], timestamp: number): SpringKgEdge[] {
-  return codegraphEdges
+function buildCallsEdges(methodId: string, springgraphEdges: readonly SpringgraphEdgeLike[], timestamp: number): SpringKgEdge[] {
+  return springgraphEdges
     .filter((edge) => edge.kind === 'calls' && edge.source === methodId)
     .map((edge) => ({
       id: hashId('CALLS', [edge.source, edge.target, 'CALLS']),
@@ -313,11 +313,11 @@ function buildCallsEdges(methodId: string, codegraphEdges: readonly CodegraphEdg
 }
 
 function findParentController(
-  method: CodegraphNodeLike,
-  nodesById: ReadonlyMap<string, CodegraphNodeLike>,
-  codegraphEdges: readonly CodegraphEdgeLike[],
-): CodegraphNodeLike | null {
-  const parentEdge = codegraphEdges.find((edge) => edge.kind === 'contains' && edge.target === method.id);
+  method: SpringgraphNodeLike,
+  nodesById: ReadonlyMap<string, SpringgraphNodeLike>,
+  springgraphEdges: readonly SpringgraphEdgeLike[],
+): SpringgraphNodeLike | null {
+  const parentEdge = springgraphEdges.find((edge) => edge.kind === 'contains' && edge.target === method.id);
   if (!parentEdge) {
     return null;
   }
@@ -331,19 +331,19 @@ function findParentController(
 }
 
 function collectMethodParameters(
-  method: CodegraphNodeLike,
-  nodesById: ReadonlyMap<string, CodegraphNodeLike>,
-  codegraphEdges: readonly CodegraphEdgeLike[],
+  method: SpringgraphNodeLike,
+  nodesById: ReadonlyMap<string, SpringgraphNodeLike>,
+  springgraphEdges: readonly SpringgraphEdgeLike[],
 ): ClassifiedParameter[] {
-  return codegraphEdges
+  return springgraphEdges
     .filter((edge) => edge.kind === 'contains' && edge.source === method.id)
     .map((edge) => nodesById.get(edge.target))
-    .filter((node): node is CodegraphNodeLike => node !== undefined && node.kind === 'parameter')
+    .filter((node): node is SpringgraphNodeLike => node !== undefined && node.kind === 'parameter')
     .map((node) => parseParameter(node))
     .filter((value): value is ClassifiedParameter => value !== null);
 }
 
-function resolveMethodDecorator(method: CodegraphNodeLike): { httpMethod: HttpMethod; methodPaths: string[] } | null {
+function resolveMethodDecorator(method: SpringgraphNodeLike): { httpMethod: HttpMethod; methodPaths: string[] } | null {
   const decorators = method.decorators ?? [];
 
   for (const decorator of decorators) {
@@ -362,8 +362,8 @@ function resolveMethodDecorator(method: CodegraphNodeLike): { httpMethod: HttpMe
 }
 
 function buildEndpointsForMethod(
-  method: CodegraphNodeLike,
-  controller: CodegraphNodeLike,
+  method: SpringgraphNodeLike,
+  controller: SpringgraphNodeLike,
   classPath: string,
   parameters: readonly ClassifiedParameter[],
 ): EndpointCandidate[] {
@@ -372,26 +372,26 @@ function buildEndpointsForMethod(
     return [];
   }
 
-  const requestDtoCodegraphNodeId = parameters.find((parameter) => parameter.kind === 'RequestBody')?.typeNodeId;
-  const responseDtoCodegraphNodeId = typeof method.metadata?.returnTypeNodeId === 'string'
+  const requestDtoSpringgraphNodeId = parameters.find((parameter) => parameter.kind === 'RequestBody')?.typeNodeId;
+  const responseDtoSpringgraphNodeId = typeof method.metadata?.returnTypeNodeId === 'string'
     ? method.metadata.returnTypeNodeId
     : undefined;
 
   return mapping.methodPaths.map((methodPath) => ({
-    codegraphNodeId: method.id,
-    controllerCodegraphNodeId: controller.id,
+    springgraphNodeId: method.id,
+    controllerSpringgraphNodeId: controller.id,
     httpMethod: mapping.httpMethod,
     path: joinPaths(classPath, methodPath),
     classPath: classPath || undefined,
     methodPath: normalizePathSegment(methodPath) || '/',
-    params: parameters.map(({ codegraphNodeId: _codegraphNodeId, typeNodeId: _typeNodeId, ...parameter }) => parameter),
-    requestDtoCodegraphNodeId,
-    responseDtoCodegraphNodeId,
+    params: parameters.map(({ springgraphNodeId: _springgraphNodeId, typeNodeId: _typeNodeId, ...parameter }) => parameter),
+    requestDtoSpringgraphNodeId,
+    responseDtoSpringgraphNodeId,
     sourceMethod: method,
   }));
 }
 
-function readClassPath(controller: CodegraphNodeLike): string {
+function readClassPath(controller: SpringgraphNodeLike): string {
   const requestMapping = findDecorator(controller.decorators, '@RequestMapping');
   if (!requestMapping) {
     return '';
@@ -405,25 +405,25 @@ export class EndpointResolver implements Resolver {
 
   async enhance(input: SpringKgEnhanceInput): Promise<SpringKgEnhanceOutput> {
     const timestamp = Date.now();
-    const nodesById = new Map(input.codegraphNodes.map((node) => [node.id, node]));
+    const nodesById = new Map(input.springgraphNodes.map((node) => [node.id, node]));
 
-    const candidates = input.codegraphNodes
+    const candidates = input.springgraphNodes
       .filter((node) => node.kind === 'method' && hasAnyDecorator(node.decorators, ['@RequestMapping', ...Object.keys(VERB_DECORATORS)]))
       .flatMap((method) => {
-        const controller = findParentController(method, nodesById, input.codegraphEdges);
+        const controller = findParentController(method, nodesById, input.springgraphEdges);
         if (!controller) {
           return [];
         }
 
-        const parameters = collectMethodParameters(method, nodesById, input.codegraphEdges);
+        const parameters = collectMethodParameters(method, nodesById, input.springgraphEdges);
         const classPath = readClassPath(controller);
         return buildEndpointsForMethod(method, controller, classPath, parameters);
       });
 
     const nodes = candidates.map((candidate) => buildEndpointNode(candidate, timestamp));
-    const handledByEdges = nodes.map((node) => buildHandledByEdge(node.id, node.codegraphNodeId, timestamp));
-    const callsEdges = Array.from(new Set(candidates.map((candidate) => candidate.codegraphNodeId)))
-      .flatMap((methodId) => buildCallsEdges(methodId, input.codegraphEdges, timestamp));
+    const handledByEdges = nodes.map((node) => buildHandledByEdge(node.id, node.springgraphNodeId, timestamp));
+    const callsEdges = Array.from(new Set(candidates.map((candidate) => candidate.springgraphNodeId)))
+      .flatMap((methodId) => buildCallsEdges(methodId, input.springgraphEdges, timestamp));
     const edges = [...handledByEdges, ...callsEdges];
 
     const byKind = nodes.reduce<Record<string, number>>((accumulator, node) => {

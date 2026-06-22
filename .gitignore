@@ -38,6 +38,7 @@ npm-debug.log*
 *.db-shm
 
 # Local Claude settings
+.claude/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 
@@ -46,6 +47,15 @@ npm-debug.log*
 
 # Springgraph data directories (in test projects)
 .springgraph/
+.codegraph/
+.codegraph_bak/
+
+# Dev tooling artifacts (not for commit)
+.cursor/
+.omo/
+资料/
+openspec/
+.playwright-mcp/
 
 test_frameworks
 

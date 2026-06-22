@@ -1,11 +1,11 @@
 /**
  * Global daemon registry + stop/list control — the discovery layer behind
- * `codegraph list` and `codegraph stop [--all]`.
+ * `springgraph list` and `springgraph stop [--all]`.
  *
  * Every per-project daemon already writes an authoritative lockfile at
- * `<root>/.codegraph/daemon.pid`. That's enough to stop ONE daemon you can name,
+ * `<root>/.springgraph/daemon.pid`. That's enough to stop ONE daemon you can name,
  * but there's no central place to find them ALL — which `list` and `stop --all`
- * need. So each daemon also drops a tiny record under `~/.codegraph/daemons/` on
+ * need. So each daemon also drops a tiny record under `~/.springgraph/daemons/` on
  * start and removes it on graceful shutdown.
  *
  * The registry is a DISCOVERY index, never a source of truth: the live pid is.
@@ -35,11 +35,11 @@ export interface DaemonRecord {
 }
 
 /**
- * `~/.codegraph/daemons` — GLOBAL, keyed off the home install dir. (The
- * `CODEGRAPH_DIR` env var only renames the per-project index dir, not this.)
+ * `~/.springgraph/daemons` — GLOBAL, keyed off the home install dir. (The
+ * `SPRINGGRAPH_DIR` env var only renames the per-project index dir, not this.)
  */
 export function getRegistryDir(): string {
-  return path.join(os.homedir(), '.codegraph', 'daemons');
+  return path.join(os.homedir(), '.springgraph', 'daemons');
 }
 
 function recordPath(root: string): string {

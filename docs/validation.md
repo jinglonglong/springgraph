@@ -11,7 +11,7 @@ springkg init examples/springcloud-demo
 springkg index examples/springcloud-demo
 ```
 
-Expected state: `springkg.db` created inside `.codegraph/`, with records in `spring_symbols`, `spring_endpoints`, `spring_feign_clients`, `spring_sql_statements`, and `runtime_config_properties`.
+Expected state: `springkg.db` created inside `.springgraph/`, with records in `spring_symbols`, `spring_endpoints`, `spring_feign_clients`, `spring_sql_statements`, and `runtime_config_properties`.
 
 ---
 
@@ -257,7 +257,7 @@ springkg init examples/springcloud-demo
 springkg index examples/springcloud-demo
 ```
 
-Expected state: `springkg.db` created inside `.codegraph/`, with records in `spring_symbols`, `spring_edges`, `spring_endpoints`, `spring_feign_clients`, `spring_sql_statements`, and `runtime_config_properties`.
+Expected state: `springkg.db` created inside `.springgraph/`, with records in `spring_symbols`, `spring_edges`, `spring_endpoints`, `spring_feign_clients`, `spring_sql_statements`, and `runtime_config_properties`.
 
 ---
 
@@ -410,7 +410,7 @@ springkg init examples/springcloud-demo
 springkg index examples/springcloud-demo
 ```
 
-Expected state: `springkg.db` created inside `.codegraph/`, with records in `spring_symbols`, `spring_edges`, `spring_endpoints`, `spring_feign_clients`, `spring_sql_statements`, `runtime_config_properties`, and `scheduled_tasks`.
+Expected state: `springkg.db` created inside `.springgraph/`, with records in `spring_symbols`, `spring_edges`, `spring_endpoints`, `spring_feign_clients`, `spring_sql_statements`, `runtime_config_properties`, and `scheduled_tasks`.
 
 ---
 

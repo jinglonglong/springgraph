@@ -175,7 +175,7 @@ export class MyBatisXmlExtractor {
     return {
       id,
       kind,
-      codegraphNodeId: id,
+      springgraphNodeId: id,
       name,
       qualifiedName: `${namespace}.${name}`,
       filePath: this.filePath,

@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 
 import type {
-  CodegraphEdgeLike,
-  CodegraphNodeLike,
+  SpringgraphEdgeLike,
+  SpringgraphNodeLike,
   Resolver,
   SpringKgEdge,
   SpringKgEnhanceInput,
@@ -12,22 +12,22 @@ import type {
 
 export type FeignDtoBinding = {
   feignMethodId: string;
-  requestDto?: { codegraphNodeId: string; typeName: string };
-  responseDto?: { codegraphNodeId: string; typeName: string };
-  paramTypes: Array<{ codegraphNodeId?: string; typeName: string; decorator?: string }>;
+  requestDto?: { springgraphNodeId: string; typeName: string };
+  responseDto?: { springgraphNodeId: string; typeName: string };
+  paramTypes: Array<{ springgraphNodeId?: string; typeName: string; decorator?: string }>;
 };
 
 type DtoRole = 'request' | 'response';
 
 type ResolvedParamType = {
-  codegraphNodeId?: string;
+  springgraphNodeId?: string;
   typeName: string;
   decorator?: string;
   decorators: string[];
 };
 
 type ResolvedDtoType = {
-  codegraphNodeId: string;
+  springgraphNodeId: string;
   typeName: string;
 };
 
@@ -41,11 +41,11 @@ function findDecorator(decorators: readonly string[], annotation: string): strin
   return decorators.find((decorator) => decorator.toLowerCase().includes(normalizedAnnotation));
 }
 
-function isFeignInterface(node: CodegraphNodeLike): boolean {
+function isFeignInterface(node: SpringgraphNodeLike): boolean {
   return node.kind === 'interface' && !!findDecorator(node.decorators ?? [], '@FeignClient');
 }
 
-function readStringMetadata(node: CodegraphNodeLike, key: string): string | undefined {
+function readStringMetadata(node: SpringgraphNodeLike, key: string): string | undefined {
   const value = node.metadata?.[key];
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 }
@@ -54,7 +54,7 @@ function normalizeTypeName(typeName: string): string {
   return typeName.replace(/^\?\s+extends\s+/i, '').replace(/^\?\s+super\s+/i, '').trim();
 }
 
-function deriveTypeName(node: CodegraphNodeLike): string | undefined {
+function deriveTypeName(node: SpringgraphNodeLike): string | undefined {
   const candidate =
     readStringMetadata(node, 'typeName') ??
     readStringMetadata(node, 'paramType') ??
@@ -69,7 +69,7 @@ function deriveTypeName(node: CodegraphNodeLike): string | undefined {
   return normalizeTypeName(candidate);
 }
 
-function readTypeNodeId(node: CodegraphNodeLike, ...keys: string[]): string | undefined {
+function readTypeNodeId(node: SpringgraphNodeLike, ...keys: string[]): string | undefined {
   for (const key of keys) {
     const value = readStringMetadata(node, key);
     if (value) {
@@ -185,9 +185,9 @@ function buildDtoNode(
   timestamp: number,
 ): SpringKgNode {
   return {
-    id: hashId('dto', ['dto', feignMethodId, role, dto.codegraphNodeId, dto.typeName]),
+    id: hashId('dto', ['dto', feignMethodId, role, dto.springgraphNodeId, dto.typeName]),
     kind: 'dto',
-    codegraphNodeId: dto.codegraphNodeId,
+    springgraphNodeId: dto.springgraphNodeId,
     name: dto.typeName,
     qualifiedName: dto.typeName,
     metadata: {
@@ -214,19 +214,19 @@ function buildUsesDtoEdge(sourceId: string, targetId: string, role: DtoRole, tim
 }
 
 function resolveParameterTypes(
-  methodNode: CodegraphNodeLike,
-  codegraphEdges: readonly CodegraphEdgeLike[],
-  nodesById: ReadonlyMap<string, CodegraphNodeLike>,
+  methodNode: SpringgraphNodeLike,
+  springgraphEdges: readonly SpringgraphEdgeLike[],
+  nodesById: ReadonlyMap<string, SpringgraphNodeLike>,
 ): ResolvedParamType[] {
-  return codegraphEdges
+  return springgraphEdges
     .filter((edge) => edge.kind === 'contains' && edge.source === methodNode.id)
     .map((edge) => nodesById.get(edge.target))
-    .filter((node): node is CodegraphNodeLike => node !== undefined && node.kind === 'parameter')
+    .filter((node): node is SpringgraphNodeLike => node !== undefined && node.kind === 'parameter')
     .map((parameterNode) => {
       const decorators = parameterNode.decorators ?? [];
       const typeName = deriveTypeName(parameterNode) ?? parameterNode.name;
       return {
-        codegraphNodeId: readTypeNodeId(parameterNode, 'typeNodeId'),
+        springgraphNodeId: readTypeNodeId(parameterNode, 'typeNodeId'),
         typeName,
         decorator: decorators[0],
         decorators,
@@ -242,51 +242,51 @@ function resolveRequestDto(paramTypes: readonly ResolvedParamType[]): ResolvedDt
   }
 
   const [requestParam] = requestBodyParams;
-  if (!requestParam || !requestParam.codegraphNodeId || isPrimitiveLike(requestParam.typeName)) {
+  if (!requestParam || !requestParam.springgraphNodeId || isPrimitiveLike(requestParam.typeName)) {
     return undefined;
   }
 
   return {
-    codegraphNodeId: requestParam.codegraphNodeId,
+    springgraphNodeId: requestParam.springgraphNodeId,
     typeName: requestParam.typeName,
   };
 }
 
-function resolveResponseDto(methodNode: CodegraphNodeLike): ResolvedDtoType | undefined {
+function resolveResponseDto(methodNode: SpringgraphNodeLike): ResolvedDtoType | undefined {
   const typeName = deriveTypeName(methodNode);
-  const codegraphNodeId = readTypeNodeId(methodNode, 'returnTypeNodeId', 'typeNodeId');
+  const springgraphNodeId = readTypeNodeId(methodNode, 'returnTypeNodeId', 'typeNodeId');
 
-  if (!typeName || !codegraphNodeId || isPrimitiveLike(typeName)) {
+  if (!typeName || !springgraphNodeId || isPrimitiveLike(typeName)) {
     return undefined;
   }
 
   return {
-    codegraphNodeId,
+    springgraphNodeId,
     typeName,
   };
 }
 
 function buildFeignBindings(
   input: SpringKgEnhanceInput,
-  nodesById: ReadonlyMap<string, CodegraphNodeLike>,
+  nodesById: ReadonlyMap<string, SpringgraphNodeLike>,
 ): FeignDtoBinding[] {
-  const feignInterfaces = input.codegraphNodes.filter(isFeignInterface);
+  const feignInterfaces = input.springgraphNodes.filter(isFeignInterface);
   const bindings: FeignDtoBinding[] = [];
 
   for (const interfaceNode of feignInterfaces) {
-    const methodNodes = input.codegraphEdges
+    const methodNodes = input.springgraphEdges
       .filter((edge) => edge.kind === 'contains' && edge.source === interfaceNode.id)
       .map((edge) => nodesById.get(edge.target))
-      .filter((node): node is CodegraphNodeLike => node !== undefined && node.kind === 'method');
+      .filter((node): node is SpringgraphNodeLike => node !== undefined && node.kind === 'method');
 
     for (const methodNode of methodNodes) {
-      const paramTypes = resolveParameterTypes(methodNode, input.codegraphEdges, nodesById);
+      const paramTypes = resolveParameterTypes(methodNode, input.springgraphEdges, nodesById);
       bindings.push({
         feignMethodId: methodNode.id,
         requestDto: resolveRequestDto(paramTypes),
         responseDto: resolveResponseDto(methodNode),
         paramTypes: paramTypes.map((paramType) => ({
-          codegraphNodeId: paramType.codegraphNodeId,
+          springgraphNodeId: paramType.springgraphNodeId,
           typeName: paramType.typeName,
           decorator: paramType.decorator,
         })),
@@ -302,7 +302,7 @@ export class FeignRequestResponseType implements Resolver {
 
   async enhance(input: SpringKgEnhanceInput): Promise<SpringKgEnhanceOutput> {
     const timestamp = Date.now();
-    const nodesById = new Map(input.codegraphNodes.map((node) => [node.id, node]));
+    const nodesById = new Map(input.springgraphNodes.map((node) => [node.id, node]));
     const bindings = buildFeignBindings(input, nodesById);
     const nodes: SpringKgNode[] = [];
     const edges: SpringKgEdge[] = [];

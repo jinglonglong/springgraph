@@ -1,7 +1,7 @@
 /**
  * Graph serialization helpers used by the web UI REST surface.
  *
- * This module owns the conversion from CodeGraph nodes/edges into the JSON
+ * This module owns the conversion from Springgraph nodes/edges into the JSON
  * shapes returned by /api/*, including architecture-facet overlays.
  */
 import { type Node, type Edge } from '../types';

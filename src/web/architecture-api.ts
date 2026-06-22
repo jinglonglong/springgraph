@@ -6,7 +6,7 @@
  */
 import * as http from 'http';
 import * as url from 'url';
-import { type CodeGraph } from '../index';
+import { type Springgraph } from '../index';
 import { type Node, type Edge, type EdgeKind } from '../types';
 import {
   type NodeArchitectureFacet,
@@ -38,7 +38,7 @@ function sendJson(res: http.ServerResponse, status: number, body: unknown): void
 // Architecture context helpers
 // ---------------------------------------------------------------------------
 
-export function getArchitectureSnapshot(cg: CodeGraph): ArchitectureSnapshot {
+export function getArchitectureSnapshot(cg: Springgraph): ArchitectureSnapshot {
   return cg.getArchitectureSnapshot();
 }
 
@@ -112,7 +112,7 @@ export function parseFilters(query: url.UrlWithParsedQuery['query']): FilterSet 
 // ---------------------------------------------------------------------------
 
 function resolveQuery(
-  cg: CodeGraph,
+  cg: Springgraph,
   query: string
 ): { node: Node | null; warnings: string[] } {
   const results = cg.searchNodes(query, { limit: 5 });
@@ -130,7 +130,7 @@ function resolveQuery(
 }
 
 function resolveNodeId(
-  cg: CodeGraph,
+  cg: Springgraph,
   nodeId: string | undefined,
   query: string | undefined
 ): { node: Node | null; warnings: string[] } {
@@ -149,7 +149,7 @@ function resolveNodeId(
 export async function handleArchitectureProfiles(
   _req: http.IncomingMessage,
   res: http.ServerResponse,
-  cg: CodeGraph
+  cg: Springgraph
 ): Promise<void> {
   const snapshot = await getArchitectureSnapshot(cg);
   const activeMatch = snapshot.result.allMatches[0];
@@ -175,7 +175,7 @@ export async function handleArchitectureProfiles(
 export async function handleArchitectureOverview(
   req: http.IncomingMessage,
   res: http.ServerResponse,
-  cg: CodeGraph
+  cg: Springgraph
 ): Promise<void> {
   const parsed = url.parse(req.url || '', true);
   const limit = Math.min(Math.max(parseInt((parsed.query.limit as string) || '80', 10) || 80, 1), 200);
@@ -241,7 +241,7 @@ function confidenceForEdge(edge: Edge): number {
 export async function handleArchitectureTrace(
   req: http.IncomingMessage,
   res: http.ServerResponse,
-  cg: CodeGraph
+  cg: Springgraph
 ): Promise<void> {
   const parsed = url.parse(req.url || '', true);
   const fromParam = (parsed.query.from as string | undefined)?.trim();
@@ -353,7 +353,7 @@ function categoryForNode(node: Node, facet: NodeArchitectureFacet | undefined): 
 export async function handleArchitectureImpact(
   req: http.IncomingMessage,
   res: http.ServerResponse,
-  cg: CodeGraph
+  cg: Springgraph
 ): Promise<void> {
   const parsed = url.parse(req.url || '', true);
   const nodeId = (parsed.query.nodeId as string | undefined)?.trim();
@@ -448,7 +448,7 @@ export async function handleArchitectureImpact(
 /**
  * Register all /api/architecture/* routes on the request handler.
  *
- * Callers pass the parsed pathname/segments and the active CodeGraph instance.
+ * Callers pass the parsed pathname/segments and the active Springgraph instance.
  * Returns true if the request was handled.
  */
 export async function handleArchitectureRoute(
@@ -456,7 +456,7 @@ export async function handleArchitectureRoute(
   segments: string[],
   req: http.IncomingMessage,
   res: http.ServerResponse,
-  cg: CodeGraph
+  cg: Springgraph
 ): Promise<boolean> {
   if (segments[0] !== 'api' || segments[1] !== 'architecture') return false;
 

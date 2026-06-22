@@ -43,8 +43,8 @@ describe('Concurrent access', () => {
       try {
         const b = SpringDatabase.open(tmp);
         try {
-          a.getDb().prepare("INSERT INTO spring_symbols (id, kind, codegraph_node_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run('s:a:1', 'controller', 'cg:1', Date.now(), Date.now());
-          b.getDb().prepare("INSERT INTO spring_symbols (id, kind, codegraph_node_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run('s:b:1', 'service', 'cg:2', Date.now(), Date.now());
+          a.getDb().prepare("INSERT INTO spring_symbols (id, kind, springgraph_node_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run('s:a:1', 'controller', 'cg:1', Date.now(), Date.now());
+          b.getDb().prepare("INSERT INTO spring_symbols (id, kind, springgraph_node_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").run('s:b:1', 'service', 'cg:2', Date.now(), Date.now());
 
           const count = a.getDb().prepare("SELECT COUNT(*) as c FROM spring_symbols").get() as { c: number };
           expect(count.c).toBe(2);

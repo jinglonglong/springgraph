@@ -2,7 +2,7 @@
 
 ## Overview
 
-SpringKg is a knowledge graph layer on top of CodeGraph that adds Spring/SpringCloud semantic understanding. It runs as a peer of CodeGraph within the same project, maintaining its own SQLite database (`springkg.db`) alongside CodeGraph's `codegraph.db`.
+SpringKg is a knowledge graph layer on top of Springgraph that adds Spring/SpringCloud semantic understanding. It runs as a peer of Springgraph within the same project, maintaining its own SQLite database (`springkg.db`) alongside Springgraph's `springgraph.db`.
 
 The system is structured as four layers, each owned by a dedicated team:
 
@@ -21,7 +21,7 @@ graph TD
     subgraph "Layer 1 — Core (Team A)"
         A1["SpringKg (orchestrator)"]
         A2["SpringDatabase (springkg.db)"]
-        A3["CodeGraphFacade (read-only wrapper)"]
+        A3["SpringgraphFacade (read-only wrapper)"]
     end
 
     subgraph "Layer 2 — Semantic (Team B)"
@@ -55,7 +55,7 @@ graph TD
     end
 
     subgraph "External"
-        CG["CodeGraph (codegraph.db)"]
+        CG["Springgraph (springgraph.db)"]
         MCP["springkg-mcp (stdio)"]
         CLI["springkg CLI"]
     end
@@ -125,7 +125,7 @@ graph LR
     CR & MI & NC & CU & GR --> ST
     CB & SG2 --> ST
     CM --> DB
-    ST --> CG(["CodeGraph (peer)"])
+    ST --> CG(["Springgraph (peer)"])
 ```
 
 ## Resolver Chain
@@ -163,10 +163,10 @@ The chain is divided into four execution stages:
 ## Data Flow
 
 ```
-File change detected by CodeGraph watcher
-  -> CodeGraph.sync() updates codegraph.db
+File change detected by Springgraph watcher
+  -> Springgraph.sync() updates springgraph.db
   -> SpringKg.enhanceOnSync(paths) called with changed files
-    -> For each changed file: collect CodeGraph nodes via cg.getNodesInFile()
+    -> For each changed file: collect Springgraph nodes via cg.getNodesInFile()
     -> For each node: collect outgoing/incoming edges
     -> Pass to resolver chain (stages execute sequentially)
     -> Each resolver emits SpringKgNodes and SpringKgEdges to springkg.db
@@ -175,7 +175,7 @@ File change detected by CodeGraph watcher
 
 ## Database Schema Ownership
 
-- `codegraph.db` — owned by CodeGraph; SpringKg reads only
+- `springgraph.db` — owned by Springgraph; SpringKg reads only
 - `springkg.db` — owned by SpringKg; populated by resolver chain
 
-SpringKg nodes store a `codegraph_node_id` column that references CodeGraph's `nodes.id`, enabling cross-database joins between SpringKg and CodeGraph data.
+SpringKg nodes store a `springgraph_node_id` column that references Springgraph's `nodes.id`, enabling cross-database joins between SpringKg and Springgraph data.

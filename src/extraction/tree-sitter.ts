@@ -315,12 +315,12 @@ export class TreeSitterExtractor {
   private nodes: Node[] = [];
   private edges: Edge[] = [];
   private unresolvedReferences: UnresolvedReference[] = [];
-  // Value-reference edges (default ON; set CODEGRAPH_VALUE_REFS=0 to disable; see flushValueRefs).
+  // Value-reference edges (default ON; set SPRINGGRAPH_VALUE_REFS=0 to disable; see flushValueRefs).
   // Same-file reads of file-scope const/var symbols → `references` edges so impact analysis catches
   // value consumers ("change this constant/table, affect its readers").
   private static readonly VALUE_REF_LANGS = new Set<string>(['typescript', 'javascript', 'tsx', 'go', 'python', 'rust', 'ruby', 'c', 'java', 'csharp', 'php', 'scala', 'kotlin', 'swift', 'dart', 'pascal']);
   private static readonly MAX_VALUE_REF_NODES = 20_000;
-  private readonly valueRefsEnabled = process.env.CODEGRAPH_VALUE_REFS !== '0';
+  private readonly valueRefsEnabled = process.env.SPRINGGRAPH_VALUE_REFS !== '0';
   private fileScopeValues = new Map<string, string>();
   private fileScopeValueCounts = new Map<string, number>(); // file-scope nodes per name (conditional-def detection)
   private valueRefScopes: Array<{ id: string; node: SyntaxNode; name: string }> = [];
@@ -664,7 +664,7 @@ export class TreeSitterExtractor {
    * The engine doesn't edge const→consumer, so impact analysis misses "change this table, affect
    * its readers" (the ReScript-PR false positive). Same-file only (resolution is unambiguous),
    * distinctive target names only (dodges the local-shadowing precision trap documented on
-   * function_ref), deduped per (reader, target). Default on (CODEGRAPH_VALUE_REFS=0 disables) +
+   * function_ref), deduped per (reader, target). Default on (SPRINGGRAPH_VALUE_REFS=0 disables) +
    * additive. Shadowed targets are pruned — see below.
    */
   private flushValueRefs(): void {
@@ -2445,7 +2445,7 @@ export class TreeSitterExtractor {
    * dynamic factory (`createService<MyServiceList>()`) turns into a callable
    * property (`api.query_apply_record(…)`). Static extraction otherwise never
    * sees that name — it's a type argument, not a declaration — so
-   * `codegraph query query_apply_record` returned nothing (issue #634). We emit
+   * `springgraph query query_apply_record` returned nothing (issue #634). We emit
    * each name as a `method` node under the type alias (qualifiedName
    * `MyServiceList::query_apply_record`) so it's searchable and resolvable as a
    * symbol. (A call through the proxy, `api.query_apply_record(…)`, still

@@ -17,7 +17,7 @@ import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 import { initGrammars, loadAllGrammars } from '../src/extraction/grammars';
 
 beforeAll(async () => {
@@ -56,7 +56,7 @@ describe('TS/JS class field classification (#808)', () => {
       ].join('\n')
     );
 
-    const cg = CodeGraph.initSync(tmpDir);
+    const cg = Springgraph.initSync(tmpDir);
     try {
       await cg.indexAll();
 
@@ -118,7 +118,7 @@ describe('TS/JS class field classification (#808)', () => {
       ].join('\n')
     );
 
-    const cg = CodeGraph.initSync(tmpDir);
+    const cg = Springgraph.initSync(tmpDir);
     try {
       await cg.indexAll();
       expect(cg.getNodesByName('count')[0]?.kind).toBe('property');
@@ -143,7 +143,7 @@ describe('TS/JS class field classification (#808)', () => {
       ].join('\n')
     );
 
-    const cg = CodeGraph.initSync(tmpDir);
+    const cg = Springgraph.initSync(tmpDir);
     try {
       await cg.indexAll();
       const onSave = cg.getNodesByName('onSave')[0]!;

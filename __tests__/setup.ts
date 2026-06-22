@@ -103,7 +103,7 @@ export async function terminateChild(child: ChildProcess | null | undefined, gra
   await waitForChildExit(child, graceMs);
 }
 
-export async function safeCloseCodeGraph(cg: { close?: () => unknown; destroy?: () => unknown } | null | undefined): Promise<void> {
+export async function safeCloseSpringgraph(cg: { close?: () => unknown; destroy?: () => unknown } | null | undefined): Promise<void> {
   if (!cg) return;
 
   try {

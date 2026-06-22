@@ -29,7 +29,7 @@ This plan fixes both problems in one coherent change.
 - `__tests__/frameworks.test.ts` — NEW. One `describe` per framework, checking that representative fixtures produce the expected `{nodes, references}`.
 - `__tests__/frameworks-integration.test.ts` — NEW. End-to-end test: index a tiny Django project fixture, assert a `route -> class` edge with kind `references` exists from `urlpatterns` entry to `UserListView`.
 
-Rationale for splitting the two test files: the unit tests are deterministic string-in / array-out and run in milliseconds; the integration test boots a CodeGraph DB and is slower but gives the strongest behavioral guarantee.
+Rationale for splitting the two test files: the unit tests are deterministic string-in / array-out and run in milliseconds; the integration test boots a Springgraph DB and is slower but gives the strongest behavioral guarantee.
 
 ## Scope Note
 
@@ -895,7 +895,7 @@ import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 import { initGrammars, loadAllGrammars } from '../src/extraction/grammars';
 
 beforeAll(async () => {
@@ -922,7 +922,7 @@ describe('Django end-to-end', () => {
       'from users.views import UserListView\n' +
       'urlpatterns = [path("users/", UserListView.as_view(), name="user-list")]\n');
 
-    const cg = new CodeGraph(tmpDir);
+    const cg = new Springgraph(tmpDir);
     await cg.initialize();
     await cg.indexAll();
 
@@ -1030,7 +1030,7 @@ Append to `README.md` after the features list:
 ```markdown
 ### Framework-aware Routes
 
-CodeGraph recognizes web framework routing files and links URL patterns to their handlers:
+Springgraph recognizes web framework routing files and links URL patterns to their handlers:
 
 - **Django**: `urlpatterns` entries in `urls.py` — `path()`, `re_path()`, `url()`, `include()`
 - **Flask / FastAPI**: `@app.route` / `@app.get` / `@router.post` decorators
@@ -1043,7 +1043,7 @@ CodeGraph recognizes web framework routing files and links URL patterns to their
 - **ASP.NET**: `[HttpGet]` + action method
 - **Vapor**: `app.get("x", use: handler)`
 
-Query `codegraph_callers(YourView)` and the route pattern will appear as an incoming edge.
+Query `springgraph_callers(YourView)` and the route pattern will appear as an incoming edge.
 ```
 
 - [ ] **Step 4: Commit**
@@ -1067,14 +1067,14 @@ git push -u origin feat/framework-extract-wiring
 
 ```bash
 gh pr create \
-  --repo colbymchenry/codegraph \
+  --repo colbymchenry/springgraph \
   --base main \
   --head timomeara:feat/framework-extract-wiring \
   --title "feat: wire up framework route extraction" \
   --body "$(cat <<'EOF'
 ## Problem
 
-`FrameworkResolver.extractNodes` is declared in the type but never called anywhere in `src/`. As a result, the graph has zero `route` nodes for any framework, and the URL-to-handler link (e.g. Django `urls.py` entry -> view class) doesn't exist. This makes `codegraph_callers(MyView)` silently miss its most important caller.
+`FrameworkResolver.extractNodes` is declared in the type but never called anywhere in `src/`. As a result, the graph has zero `route` nodes for any framework, and the URL-to-handler link (e.g. Django `urls.py` entry -> view class) doesn't exist. This makes `springgraph_callers(MyView)` silently miss its most important caller.
 
 ## Fix
 

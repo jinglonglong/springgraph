@@ -1,5 +1,5 @@
 /* ============================================================================
- * SpringKG — Local Web UI (front-end)
+ * springgraph — Local Web UI (front-end)
  * Plain JS, no frameworks, no build step. Cytoscape.js v3.x loaded from CDN.
  *
  * API CONTRACT  (server binds to 127.0.0.1:4000 by default, base path /)
@@ -17,7 +17,7 @@
  *        nodes: [...], edges: [...] }
  *
  * POST /api/project { path }
- *   -> switch active project. `path` may be a project root or its .codegraph dir.
+ *   -> switch active project. `path` may be a project root or its .springgraph dir.
  *
  * GET /api/browse?path=<dir>|__roots__
  *   -> local directory listing for choosing an indexed project.
@@ -789,7 +789,7 @@
   async function switchProject(rawPath) {
     const nextPath = (rawPath || '').trim();
     if (!nextPath) {
-      showToast('请输入项目根目录或 .codegraph 目录路径。', 'warn');
+      showToast('请输入项目根目录或 .springgraph 目录路径。', 'warn');
       return;
     }
     const button = $('#btn-project-load');
@@ -811,7 +811,7 @@
       runSearch('');
       await refreshStats();
       await loadOverview();
-      showToast('已切换到新的 SpringKG 索引。', 'ok', '加载完成');
+      showToast('已切换到新的 springgraph 索引。', 'ok', '加载完成');
     } catch (err) {
       showToast(err.message || '切换项目失败', 'error', '加载失败');
     } finally {
@@ -843,7 +843,7 @@
       state.browseParent = data.parent;
       $('#browse-path').textContent = data.path || '—';
       $('#btn-browse-parent').disabled = !data.parent;
-      $('#btn-browse-select-current').disabled = !(data.isCodeGraphProject || data.isCodeGraphDir);
+      $('#btn-browse-select-current').disabled = !(data.isSpringgraphProject || data.isSpringgraphDir);
       renderDirectoryEntries(data.entries || []);
     } catch (err) {
       showToast(err.message || '目录读取失败', 'error', '浏览失败');
@@ -875,11 +875,11 @@
       return;
     }
     entries.forEach((entry) => {
-      const loadable = entry.isCodeGraphProject || entry.isCodeGraphDir;
-      const meta = entry.isCodeGraphDir
-        ? '.codegraph 索引目录'
-        : entry.isCodeGraphProject
-          ? 'SpringKG 项目根目录'
+      const loadable = entry.isSpringgraphProject || entry.isSpringgraphDir;
+      const meta = entry.isSpringgraphDir
+        ? '.springgraph 索引目录'
+        : entry.isSpringgraphProject
+          ? 'springgraph 项目根目录'
           : '目录';
       list.appendChild(createBrowseRow(entry.name, entry.path, meta, loadable));
     });
@@ -1957,7 +1957,7 @@
 
     // Filter section collapse/expand — per-section state persisted in localStorage
     // so the user's preferred panel layout survives reloads.
-    const FILTER_COLLAPSED_KEY = 'codegraph-filter-collapsed';
+    const FILTER_COLLAPSED_KEY = 'springgraph-filter-collapsed';
     function getFilterCollapsed() {
       try { return JSON.parse(localStorage.getItem(FILTER_COLLAPSED_KEY) || '{}'); } catch { return {}; }
     }
@@ -2199,14 +2199,14 @@
   // loaded once per modal open and cached on state.
   // ──────────────────────────────────────────────────────────────────────────
   const PG_EXAMPLES = {
-    codegraph_search:    { query: 'UserService', limit: 10 },
-    codegraph_explore:   { query: 'UserService login', maxFiles: 8 },
-    codegraph_node:      { symbol: 'UserService', includeCode: true },
-    codegraph_callers:   { symbol: 'UserService', limit: 20 },
-    codegraph_callees:   { symbol: 'UserService', limit: 20 },
-    codegraph_impact:    { symbol: 'UserService', depth: 2 },
-    codegraph_files:     { format: 'grouped', maxDepth: 3 },
-    codegraph_status:    {},
+    springgraph_search:    { query: 'UserService', limit: 10 },
+    springgraph_explore:   { query: 'UserService login', maxFiles: 8 },
+    springgraph_node:      { symbol: 'UserService', includeCode: true },
+    springgraph_callers:   { symbol: 'UserService', limit: 20 },
+    springgraph_callees:   { symbol: 'UserService', limit: 20 },
+    springgraph_impact:    { symbol: 'UserService', depth: 2 },
+    springgraph_files:     { format: 'grouped', maxDepth: 3 },
+    springgraph_status:    {},
   };
 
   // 中文翻译表 — MCP 工具的描述和参数描述来自英文 schema，
@@ -2214,28 +2214,28 @@
   // 缺失时回退到原文，不会影响真实 MCP 协议输出。
   const PG_TRANSLATIONS = {
     tools: {
-      codegraph_search: '按名称快速搜索符号。仅返回位置（不含源码）。如需查看源码或理解一片区域，请改用 codegraph_explore。',
-      codegraph_callers: '列出调用 <symbol> 的所有函数。查看完整调用流程请用 codegraph_explore。',
-      codegraph_callees: '列出 <symbol> 调用的所有函数。查看完整调用流程请用 codegraph_explore。',
-      codegraph_impact: '列出修改 <symbol> 后会受影响的符号。重构前使用。',
-      codegraph_node: '两种模式。(1) 像 Read 一样读文件：传 file（路径或文件名）而不传 symbol，返回该文件当前磁盘上的完整源码（带行号，与 Read 工具输出一致），可用 offset/limit 收窄范围 — 同时附一行说明哪些文件依赖它。字节内容与 Read 一致，但来自索引更快，且附带影响范围。(2) 读取一个能命名的符号：位置、签名、完整源码（includeCode=true）和调用方/被调用方轨迹，一次返回。对于有歧义的名称，会在一次调用中返回所有重载的源码（这样你不必为了找对重载而 Read 文件）；传 file/line 来精确定位。多个相关符号或完整流程请用 codegraph_explore。',
-      codegraph_explore: '首选工具 — 几乎所有问题的首次调用，包括「X 是怎么工作的」、架构、bug、X 在哪里、调查一片区域，或即将修改的符号。一次返回相关符号的完整源码（按文件分组），并在符号之间画出调用路径。查询可以是自然语言问题，也可以是符号/文件名列表。',
-      codegraph_status: '索引健康检查（文件 / 节点 / 边）。除非调试，否则跳过。',
-      codegraph_files: '已索引的文件树，附语言和符号计数。比 Glob 更快地展示项目结构。',
+      springgraph_search: '按名称快速搜索符号。仅返回位置（不含源码）。如需查看源码或理解一片区域，请改用 springgraph_explore。',
+      springgraph_callers: '列出调用 <symbol> 的所有函数。查看完整调用流程请用 springgraph_explore。',
+      springgraph_callees: '列出 <symbol> 调用的所有函数。查看完整调用流程请用 springgraph_explore。',
+      springgraph_impact: '列出修改 <symbol> 后会受影响的符号。重构前使用。',
+      springgraph_node: '两种模式。(1) 像 Read 一样读文件：传 file（路径或文件名）而不传 symbol，返回该文件当前磁盘上的完整源码（带行号，与 Read 工具输出一致），可用 offset/limit 收窄范围 — 同时附一行说明哪些文件依赖它。字节内容与 Read 一致，但来自索引更快，且附带影响范围。(2) 读取一个能命名的符号：位置、签名、完整源码（includeCode=true）和调用方/被调用方轨迹，一次返回。对于有歧义的名称，会在一次调用中返回所有重载的源码（这样你不必为了找对重载而 Read 文件）；传 file/line 来精确定位。多个相关符号或完整流程请用 springgraph_explore。',
+      springgraph_explore: '首选工具 — 几乎所有问题的首次调用，包括「X 是怎么工作的」、架构、bug、X 在哪里、调查一片区域，或即将修改的符号。一次返回相关符号的完整源码（按文件分组），并在符号之间画出调用路径。查询可以是自然语言问题，也可以是符号/文件名列表。',
+      springgraph_status: '索引健康检查（文件 / 节点 / 边）。除非调试，否则跳过。',
+      springgraph_files: '已索引的文件树，附语言和符号计数。比 Glob 更快地展示项目结构。',
     },
     params: {
-      codegraph_search: {
+      springgraph_search: {
         query: '符号名称或部分名称（例如：「auth」、「signIn」、「UserService」）',
         kind: '按节点类型筛选',
         limit: '最大结果数（默认：10）',
-        projectPath: '其他项目的路径（需已初始化 .codegraph/）。省略则使用当前项目。用于跨代码库查询。',
+        projectPath: '其他项目的路径（需已初始化 .springgraph/）。省略则使用当前项目。用于跨代码库查询。',
       },
-      codegraph_explore: {
-        query: '要探索的符号名、文件名或简短的代码术语（例如：「AuthService loginUser session-manager」、「GraphTraverser BFS impact traversal.ts」）。对于流程问题，列出贯穿该流程的符号（例如「mutateElement renderScene」）。自然语言问题也可以 — 无需先调用 codegraph_search。',
+      springgraph_explore: {
+        query: '要探索的符号名、文件名或简短的代码术语（例如：「AuthService loginUser session-manager」、「GraphTraverser BFS impact traversal.ts」）。对于流程问题，列出贯穿该流程的符号（例如「mutateElement renderScene」）。自然语言问题也可以 — 无需先调用 springgraph_search。',
         maxFiles: '包含源码的最大文件数（默认：12）',
-        projectPath: '其他项目的路径（需已初始化 .codegraph/）。省略则使用当前项目。',
+        projectPath: '其他项目的路径（需已初始化 .springgraph/）。省略则使用当前项目。',
       },
-      codegraph_node: {
+      springgraph_node: {
         symbol: '要读取的符号名称（符号模式）。省略此参数并单独传 file 即可像 Read 工具一样读整个文件。',
         includeCode: '符号模式：是否包含符号的完整函数体（默认：false）。文件模式下忽略；除非设置 symbolsOnly，否则始终返回源码。',
         file: '文件路径或文件名（例如「harness.rs」、「src/auth/session.ts」）。单独传它（不传 symbol）即可像 Read 工具一样读取文件 — 返回带行号的完整源码 + 哪些文件依赖它。或与 symbol 一起传，用于在多个同名符号中精确定位到该文件中的定义。',
@@ -2243,36 +2243,36 @@
         limit: '文件模式：返回的最大行数，与 Read 的 limit 一致。默认返回整个文件（最多 2000 行，与 Read 一致）。',
         symbolsOnly: '文件模式：仅返回文件的符号地图和依赖项（轻量结构概览），不返回源码。',
         line: '仅符号模式：精确定位到该行附近的定义（与 trail 给出的 file:line 一起使用）。',
-        projectPath: '其他项目的路径（需已初始化 .codegraph/）。省略则使用当前项目。',
+        projectPath: '其他项目的路径（需已初始化 .springgraph/）。省略则使用当前项目。',
       },
-      codegraph_callers: {
+      springgraph_callers: {
         symbol: '要查找调用方的函数、方法或类的名称',
         file: '当存在多个同名符号时（例如 monorepo 中每个 app 都有一个 UserService），限定到该文件中的定义（路径或后缀）',
         limit: '最大返回调用方数（默认：20）',
-        projectPath: '其他项目的路径（需已初始化 .codegraph/）。省略则使用当前项目。',
+        projectPath: '其他项目的路径（需已初始化 .springgraph/）。省略则使用当前项目。',
       },
-      codegraph_callees: {
+      springgraph_callees: {
         symbol: '要查找被调用方的函数、方法或类的名称',
         file: '当存在多个同名符号时，限定到该文件中的定义（路径或后缀）',
         limit: '最大返回被调用方数（默认：20）',
-        projectPath: '其他项目的路径（需已初始化 .codegraph/）。省略则使用当前项目。',
+        projectPath: '其他项目的路径（需已初始化 .springgraph/）。省略则使用当前项目。',
       },
-      codegraph_impact: {
+      springgraph_impact: {
         symbol: '要分析影响范围的符号名称',
         file: '当存在多个同名符号时，限定到该文件中的定义（路径或后缀）',
         depth: '遍历依赖的层数（默认：2）',
-        projectPath: '其他项目的路径（需已初始化 .codegraph/）。省略则使用当前项目。',
+        projectPath: '其他项目的路径（需已初始化 .springgraph/）。省略则使用当前项目。',
       },
-      codegraph_files: {
+      springgraph_files: {
         path: '筛选该目录下的文件（例如「src/components」）。不指定则返回所有文件。',
         pattern: '匹配该 glob 模式的文件（例如「*.tsx」、「**/*.test.ts」）',
         format: '输出格式：「tree」（层级结构，默认）、「flat」（简单列表）、「grouped」（按语言分组）',
         includeMetadata: '是否包含文件元数据，如语言和符号计数（默认：true）',
         maxDepth: '最大目录深度（默认：无限制）',
-        projectPath: '其他项目的路径（需已初始化 .codegraph/）。省略则使用当前项目。',
+        projectPath: '其他项目的路径（需已初始化 .springgraph/）。省略则使用当前项目。',
       },
-      codegraph_status: {
-        projectPath: '其他项目的路径（需已初始化 .codegraph/）。省略则使用当前项目。',
+      springgraph_status: {
+        projectPath: '其他项目的路径（需已初始化 .springgraph/）。省略则使用当前项目。',
       },
     },
     enumLabels: {
@@ -2333,7 +2333,7 @@
       renderPlaygroundToolList();
       if (state.pgTools.length > 0) {
         // Default to the first tool so the user sees a form immediately.
-        const preferred = state.pgTools.find((t) => t.name === 'codegraph_search') || state.pgTools[0];
+        const preferred = state.pgTools.find((t) => t.name === 'springgraph_search') || state.pgTools[0];
         selectPlaygroundTool(preferred.name, { keepResponse: false });
       } else {
         clearPlaygroundForm();

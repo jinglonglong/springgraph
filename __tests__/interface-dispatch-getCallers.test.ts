@@ -2,9 +2,9 @@ import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 import { initGrammars, loadAllGrammars } from '../src/extraction/grammars';
-import { removeDirWithRetries, safeCloseCodeGraph } from './setup';
+import { removeDirWithRetries, safeCloseSpringgraph } from './setup';
 
 beforeAll(async () => {
   await initGrammars();
@@ -18,9 +18,9 @@ beforeAll(async () => {
  */
 describe('getCallers / getCallees follow JVM dispatch', () => {
   let tmpDir: string | undefined;
-  let cg: CodeGraph | undefined;
+  let cg: Springgraph | undefined;
   afterEach(async () => {
-    await safeCloseCodeGraph(cg);
+    await safeCloseSpringgraph(cg);
     cg = undefined;
     await removeDirWithRetries(tmpDir);
     tmpDir = undefined;
@@ -30,7 +30,7 @@ describe('getCallers / getCallees follow JVM dispatch', () => {
     fs.writeFileSync(path.join(dir, name), body);
   }
 
-  function findMethod(name: string, file: string): ReturnType<CodeGraph['getNodesByKind']>[number] | undefined {
+  function findMethod(name: string, file: string): ReturnType<Springgraph['getNodesByKind']>[number] | undefined {
     return cg!
       .getNodesByKind('method')
       .find((n) => n.name === name && n.filePath.endsWith(file));
@@ -72,7 +72,7 @@ describe('getCallers / getCallees follow JVM dispatch', () => {
         '}\n'
     );
 
-    cg = CodeGraph.initSync(tmpDir);
+    cg = Springgraph.initSync(tmpDir);
     await cg.indexAll();
 
     const implMethod = findMethod('findById', 'UserServiceImpl.java');
@@ -114,7 +114,7 @@ describe('getCallers / getCallees follow JVM dispatch', () => {
         '}\n'
     );
 
-    cg = CodeGraph.initSync(tmpDir);
+    cg = Springgraph.initSync(tmpDir);
     await cg.indexAll();
 
     const ifaceMethod = findMethod('load', 'Repo.java');
@@ -161,7 +161,7 @@ describe('getCallers / getCallees follow JVM dispatch', () => {
         '}\n'
     );
 
-    cg = CodeGraph.initSync(tmpDir);
+    cg = Springgraph.initSync(tmpDir);
     await cg.indexAll();
 
     const baseMethod = findMethod('setMethod', 'BaseRequest.java');

@@ -542,7 +542,7 @@ function goImplementsEdges(queries: QueryBuilder): Edge[] {
  * when the receiver type is in the SAME file — the owner lookup in
  * `tree-sitter.ts` is scoped to the file being parsed — so a cross-file method
  * is left orphaned from its type (it's still `contains`ed by its file, just not
- * its struct). That breaks `codegraph_node` member outlines, any
+ * its struct). That breaks `springgraph_node` member outlines, any
  * callers/callees/impact traversal that goes through the type's `contains`
  * edges, and the {@link goImplementsEdges} method-set computation (which derives
  * a struct's method set from those same edges, so it under-counts interfaces a

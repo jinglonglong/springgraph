@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Analyze the tool-surface ablation (/tmp/arms/<repo>/<arm>-r<n>.jsonl).
-// Compares arms A–E on trace adoption, Read/Grep fallback, codegraph payload,
+// Compares arms A–E on trace adoption, Read/Grep fallback, springgraph payload,
 // round-trips, and duration — averaged across runs per arm.
 //
 // The decisive signal is READS: if removing a tool raises Reads on a question
@@ -18,7 +18,7 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'fs';
 import { join } from 'path';
 
 const ROOT = process.argv[2] || '/tmp/arms';
-const cgShort = (n) => n.replace('mcp__codegraph__codegraph_', '').replace('mcp__codegraph__', '');
+const cgShort = (n) => n.replace('mcp__springgraph__springgraph_', '').replace('mcp__springgraph__', '');
 
 function parse(file) {
   if (!existsSync(file)) return null;
@@ -26,7 +26,7 @@ function parse(file) {
   const calls = []; let result = null, initCg = 0;
   for (const l of lines) {
     let ev; try { ev = JSON.parse(l); } catch { continue; }
-    if (ev.type === 'system' && ev.subtype === 'init') initCg = (ev.tools || []).filter(t => /codegraph/.test(t)).length;
+    if (ev.type === 'system' && ev.subtype === 'init') initCg = (ev.tools || []).filter(t => /springgraph/.test(t)).length;
     if (ev.type === 'assistant') for (const b of (ev.message?.content || [])) if (b.type === 'tool_use')
       calls.push({ id: b.id, name: b.name, out: 0 });
     if (ev.type === 'user') for (const b of (ev.message?.content || [])) if (b.type === 'tool_result') {
@@ -36,7 +36,7 @@ function parse(file) {
     }
     if (ev.type === 'result') result = ev;
   }
-  const cg = calls.filter(c => c.name.includes('codegraph'));
+  const cg = calls.filter(c => c.name.includes('springgraph'));
   return {
     initCg,
     reads: calls.filter(c => c.name === 'Read').length,

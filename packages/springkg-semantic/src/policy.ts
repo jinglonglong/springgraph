@@ -31,7 +31,7 @@ export const HANDOFF_DECORATORS = {
 export type HandoffTeam = (typeof HANDOFF_DECORATORS)[keyof typeof HANDOFF_DECORATORS] | 'team-c-data';
 
 export type ReusePolicyDb = {
-  hasSymbol(kind: SpringKgNodeKind, codegraphNodeId: string): boolean;
+  hasSymbol(kind: SpringKgNodeKind, springgraphNodeId: string): boolean;
 };
 
 function normalizeDecorators(decorators: readonly string[]): string[] {
@@ -75,9 +75,9 @@ export function handoffTeam(decorators: string[]): HandoffTeam | null {
 
 export class ReusePolicy {
   // Mirrors the future Team A DB contract safely for Team B's local tests:
-  // the real implementation will query spring_symbols by (kind, codegraph_node_id)
+  // the real implementation will query spring_symbols by (kind, springgraph_node_id)
   // before insert, but for now we depend on a tiny DB-like surface we can fake in tests.
-  dedup(kind: SpringKgNodeKind, codegraphNodeId: string, db: ReusePolicyDb): boolean {
-    return !db.hasSymbol(kind, codegraphNodeId);
+  dedup(kind: SpringKgNodeKind, springgraphNodeId: string, db: ReusePolicyDb): boolean {
+    return !db.hasSymbol(kind, springgraphNodeId);
   }
 }

@@ -10,7 +10,7 @@ import {
 import type { DaemonRecord, StopResult } from '../src/mcp/daemon-registry';
 
 const rec = (root: string, pid: number, startedAt: number): DaemonRecord => ({
-  root, pid, version: '1.0.0', socketPath: `${root}/.codegraph/daemon.sock`, startedAt,
+  root, pid, version: '1.0.0', socketPath: `${root}/.springgraph/daemon.sock`, startedAt,
 });
 
 describe('formatUptime', () => {

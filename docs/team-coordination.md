@@ -4,7 +4,7 @@
 
 ---
 
-## Team A — Foundation / CodeGraph Integration
+## Team A — Foundation / Springgraph Integration
 
 **Status**: ✅ Phase 1 + Phase 2 complete (all 15 tasks)
 
@@ -28,7 +28,7 @@ sk.registerResolver({
   name: 'my-resolver',
   emitsKinds: ['controller', 'service'],
   enhance: async (input) => {
-    // input.codegraphNodes, input.codegraphEdges, input.changedFiles, input.cg
+    // input.springgraphNodes, input.springgraphEdges, input.changedFiles, input.cg
     return { symbolsAdded: 5, edgesAdded: 3, byKind: { controller: 2, service: 3 } };
   },
 });
@@ -91,7 +91,7 @@ None — Team A's schema already covered the required columns (`mapper_namespace
 
 1. Should `spring_find_mapper` filter on `kind='mapper'` or `kind='class'` with `@Mapper` decorator?
 2. How should annotation-only Mapper methods (without XML binding) appear in `spring_find_mapper` output?
-3. Is the `sql_statement.codegraphNodeId` field used by Team E's MCP tools, or can it be a placeholder?
+3. Is the `sql_statement.springgraphNodeId` field used by Team E's MCP tools, or can it be a placeholder?
 
 ### Merge order
 

@@ -15,7 +15,7 @@ export class MapperBindingResolver {
       symbols.push({
         id: `mapper:${interfaceNode.id}`,
         kind: 'mapper',
-        codegraphNodeId: interfaceNode.id,
+        springgraphNodeId: interfaceNode.id,
         name: interfaceNode.name ?? interfaceNode.qualifiedName?.split('.').pop() ?? interfaceNode.id,
         qualifiedName: interfaceNode.qualifiedName,
         filePath: interfaceNode.filePath,
@@ -51,7 +51,7 @@ export class MapperBindingResolver {
         symbols.push({
           id: mapperMethodId,
           kind: 'mapper_method',
-          codegraphNodeId: method.id,
+          springgraphNodeId: method.id,
           name: methodName,
           qualifiedName: `${ns}::${methodName}`,
           filePath: interfaceNode.filePath,

@@ -2,9 +2,9 @@ import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 import { initGrammars, loadAllGrammars } from '../src/extraction/grammars';
-import { removeDirWithRetries, safeCloseCodeGraph } from './setup';
+import { removeDirWithRetries, safeCloseSpringgraph } from './setup';
 
 beforeAll(async () => {
   await initGrammars();
@@ -13,9 +13,9 @@ beforeAll(async () => {
 
 describe('Spring config impact synthesizer', () => {
   let tmpDir: string | undefined;
-  let cg: CodeGraph | undefined;
+  let cg: Springgraph | undefined;
   afterEach(async () => {
-    await safeCloseCodeGraph(cg);
+    await safeCloseSpringgraph(cg);
     cg = undefined;
     await removeDirWithRetries(tmpDir);
     tmpDir = undefined;
@@ -42,7 +42,7 @@ describe('Spring config impact synthesizer', () => {
         '}\n'
     );
 
-    cg = CodeGraph.initSync(tmpDir);
+    cg = Springgraph.initSync(tmpDir);
     await cg.indexAll();
 
     const field = cg.getNodesByKind('field').find((n) => n.name === 'timeout'
@@ -83,7 +83,7 @@ describe('Spring config impact synthesizer', () => {
         '}\n'
     );
 
-    cg = CodeGraph.initSync(tmpDir);
+    cg = Springgraph.initSync(tmpDir);
     await cg.indexAll();
 
     const field = cg.getNodesByKind('field').find((n) => n.name === 'timeout'
@@ -122,7 +122,7 @@ describe('Spring config impact synthesizer', () => {
         '}\n'
     );
 
-    cg = CodeGraph.initSync(tmpDir);
+    cg = Springgraph.initSync(tmpDir);
     await cg.indexAll();
 
     const fields = cg.getNodesByKind('field').filter(
@@ -160,7 +160,7 @@ describe('Spring config impact synthesizer', () => {
         '}\n'
     );
 
-    cg = CodeGraph.initSync(tmpDir);
+    cg = Springgraph.initSync(tmpDir);
     await cg.indexAll();
 
     const field = cg.getNodesByKind('field').find((n) => n.name === 'timeout'

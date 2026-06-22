@@ -3,7 +3,7 @@
 # arms-matrix.sh, so F vs B isolates the trace-enrichment effect (same surface,
 # old thin trace in B vs body-inlining trace here).
 set -uo pipefail
-H="$(cd "$(dirname "$0")" && pwd)"; RUNS="${RUNS:-2}"; C="${CORPUS:-/tmp/codegraph-corpus}"
+H="$(cd "$(dirname "$0")" && pwd)"; RUNS="${RUNS:-2}"; C="${CORPUS:-/tmp/springgraph-corpus}"
 ROWS=(
 "$C/flutter-samples/add_to_app/books/flutter_module_books|How does the books UI build and what child widgets does it show?"
 "$C/aspnet-realworld|How is creating an article handled? Trace the controller to the service."

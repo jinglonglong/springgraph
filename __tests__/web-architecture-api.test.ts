@@ -2,15 +2,15 @@
  * Tests for the architecture-specific web API endpoints and the additive
  * /api/overview response fields introduced in Phase 6.
  */
-process.env.CODEGRAPH_WASM_RELAUNCHED = '1';
-process.env.CODEGRAPH_NO_DAEMON = '1';
+process.env.SPRINGGRAPH_WASM_RELAUNCHED = '1';
+process.env.SPRINGGRAPH_NO_DAEMON = '1';
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as http from 'http';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 import { startWebServer } from '../src/web/server';
 import { facetRegistry } from '../src/architecture/facet-engine';
 import { profileRegistry, genericProfile } from '../src/architecture/profile-registry';
@@ -62,7 +62,7 @@ function classifyByName(name: string): string | null {
 describe('architecture web api', () => {
   let tempDir: string;
   let publicDir: string;
-  let cg: CodeGraph;
+  let cg: Springgraph;
   let port: number;
   let close: () => Promise<void>;
   const originalProfiles = profileRegistry.getProfiles();
@@ -139,9 +139,9 @@ describe('architecture web api', () => {
     facetRegistry.register(testFacet);
     profileRegistry.register(testProfile);
 
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-archweb-'));
-    publicDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-archweb-public-'));
-    fs.writeFileSync(path.join(publicDir, 'index.html'), '<!doctype html><title>codegraph</title>');
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-archweb-'));
+    publicDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-archweb-public-'));
+    fs.writeFileSync(path.join(publicDir, 'index.html'), '<!doctype html><title>springgraph</title>');
 
     fs.mkdirSync(path.join(tempDir, 'ruoyi-system', 'src'), { recursive: true });
     fs.mkdirSync(path.join(tempDir, 'ruoyi-admin', 'src'), { recursive: true });
@@ -180,7 +180,7 @@ describe('architecture web api', () => {
       ].join('\n')
     );
 
-    cg = CodeGraph.initSync(tempDir);
+    cg = Springgraph.initSync(tempDir);
     await cg.indexAll();
 
     const handle = await startWebServer(cg, { port: 0, publicDir, silent: true });

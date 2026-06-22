@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { FeignRequestResponseType } from '../src/feign-dto';
-import type { CodegraphEdgeLike, CodegraphNodeLike, SpringKgEdge, SpringKgNode } from '../src/shared-types';
-import { makeCodegraphStub } from '../src/shared-types';
+import type { SpringgraphEdgeLike, SpringgraphNodeLike, SpringKgEdge, SpringKgNode } from '../src/shared-types';
+import { makeSpringgraphStub } from '../src/shared-types';
 
-function makeInterfaceNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
+function makeInterfaceNode(overrides: Partial<SpringgraphNodeLike> = {}): SpringgraphNodeLike {
   const id = overrides.id ?? 'feign-client-1';
   const name = overrides.name ?? 'UserClient';
 
@@ -29,7 +29,7 @@ function makeInterfaceNode(overrides: Partial<CodegraphNodeLike> = {}): Codegrap
   };
 }
 
-function makeMethodNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
+function makeMethodNode(overrides: Partial<SpringgraphNodeLike> = {}): SpringgraphNodeLike {
   const id = overrides.id ?? 'method-create';
   const name = overrides.name ?? 'create';
 
@@ -54,7 +54,7 @@ function makeMethodNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNo
   };
 }
 
-function makeParameterNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
+function makeParameterNode(overrides: Partial<SpringgraphNodeLike> = {}): SpringgraphNodeLike {
   const id = overrides.id ?? 'param-request';
   const name = overrides.name ?? 'req';
 
@@ -79,9 +79,9 @@ function makeParameterNode(overrides: Partial<CodegraphNodeLike> = {}): Codegrap
   };
 }
 
-async function enhance(nodes: CodegraphNodeLike[], edges: CodegraphEdgeLike[] = []) {
+async function enhance(nodes: SpringgraphNodeLike[], edges: SpringgraphEdgeLike[] = []) {
   const resolver = new FeignRequestResponseType();
-  return resolver.enhance({ codegraphNodes: nodes, codegraphEdges: edges, changedFiles: [], cg: makeCodegraphStub() });
+  return resolver.enhance({ springgraphNodes: nodes, springgraphEdges: edges, changedFiles: [], cg: makeSpringgraphStub() });
 }
 
 function findDtoNodes(nodes: readonly SpringKgNode[]): SpringKgNode[] {
@@ -116,7 +116,7 @@ describe('FeignRequestResponseType', () => {
     expect(result.byKind.dto).toBe(2);
     expect(requestDto).toMatchObject({
       kind: 'dto',
-      codegraphNodeId: 'dto-create-user-request',
+      springgraphNodeId: 'dto-create-user-request',
       name: 'CreateUserRequest',
       metadata: {
         fromFeignMethodId: methodNode.id,
@@ -127,7 +127,7 @@ describe('FeignRequestResponseType', () => {
     });
     expect(responseDto).toMatchObject({
       kind: 'dto',
-      codegraphNodeId: 'dto-user',
+      springgraphNodeId: 'dto-user',
       name: 'UserDto',
       metadata: {
         fromFeignMethodId: methodNode.id,

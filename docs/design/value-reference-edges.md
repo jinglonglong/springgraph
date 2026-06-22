@@ -1,6 +1,6 @@
 # Design + status: same-file value-reference edges
 
-**Status:** SHIPPED (default-on for TS/JS/tsx + Go + Python + Rust + Ruby + C + Java + C# + PHP + Scala + Kotlin + Swift + Dart + Pascal; `CODEGRAPH_VALUE_REFS=0` disables). The
+**Status:** SHIPPED (default-on for TS/JS/tsx + Go + Python + Rust + Ruby + C + Java + C# + PHP + Scala + Kotlin + Swift + Dart + Pascal; `SPRINGGRAPH_VALUE_REFS=0` disables). The
 emitter lives in `TreeSitterExtractor.flushValueRefs` (`src/extraction/tree-sitter.ts`).
 **Motivation:** close the impact-analysis hole for *value consumers*. Static
 extraction edges calls, imports, and inheritance, but never edges a constant to the
@@ -14,8 +14,8 @@ readers" class of change (the ReScript-PR false positive that motivated the work
 
 We emit a `references` edge (`metadata: { valueRef: true }`) from a reader symbol to
 the **file/package-scope `const`/`var` it reads**, same-file only, for TS/JS/tsx + Go + Python + Rust + Ruby + C + Java + C# + PHP + Scala + Kotlin + Swift + Dart + Pascal. Those edges
-flow straight into `getImpactRadius` / `codegraph impact` and the impact trail in
-`codegraph_explore` / `codegraph_node` — no agent-behaviour change required.
+flow straight into `getImpactRadius` / `springgraph impact` and the impact trail in
+`springgraph_explore` / `springgraph_node` — no agent-behaviour change required.
 
 The win is **impact-radius correctness**, not agent read-reduction (see "Agent A/B").
 
@@ -48,8 +48,8 @@ The win is **impact-radius correctness**, not agent read-reduction (see "Agent A
 
 ## Validation matrix — TS / JS / Go / Python / Rust / Ruby / C / Java / C# / PHP / Scala / Kotlin / Swift / Dart / Pascal
 
-Method per repo: index the same tree twice (value-refs on vs `CODEGRAPH_VALUE_REFS=0`),
-diff node/edge counts, spot-check precision, and measure `codegraph impact` on a few
+Method per repo: index the same tree twice (value-refs on vs `SPRINGGRAPH_VALUE_REFS=0`),
+diff node/edge counts, spot-check precision, and measure `springgraph impact` on a few
 file-scope consts. Node count must be **identical** on/off (edges-only feature).
 
 **TypeScript**
@@ -436,11 +436,11 @@ dodge this entirely: they're `import`-kind nodes, not `const`/`var`, so never ta
 ## Agent A/B — what it does and doesn't buy (excalidraw, sonnet/high, 12 runs)
 
 - **Impact API (the win):** `impact` ON vs OFF — `tablerIconProps` 1→170,
-  `COLOR_PALETTE` 15→26, `CaptureUpdateAction` 61→86. This is what `codegraph impact`
-  and CodeGraph Pro's verdict engine consume via `getImpactRadius`.
+  `COLOR_PALETTE` 15→26, `CaptureUpdateAction` 61→86. This is what `springgraph impact`
+  and Springgraph Pro's verdict engine consume via `getImpactRadius`.
 - **Agent read-displacement: none — and that's expected.** On an indexed repo the agent
-  answers impact questions in one codegraph call (0 Read / 0 Grep in *both* arms), and it
-  reaches for `codegraph_search` / `callers`, **not** `impact`/`explore`, so it often
+  answers impact questions in one springgraph call (0 Read / 0 Grep in *both* arms), and it
+  reaches for `springgraph_search` / `callers`, **not** `impact`/`explore`, so it often
   doesn't query the value-ref edges at all. ON was never worse than OFF. **Do not claim
   value-refs reduces agent reads** — the win is blast-radius correctness, not fewer turns.
   (This is the "adapt the tool to the agent" wall: edges only help if the agent calls the

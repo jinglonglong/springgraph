@@ -15,12 +15,12 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 import { ToolHandler } from '../src/mcp/tools';
 import { initGrammars, loadAllGrammars } from '../src/extraction/grammars';
 
 let tmpDir: string;
-let cg: CodeGraph;
+let cg: Springgraph;
 let handler: ToolHandler;
 
 const text = async (tool: string, args: Record<string, unknown>): Promise<string> => {
@@ -68,7 +68,7 @@ beforeAll(async () => {
     );
   }
 
-  cg = CodeGraph.initSync(tmpDir);
+  cg = Springgraph.initSync(tmpDir);
   await cg.indexAll();
   handler = new ToolHandler(cg);
 }, 120_000);
@@ -92,7 +92,7 @@ describe('same-named symbols across apps (#764)', () => {
   });
 
   it('callers: one section per distinct definition, each with only its own callers', async () => {
-    const out = await text('codegraph_callers', { symbol: 'findAll' });
+    const out = await text('springgraph_callers', { symbol: 'findAll' });
     expect(out).toContain('2 distinct definitions');
     // Section per definition…
     expect(out).toContain('apps/admin/src/users/user.service.ts');
@@ -105,7 +105,7 @@ describe('same-named symbols across apps (#764)', () => {
   });
 
   it('callers: `file` narrows to one definition (flat list, no stale aggregation note)', async () => {
-    const out = await text('codegraph_callers', {
+    const out = await text('springgraph_callers', {
       symbol: 'findAll',
       file: 'apps/billing/src/users/user.service.ts',
     });
@@ -116,13 +116,13 @@ describe('same-named symbols across apps (#764)', () => {
   });
 
   it('callers: a non-matching `file` falls back to all definitions with a note', async () => {
-    const out = await text('codegraph_callers', { symbol: 'findAll', file: 'apps/nonexistent/x.ts' });
+    const out = await text('springgraph_callers', { symbol: 'findAll', file: 'apps/nonexistent/x.ts' });
     expect(out).toContain('no definition of "findAll" matches file');
     expect(out).toContain('2 distinct definitions');
   });
 
   it('impact: separate blast radius per definition, never a merged one', async () => {
-    const out = await text('codegraph_impact', { symbol: 'UserService' });
+    const out = await text('springgraph_impact', { symbol: 'UserService' });
     expect(out).toContain('2 distinct definitions');
     // Each section's count covers ONE app (service + ctor + findAll +
     // controller side), not the union of both.
@@ -132,7 +132,7 @@ describe('same-named symbols across apps (#764)', () => {
   });
 
   it('callees: grouped the same way', async () => {
-    const out = await text('codegraph_callees', { symbol: 'list' });
+    const out = await text('springgraph_callees', { symbol: 'list' });
     expect(out).toContain('2 distinct definitions');
   });
 });

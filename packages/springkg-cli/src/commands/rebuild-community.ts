@@ -4,8 +4,8 @@
  * rebuild-community: triggers SpringKg.summarizeNow() to regenerate feature
  *   community summaries. Idempotent — safe to run repeatedly.
  *
- * uninit: deletes .codegraph/springkg.db ONLY. Does NOT touch
- *   .codegraph/codegraph.db (CodeGraph's index). The project can be
+ * uninit: deletes .springgraph/springkg.db ONLY. Does NOT touch
+ *   .springgraph/springgraph.db (Springgraph's index). The project can be
  *   re-initialized with `springkg init` at any time.
  */
 
@@ -28,8 +28,8 @@ export async function runRebuildCommunity(projectPath: string): Promise<void> {
 }
 
 export async function runUninit(projectPath: string): Promise<void> {
-  const dbPath = path.join(projectPath, '.codegraph', 'springkg.db');
-  const codegraphDbPath = path.join(projectPath, '.codegraph', 'codegraph.db');
+  const dbPath = path.join(projectPath, '.springgraph', 'springkg.db');
+  const springgraphDbPath = path.join(projectPath, '.springgraph', 'springgraph.db');
 
   if (!fs.existsSync(dbPath)) {
     console.log(`No springkg.db found at: ${dbPath}`);
@@ -49,10 +49,10 @@ export async function runUninit(projectPath: string): Promise<void> {
     }
   }
 
-  if (fs.existsSync(codegraphDbPath)) {
-    console.log(`Preserved: ${codegraphDbPath} (CodeGraph index untouched)`);
+  if (fs.existsSync(springgraphDbPath)) {
+    console.log(`Preserved: ${springgraphDbPath} (Springgraph index untouched)`);
   } else {
-    console.log('No codegraph.db present (CodeGraph was never initialized here).');
+    console.log('No springgraph.db present (Springgraph was never initialized here).');
   }
   console.log('SpringKg uninitialized from project.');
 }

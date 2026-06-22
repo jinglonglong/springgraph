@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Sanity-check that codegraph extracted REAL symbols (not just file/import nodes)
+// Sanity-check that springgraph extracted REAL symbols (not just file/import nodes)
 // from a repo for a given language. Exits non-zero on a critical failure so it
 // can drive a write-extractor -> build -> re-check loop.
 //
 // Usage: node scripts/add-lang/verify-extraction.mjs <repo-path> <lang>
-// Reads `codegraph status <repo> --json` using whatever codegraph is on PATH,
+// Reads `springgraph status <repo> --json` using whatever springgraph is on PATH,
 // so it reflects the binary that built the index.
 //
 // Exit codes: 0 = pass or soft-warn, 1 = critical fail, 2 = could not run.
@@ -19,15 +19,15 @@ if (!repo || !lang) {
 
 let status;
 try {
-  const out = execFileSync('codegraph', ['status', repo, '--json'], { encoding: 'utf8' });
+  const out = execFileSync('springgraph', ['status', repo, '--json'], { encoding: 'utf8' });
   status = JSON.parse(out);
 } catch (e) {
-  console.error(`[verify] could not read codegraph status for ${repo}: ${e.message}`);
+  console.error(`[verify] could not read springgraph status for ${repo}: ${e.message}`);
   process.exit(2);
 }
 
 // Kinds that prove the extractor mapped AST node types (everything except
-// 'file' and 'import', which codegraph creates structurally for any language).
+// 'file' and 'import', which springgraph creates structurally for any language).
 const SYMBOL_KINDS = new Set([
   'module', 'class', 'struct', 'interface', 'trait', 'protocol', 'function',
   'method', 'property', 'field', 'variable', 'constant', 'enum', 'enum_member',

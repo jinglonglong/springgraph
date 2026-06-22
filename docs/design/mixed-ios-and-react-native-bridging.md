@@ -2,7 +2,7 @@
 
 **Audience:** a Claude agent (or human) continuing this work after #165 landed
 pure-Objective-C support.
-**Mission:** make codegraph's `trace` / `callers` / `callees` / `impact` /
+**Mission:** make springgraph's `trace` / `callers` / `callees` / `impact` /
 flow-context calls connect end-to-end across **cross-language runtime
 dispatch boundaries** that today silently break flows: **Swift ↔ Objective-C**
 in mixed iOS codebases, and **JavaScript ↔ native** in React Native / Expo
@@ -23,7 +23,7 @@ playbook for the reference Django ORM resolver.
 
 ## 1. Why this matters (the gap today)
 
-After #165, codegraph indexes Swift, Objective-C, and JavaScript/TypeScript
+After #165, springgraph indexes Swift, Objective-C, and JavaScript/TypeScript
 each correctly **in isolation**. But the value is in cross-language flows —
 exactly where iOS apps and React Native apps live:
 
@@ -271,7 +271,7 @@ verifying each repo still builds an index cleanly.
 Bar per repo:
 1. Pure-language probes still pass (Swift-in-Swift trace; ObjC-in-ObjC trace) — no regression vs #165's pure-ObjC baseline.
 2. **Cross-language probe passes:** the canonical flow above traces end-to-end with `trace`, no break at the language boundary.
-3. **Agent A/B (with vs without codegraph, ≥2 runs/arm):** Read = 0 within the explore-call budget; faster than without-codegraph; no regression on a pure-Swift or pure-ObjC control repo (e.g. Texture).
+3. **Agent A/B (with vs without springgraph, ≥2 runs/arm):** Read = 0 within the explore-call budget; faster than without-springgraph; no regression on a pure-Swift or pure-ObjC control repo (e.g. Texture).
 4. **No node-count explosion** vs pre-bridging baseline (`select count(*) from nodes` before/after).
 
 ### 5b. React Native — pick 3
@@ -288,7 +288,7 @@ Bar per repo:
 2. **JS → ObjC bridge probe passes** for ≥1 known RCT_EXPORT_METHOD on each repo.
 3. **JS → TurboModule probe passes** on a repo that uses TurboModules (react-native main has both; pick one of each).
 4. **Native → JS event probe passes** for ≥1 emitter (NativeEventEmitter pattern).
-5. **Agent A/B** as above. Critical: a question that *crosses the bridge* (e.g. "how does pressing Button X reach the network call") must drop Read to 0 in ≥1 run with codegraph.
+5. **Agent A/B** as above. Critical: a question that *crosses the bridge* (e.g. "how does pressing Button X reach the network call") must drop Read to 0 in ≥1 run with springgraph.
 6. **No regression** on a pure-JS control repo (existing react-realworld / excalidraw measurements unchanged).
 
 ### 5c. Expo — pick 2 (smaller scope, narrower API surface)
@@ -398,7 +398,7 @@ bridge edge directly).
 
 ### 8c. Architectural fix discovered during validation
 
-The resolver's `initialize()` runs at CodeGraph construction — before any
+The resolver's `initialize()` runs at Springgraph construction — before any
 files are indexed — so framework resolvers whose `detect()` consults
 the indexed file list (UIKit / SwiftUI scanning for imports,
 `swift-objc-bridge` looking for both Swift and ObjC files,
@@ -544,12 +544,12 @@ decide *while* writing the Swift↔ObjC resolver:
 Phase 1 (Swift↔ObjC) is done when:
 - All three §5a corpora pass: pure-language probes unchanged; cross-language
   canonical flow probe finds the path end-to-end; agent A/B shows Read = 0
-  in ≥1 run with codegraph, faster than without.
+  in ≥1 run with springgraph, faster than without.
 - Coverage matrix row in §6 of the playbook is filled in with numbers.
 - A CHANGELOG `[Unreleased]` entry exists, written user-side.
 
 Each subsequent Phase has the same shape — its own §5 corpus, its own
 matrix row, its own CHANGELOG entry — and **doesn't ship until the
 previous one passes**. Half-bridges are not optional to avoid here; they
-actively make codegraph worse on these codebases than not having any
+actively make springgraph worse on these codebases than not having any
 bridging at all.

@@ -18,7 +18,7 @@
  *      b. Name pattern: function `{moduleName}_{hookSuffix}()` → catches hooks without
  *         docblocks but may produce false positives on helper functions.
  *    Detected hooks emit an `UnresolvedRef` from the implementing function node to the
- *    canonical `hook_X` name, linking implementations to the hook when `codegraph_callers`
+ *    canonical `hook_X` name, linking implementations to the hook when `springgraph_callers`
  *    is invoked.
  *
  * ## Design decisions (review in future iterations)
@@ -26,7 +26,7 @@
  * - Hook graph resolution (v1): hook references are stored as UnresolvedRef pointing to the
  *   canonical `hook_X` name. If Drupal core is indexed, these will resolve to core hook
  *   definitions. Without core, they remain unresolved but are still searchable via
- *   `codegraph_search("form_alter")`. Full hook-node creation (virtual nodes for every hook)
+ *   `springgraph_search("form_alter")`. Full hook-node creation (virtual nodes for every hook)
  *   is deferred to a future iteration.
  *
  * - Services / plugins (out of scope for v1): `*.services.yml` service definitions and plugin
@@ -43,7 +43,7 @@
  * - TODO: Extract plugin annotations (`@Block`, `@FormElement`, `@Field`, etc.) from PHP
  *   docblocks and emit plugin nodes with references to the annotated class.
  * - TODO: Add Twig symbol extraction when a tree-sitter Twig grammar becomes available.
- * - TODO: Improve hook resolution: create virtual `hook_*` nodes so `codegraph_callers`
+ * - TODO: Improve hook resolution: create virtual `hook_*` nodes so `springgraph_callers`
  *   returns all implementations even when Drupal core is not indexed.
  */
 

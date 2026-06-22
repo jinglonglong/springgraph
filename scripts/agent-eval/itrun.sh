@@ -4,13 +4,13 @@
 #
 # Why interactive (not `claude -p`): headless print-mode picks the
 # general-purpose subagent, while real interactive sessions delegate to the
-# Explore subagent (or drive codegraph from the main thread). Only the
+# Explore subagent (or drive springgraph from the main thread). Only the
 # interactive TUI reproduces the behavior users actually see. (Idle-detection
 # technique borrowed from devpit's WaitForIdle.)
 #
 # Usage: itrun.sh <repo-path> <label> "<prompt>"
 # Output dir: $AGENT_EVAL_OUT (default /tmp/agent-eval)
-# Requires: tmux 3.0+, a logged-in `claude` CLI, codegraph MCP configured.
+# Requires: tmux 3.0+, a logged-in `claude` CLI, springgraph MCP configured.
 set -uo pipefail
 REPO="$1"; LABEL="$2"; PROMPT="$3"
 SESSION="cgt_${LABEL}"

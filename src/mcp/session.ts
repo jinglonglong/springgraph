@@ -3,7 +3,7 @@
  * tools/list, tools/call) over a single {@link JsonRpcTransport}. It owns
  * per-client state only (which protocol version the client asked for, whether
  * it advertised `roots`, the one-shot roots/list latch); the heavyweight
- * resources (CodeGraph, watcher, ToolHandler) live in the shared
+ * resources (Springgraph, watcher, ToolHandler) live in the shared
  * {@link MCPEngine} so daemon mode can collapse N inotify sets / DB handles
  * to one.
  *
@@ -17,8 +17,8 @@ import { JsonRpcRequest, JsonRpcNotification, JsonRpcTransport, ErrorCodes } fro
 import { MCPEngine } from './engine';
 import { tools } from './tools';
 import { SERVER_INSTRUCTIONS, SERVER_INSTRUCTIONS_UNINDEXED } from './server-instructions';
-import { CodeGraphPackageVersion } from './version';
-import { findNearestCodeGraphRoot } from '../directory';
+import { SpringgraphPackageVersion } from './version';
+import { findNearestSpringgraphRoot } from '../directory';
 import { getTelemetry, ClientInfo } from '../telemetry';
 
 /**
@@ -28,8 +28,8 @@ import { getTelemetry, ClientInfo } from '../telemetry';
 // Exported so the proxy can answer `initialize` locally with the IDENTICAL
 // payload the daemon would send — no drift between the two handshake paths.
 export const SERVER_INFO = {
-  name: 'codegraph',
-  version: CodeGraphPackageVersion,
+  name: 'springgraph',
+  version: SpringgraphPackageVersion,
 };
 
 /** MCP Protocol Version (latest the server claims). */
@@ -194,12 +194,12 @@ export class MCPSession {
     // respond-fast contract holds). An unindexed workspace gets the short
     // "inactive this session" note instead of the full playbook: the playbook
     // tells the agent to lean on tools that would all fail, and early failures
-    // teach the agent to abandon codegraph entirely. `tools/list` is gated the
+    // teach the agent to abandon springgraph entirely. `tools/list` is gated the
     // same way (empty list when unindexed). When no explicit path is known yet
     // (roots/list dance pending), cwd is the best predictor of where the
     // default project will resolve — and on a mismatch the worst case is the
     // optimistic full playbook backstopped by the empty tool list.
-    const indexed = findNearestCodeGraphRoot(explicitPath ?? process.cwd()) !== null;
+    const indexed = findNearestSpringgraphRoot(explicitPath ?? process.cwd()) !== null;
 
     // Respond to the handshake BEFORE doing any heavy init — see issue #172.
     this.transport.sendResult(request.id, {
@@ -221,13 +221,13 @@ export class MCPSession {
     await this.retryInitIfNeeded();
     // An unindexed workspace serves an EMPTY tool list: absence is the one
     // signal an agent can't misread. Listing 8 tools that all fail wastes the
-    // agent's calls and teaches it codegraph is broken (observed: one or two
-    // early isError responses and the agent stops calling codegraph for the
-    // whole session). A `codegraph init` run after the server started is
+    // agent's calls and teaches it springgraph is broken (observed: one or two
+    // early isError responses and the agent stops calling springgraph for the
+    // whole session). A `springgraph init` run after the server started is
     // picked up on the next tools/list — retryInitIfNeeded re-walks — though
     // most hosts only request the list once per connection.
     this.transport.sendResult(request.id, {
-      tools: this.engine.hasDefaultCodeGraph() ? this.engine.getToolHandler().getTools() : [],
+      tools: this.engine.hasDefaultSpringgraph() ? this.engine.getToolHandler().getTools() : [],
     });
   }
 
@@ -270,7 +270,7 @@ export class MCPSession {
    *   2. if still uninitialized and we never asked the client for its roots,
    *      do so now (one-shot); fall back to cwd if the client lacks roots;
    *   3. last-resort: re-walk from the best candidate — picks up projects
-   *      that were `codegraph init`'d *after* the server started.
+   *      that were `springgraph init`'d *after* the server started.
    */
   private async retryInitIfNeeded(): Promise<void> {
     if (this.resolvePromise) {
@@ -278,7 +278,7 @@ export class MCPSession {
       this.resolvePromise = null;
     }
 
-    if (this.engine.hasDefaultCodeGraph()) return;
+    if (this.engine.hasDefaultSpringgraph()) return;
 
     const hint = this.explicitProjectPath ?? this.engine.getProjectPath();
     if (!hint && !this.rootsAttempted) {
@@ -288,7 +288,7 @@ export class MCPSession {
         : this.engine.ensureInitialized(process.cwd());
       try { await this.resolvePromise; } catch { /* fall through */ }
       this.resolvePromise = null;
-      if (this.engine.hasDefaultCodeGraph()) return;
+      if (this.engine.hasDefaultSpringgraph()) return;
     }
 
     // Last resort: walk from the best candidate (sync open). Picks up
@@ -309,11 +309,11 @@ export class MCPSession {
       if (rootPath) {
         target = rootPath;
       } else {
-        process.stderr.write('[CodeGraph MCP] Client returned no workspace roots; falling back to process cwd.\n');
+        process.stderr.write('[Springgraph MCP] Client returned no workspace roots; falling back to process cwd.\n');
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      process.stderr.write(`[CodeGraph MCP] roots/list request failed (${msg}); falling back to process cwd.\n`);
+      process.stderr.write(`[Springgraph MCP] roots/list request failed (${msg}); falling back to process cwd.\n`);
     }
     await this.engine.ensureInitialized(target);
   }

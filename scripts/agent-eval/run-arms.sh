@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Tool-surface ablation — run ONE repo+question under ONE arm.
 #
-# Arms vary (exposed codegraph tools, trace-first steering). Tools are trimmed
-# SERVER-SIDE via CODEGRAPH_MCP_TOOLS in the MCP config's `env` block, so an
+# Arms vary (exposed springgraph tools, trace-first steering). Tools are trimmed
+# SERVER-SIDE via SPRINGGRAPH_MCP_TOOLS in the MCP config's `env` block, so an
 # ablated tool is genuinely absent from ListTools — no deferred-ToolSearch or
 # denied-call confound (which --disallowedTools would introduce). Steering is
 # injected with --append-system-prompt, so no rebuild of the shipped
@@ -17,13 +17,13 @@
 # Usage: run-arms.sh <repo-path> "<question>" <A|B|C|D|E> [run-id]
 set -uo pipefail
 REPO="${1:?repo path}"; Q="${2:?question}"; ARM="${3:?arm A-E}"; RID="${4:-1}"
-CG_BIN="${CG_BIN:-$(command -v codegraph)}"
+CG_BIN="${CG_BIN:-$(command -v springgraph)}"
 OUT="${ARMS_OUT:-/tmp/arms}/$(basename "$REPO")"
 mkdir -p "$OUT"
-[ -n "$CG_BIN" ] || { echo "no codegraph binary (set CG_BIN)"; exit 1; }
-[ -d "$REPO/.codegraph" ] || { echo "no .codegraph index at $REPO"; exit 1; }
+[ -n "$CG_BIN" ] || { echo "no springgraph binary (set CG_BIN)"; exit 1; }
+[ -d "$REPO/.springgraph" ] || { echo "no .springgraph index at $REPO"; exit 1; }
 
-STEER='Flow questions ("how does X reach/become Y", "trace the flow", request to handler, state to render): call codegraph_trace(from,to) FIRST — one call returns the whole path. Use codegraph_context/search only to locate the two endpoint symbols if you do not know them. Do NOT reconstruct the path with repeated search/callers/explore.'
+STEER='Flow questions ("how does X reach/become Y", "trace the flow", request to handler, state to render): call springgraph_trace(from,to) FIRST — one call returns the whole path. Use springgraph_context/search only to locate the two endpoint symbols if you do not know them. Do NOT reconstruct the path with repeated search/callers/explore.'
 KEEP_NO_EXPLORE="trace,search,node,context,callers,callees,impact,files,status"
 KEEP_TRACE_CENTRIC="trace,search,node,callers,callees,impact,files,status"
 
@@ -38,11 +38,11 @@ esac
 CFG="$OUT/mcp-$ARM.json"
 if [ -n "$TOOLS" ]; then
   cat > "$CFG" <<JSON
-{"mcpServers":{"codegraph":{"command":"$CG_BIN","args":["serve","--mcp","--path","$REPO"],"env":{"CODEGRAPH_MCP_TOOLS":"$TOOLS"}}}}
+{"mcpServers":{"springgraph":{"command":"$CG_BIN","args":["serve","--mcp","--path","$REPO"],"env":{"SPRINGGRAPH_MCP_TOOLS":"$TOOLS"}}}}
 JSON
 else
   cat > "$CFG" <<JSON
-{"mcpServers":{"codegraph":{"command":"$CG_BIN","args":["serve","--mcp","--path","$REPO"]}}}
+{"mcpServers":{"springgraph":{"command":"$CG_BIN","args":["serve","--mcp","--path","$REPO"]}}}
 JSON
 fi
 

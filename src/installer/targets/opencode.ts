@@ -13,7 +13,7 @@
  *     never reads `%APPDATA%`; that layout belonged to the discontinued
  *     Go fork. We previously wrote there on Windows, so opencode never
  *     saw the entry (#535) — install/uninstall now also sweep a stale
- *     codegraph entry out of the legacy `%APPDATA%/opencode` location.
+ *     springgraph entry out of the legacy `%APPDATA%/opencode` location.
  *   - Instructions to `~/.config/opencode/AGENTS.md` (global) or
  *     `./AGENTS.md` (local). opencode reads AGENTS.md for agent
  *     instructions — same convention Codex CLI uses.
@@ -22,7 +22,7 @@
  * Config shape uses opencode's wrapper:
  *   {
  *     "$schema": "https://opencode.ai/config.json",
- *     "mcp": { "codegraph": { "type": "local", "command": [...], "enabled": true } }
+ *     "mcp": { "springgraph": { "type": "local", "command": [...], "enabled": true } }
  *   }
  *
  * The shape differs from Claude/Cursor — opencode uses `mcp.<name>`
@@ -52,8 +52,8 @@ import {
   upsertInstructionsEntry,
 } from './shared';
 import {
-  CODEGRAPH_SECTION_END,
-  CODEGRAPH_SECTION_START,
+  SPRINGGRAPH_SECTION_END,
+  SPRINGGRAPH_SECTION_START,
 } from '../instructions-template';
 
 function globalConfigDir(): string {
@@ -118,7 +118,7 @@ function parseConfig(text: string): Record<string, any> {
 function getOpencodeServerEntry(): { type: string; command: string[]; enabled: boolean } {
   return {
     type: 'local',
-    command: ['codegraph', 'serve', '--mcp'],
+    command: ['springgraph', 'serve', '--mcp'],
     enabled: true,
   };
 }
@@ -137,7 +137,7 @@ class OpencodeTarget implements AgentTarget {
   detect(loc: Location): DetectionResult {
     const file = configPath(loc);
     const config = parseConfig(readConfigText(file));
-    const alreadyConfigured = !!config.mcp?.codegraph;
+    const alreadyConfigured = !!config.mcp?.springgraph;
     // Global: the XDG dir is what current opencode creates on first run; the
     // legacy %APPDATA% dir still counts as "opencode present" so a re-install
     // can sweep the stale pre-#535 entry out of it.
@@ -152,7 +152,7 @@ class OpencodeTarget implements AgentTarget {
     const files: WriteResult['files'] = [];
     files.push(writeMcpEntry(loc));
 
-    // AGENTS.md gets the short marker-fenced CodeGraph block (#704):
+    // AGENTS.md gets the short marker-fenced Springgraph block (#704):
     // subagents and non-MCP harnesses read AGENTS.md but never the MCP
     // initialize instructions. Upsert self-heals a stale pre-#529 block.
     files.push(upsertInstructionsEntry(instructionsPath(loc)));
@@ -176,7 +176,7 @@ class OpencodeTarget implements AgentTarget {
     const target = configPath(loc);
     const snippet = JSON.stringify({
       $schema: 'https://opencode.ai/config.json',
-      mcp: { codegraph: getOpencodeServerEntry() },
+      mcp: { springgraph: getOpencodeServerEntry() },
     }, null, 2);
     return `# Add to ${target}\n\n${snippet}\n`;
   }
@@ -199,7 +199,7 @@ function writeMcpEntry(loc: Location): WriteResult['files'][number] {
   }
 
   const config = parseConfig(text);
-  const before = config.mcp?.codegraph;
+  const before = config.mcp?.springgraph;
   const after = getOpencodeServerEntry();
 
   if (jsonDeepEqual(before, after)) {
@@ -216,7 +216,7 @@ function writeMcpEntry(loc: Location): WriteResult['files'][number] {
 
   // Surgical edit — preserves comments, formatting, and order of
   // every key we don't touch.
-  const edits = modify(text, ['mcp', 'codegraph'], after, {
+  const edits = modify(text, ['mcp', 'springgraph'], after, {
     formattingOptions: FORMATTING,
   });
   const updated = applyEdits(text, edits);
@@ -226,7 +226,7 @@ function writeMcpEntry(loc: Location): WriteResult['files'][number] {
 }
 
 /**
- * Surgically drop `mcp.codegraph` from one config file. Leaves sibling
+ * Surgically drop `mcp.springgraph` from one config file. Leaves sibling
  * servers, comments, and formatting untouched; drops an emptied `mcp`
  * wrapper too. Shared by uninstall and the legacy-%APPDATA% sweep.
  */
@@ -234,9 +234,9 @@ function removeMcpEntryAt(file: string): WriteResult['files'][number] {
   if (!fs.existsSync(file)) return { path: file, action: 'not-found' };
   const text = readConfigText(file);
   const config = parseConfig(text);
-  if (!config.mcp?.codegraph) return { path: file, action: 'not-found' };
+  if (!config.mcp?.springgraph) return { path: file, action: 'not-found' };
 
-  let edits = modify(text, ['mcp', 'codegraph'], undefined, {
+  let edits = modify(text, ['mcp', 'springgraph'], undefined, {
     formattingOptions: FORMATTING,
   });
   let updated = applyEdits(text, edits);
@@ -269,19 +269,19 @@ function cleanupLegacyWindowsState(): WriteResult['files'] {
     if (res.action === 'removed') out.push(res);
   }
   const agents = path.join(dir, 'AGENTS.md');
-  const action = removeMarkedSection(agents, CODEGRAPH_SECTION_START, CODEGRAPH_SECTION_END);
+  const action = removeMarkedSection(agents, SPRINGGRAPH_SECTION_START, SPRINGGRAPH_SECTION_END);
   if (action === 'removed') out.push({ path: agents, action });
   return out;
 }
 
 /**
- * Strip the marker-delimited CodeGraph block from AGENTS.md if a prior
+ * Strip the marker-delimited Springgraph block from AGENTS.md if a prior
  * install wrote one. Used by both install (self-heal on upgrade) and
  * uninstall — see issue #529.
  */
 function removeInstructionsEntry(loc: Location): WriteResult['files'][number] {
   const file = instructionsPath(loc);
-  const action = removeMarkedSection(file, CODEGRAPH_SECTION_START, CODEGRAPH_SECTION_END);
+  const action = removeMarkedSection(file, SPRINGGRAPH_SECTION_START, SPRINGGRAPH_SECTION_END);
   return { path: file, action };
 }
 

@@ -2,9 +2,9 @@ import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 import { initGrammars, loadAllGrammars } from '../src/extraction/grammars';
-import { removeDirWithRetries, safeCloseCodeGraph } from './setup';
+import { removeDirWithRetries, safeCloseSpringgraph } from './setup';
 
 beforeAll(async () => {
   await initGrammars();
@@ -13,9 +13,9 @@ beforeAll(async () => {
 
 describe('MyBatis XML impact synthesizer', () => {
   let tmpDir: string | undefined;
-  let cg: CodeGraph | undefined;
+  let cg: Springgraph | undefined;
   afterEach(async () => {
-    await safeCloseCodeGraph(cg);
+    await safeCloseSpringgraph(cg);
     cg = undefined;
     await removeDirWithRetries(tmpDir);
     tmpDir = undefined;
@@ -58,7 +58,7 @@ describe('MyBatis XML impact synthesizer', () => {
         '</mapper>\n'
     );
 
-    cg = CodeGraph.initSync(tmpDir);
+    cg = Springgraph.initSync(tmpDir);
     await cg.indexAll();
 
     const javaMethod = cg.getNodesByKind('method').find(
@@ -93,7 +93,7 @@ describe('MyBatis XML impact synthesizer', () => {
         '</mapper>\n'
     );
 
-    cg = CodeGraph.initSync(tmpDir);
+    cg = Springgraph.initSync(tmpDir);
     await cg.indexAll();
 
     const xmlMethod = cg.getNodesByKind('method').find(
@@ -138,7 +138,7 @@ describe('MyBatis XML impact synthesizer', () => {
         '</mapper>\n'
     );
 
-    cg = CodeGraph.initSync(tmpDir);
+    cg = Springgraph.initSync(tmpDir);
     await cg.indexAll();
 
     const xmlMethod = cg.getNodesByKind('method').find(

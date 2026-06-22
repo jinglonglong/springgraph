@@ -1,5 +1,5 @@
 /**
- * CODEGRAPH_WATCH_DEBOUNCE_MS env override (issue #403).
+ * SPRINGGRAPH_WATCH_DEBOUNCE_MS env override (issue #403).
  *
  * Lets users tune the watcher quiet window from MCP-launched configs without
  * editing the agent's command line — formatter-on-save chains and large

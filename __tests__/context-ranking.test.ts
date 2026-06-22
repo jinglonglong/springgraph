@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import CodeGraph from '../src/index';
+import Springgraph from '../src/index';
 import { LOW_CONFIDENCE_MARKER } from '../src/context';
 import { isDistinctiveIdentifier, scorePathRelevance, deriveProjectNameTokens } from '../src/search/query-utils';
 
@@ -69,7 +69,7 @@ describe('scorePathRelevance per-word scoring (#720)', () => {
 // name alone, so the rest of the query decides the ranking (#720).
 describe('project-name down-weighting in path relevance (#720)', () => {
   it('derives the project name from go.mod / package.json, skipping short names', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-projname-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-projname-'));
     try {
       fs.writeFileSync(path.join(dir, 'go.mod'), 'module example.com/SuperBizAgent\n\ngo 1.21\n');
       fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: '@acme/superbizagent-web' }));
@@ -107,10 +107,10 @@ describe('project-name down-weighting in path relevance (#720)', () => {
 
 describe('Context ranking — common-word precision & confidence', () => {
   let testDir: string;
-  let cg: CodeGraph;
+  let cg: Springgraph;
 
   beforeEach(async () => {
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-ctxrank-'));
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-ctxrank-'));
 
     // The corroborated target: a capture-flow screen whose NAME alone matches
     // three query terms (capture + intro + screen), and which lives under a
@@ -137,7 +137,7 @@ export function downloadDataset(name: string): string { return name; }
 `
     );
 
-    cg = CodeGraph.initSync(testDir, {
+    cg = Springgraph.initSync(testDir, {
       config: { include: ['**/*.ts', '**/*.tsx'], exclude: [] },
     });
     await cg.indexAll();
@@ -176,7 +176,7 @@ export function downloadDataset(name: string): string { return name; }
     expect(typeof md).toBe('string');
     expect(md as string).toContain(LOW_CONFIDENCE_MARKER);
     // The handoff routes to the precise tools rather than claiming completeness.
-    expect(md as string).toMatch(/codegraph_explore/);
+    expect(md as string).toMatch(/springgraph_explore/);
   });
 
   it('does not emit the handoff for a precise, distinctive-symbol query', async () => {

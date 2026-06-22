@@ -16,6 +16,6 @@
     "@springkg/runtime": "0.1.0"
   },
   "peerDependencies": {
-    "@colbymchenry/codegraph": ">=0.9.0 <1.0.0"
+    "@colbymchenry/springgraph": ">=0.9.0 <1.0.0"
   }
 }

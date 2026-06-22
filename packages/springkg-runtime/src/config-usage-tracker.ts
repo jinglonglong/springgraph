@@ -1,6 +1,6 @@
 import { computeId } from './internal/key-mask.js';
 import { logResolverWarning } from './types.js';
-import type { ConfigPropertyRow, DecoratedCodegraphNode, SpringKgLike } from './types.js';
+import type { ConfigPropertyRow, DecoratedSpringgraphNode, SpringKgLike } from './types.js';
 
 export interface SpringKgEnhanceInput {
   projectPath: string;
@@ -21,15 +21,15 @@ export class ConfigPropertyUsageTracker {
     let edgesCount = 0;
 
     // Get nodes with @Value or @ConfigurationProperties decorators
-    let decoratedNodes: DecoratedCodegraphNode[] = [];
+    let decoratedNodes: DecoratedSpringgraphNode[] = [];
     try {
-      if (kg.codegraph?.findNodes) {
-        decoratedNodes = await kg.codegraph.findNodes({
+      if (kg.springgraph?.findNodes) {
+        decoratedNodes = await kg.springgraph.findNodes({
           decoratorPattern: '@Value|@ConfigurationProperties'
         });
       }
     } catch (error) {
-      logResolverWarning('ConfigPropertyUsageTracker', 'codegraph.findNodes failed, falling back to kg.findDecoratedNodes', error);
+      logResolverWarning('ConfigPropertyUsageTracker', 'springgraph.findNodes failed, falling back to kg.findDecoratedNodes', error);
       try {
         decoratedNodes = await kg.findDecoratedNodes?.() || [];
       } catch (err) {

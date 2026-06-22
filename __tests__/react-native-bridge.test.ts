@@ -5,7 +5,7 @@ import * as path from 'path';
 import type { Node, Language } from '../src/types';
 import type { ResolutionContext, UnresolvedRef } from '../src/resolution/types';
 import { reactNativeBridgeResolver } from '../src/resolution/frameworks/react-native';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 
 /**
  * Mock ResolutionContext for the React Native bridge resolver.
@@ -316,7 +316,7 @@ describe('React Native cross-platform pairing — end to end', () => {
       "RCT_EXPORT_MODULE()\n" +
       "RCT_EXPORT_METHOD(uniquePingMethod:(RCTResponseSenderBlock)cb) {}\n@end\n");
 
-    const cg = await CodeGraph.init(dir, { silent: true });
+    const cg = await Springgraph.init(dir, { silent: true });
     await cg.indexAll();
     const db = (cg as any).db.db;
 

@@ -6,7 +6,7 @@
 set -uo pipefail
 HARNESS="$(cd "$(dirname "$0")" && pwd)"
 RUNS="${RUNS:-2}"
-C="${CORPUS:-/tmp/codegraph-corpus}"
+C="${CORPUS:-/tmp/springgraph-corpus}"
 NFQ='What are the main modules/components of this codebase and what does each one do? Give an overview of how it is organized.'
 
 # repo-path|flow-question  (2 small, 2 medium, 2 large — spans the size range)

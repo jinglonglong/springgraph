@@ -1,5 +1,5 @@
 /**
- * CodeGraph Error Classes
+ * Springgraph Error Classes
  *
  * Custom error types for better error handling and debugging.
  *
@@ -7,7 +7,7 @@
  *
  * @example
  * ```typescript
- * import { FileError, ParseError, setLogger, silentLogger } from 'codegraph';
+ * import { FileError, ParseError, setLogger, silentLogger } from 'springgraph';
  *
  * // Catch specific error types
  * try {
@@ -26,23 +26,23 @@
  */
 
 /**
- * Base error class for all CodeGraph errors.
+ * Base error class for all Springgraph errors.
  *
- * All CodeGraph-specific errors extend this class, allowing you to catch
- * all CodeGraph errors with a single catch block.
+ * All Springgraph-specific errors extend this class, allowing you to catch
+ * all Springgraph errors with a single catch block.
  *
  * @example
  * ```typescript
  * try {
  *   await cg.indexAll();
  * } catch (error) {
- *   if (error instanceof CodeGraphError) {
- *     console.log(`CodeGraph error [${error.code}]: ${error.message}`);
+ *   if (error instanceof SpringgraphError) {
+ *     console.log(`Springgraph error [${error.code}]: ${error.message}`);
  *   }
  * }
  * ```
  */
-export class CodeGraphError extends Error {
+export class SpringgraphError extends Error {
   /** Error code for categorization (e.g., 'FILE_ERROR', 'PARSE_ERROR') */
   readonly code: string;
   /** Additional context about the error */
@@ -50,7 +50,7 @@ export class CodeGraphError extends Error {
 
   constructor(message: string, code: string, context?: Record<string, unknown>) {
     super(message);
-    this.name = 'CodeGraphError';
+    this.name = 'SpringgraphError';
     this.code = code;
     this.context = context;
 
@@ -64,7 +64,7 @@ export class CodeGraphError extends Error {
 /**
  * Error reading or accessing files
  */
-export class FileError extends CodeGraphError {
+export class FileError extends SpringgraphError {
   readonly filePath: string;
 
   constructor(message: string, filePath: string, cause?: Error) {
@@ -80,7 +80,7 @@ export class FileError extends CodeGraphError {
 /**
  * Error parsing source code
  */
-export class ParseError extends CodeGraphError {
+export class ParseError extends SpringgraphError {
   readonly filePath: string;
   readonly line?: number;
   readonly column?: number;
@@ -109,7 +109,7 @@ export class ParseError extends CodeGraphError {
 /**
  * Error with database operations
  */
-export class DatabaseError extends CodeGraphError {
+export class DatabaseError extends SpringgraphError {
   readonly operation: string;
 
   constructor(message: string, operation: string, cause?: Error) {
@@ -125,7 +125,7 @@ export class DatabaseError extends CodeGraphError {
 /**
  * Error with search operations
  */
-export class SearchError extends CodeGraphError {
+export class SearchError extends SpringgraphError {
   readonly query: string;
 
   constructor(message: string, query: string, cause?: Error) {
@@ -141,7 +141,7 @@ export class SearchError extends CodeGraphError {
 /**
  * Error with vector/embedding operations
  */
-export class VectorError extends CodeGraphError {
+export class VectorError extends SpringgraphError {
   constructor(message: string, operation: string, cause?: Error) {
     super(message, 'VECTOR_ERROR', { operation, cause: cause?.message });
     this.name = 'VectorError';
@@ -154,7 +154,7 @@ export class VectorError extends CodeGraphError {
 /**
  * Error with configuration
  */
-export class ConfigError extends CodeGraphError {
+export class ConfigError extends SpringgraphError {
   constructor(message: string, details?: Record<string, unknown>) {
     super(message, 'CONFIG_ERROR', details);
     this.name = 'ConfigError';
@@ -162,7 +162,7 @@ export class ConfigError extends CodeGraphError {
 }
 
 /**
- * Simple logger for CodeGraph operations
+ * Simple logger for Springgraph operations
  *
  * By default, logs to console.warn for warnings and console.error for errors.
  * Can be configured to use custom logging.
@@ -178,15 +178,15 @@ export interface Logger {
  */
 export const defaultLogger: Logger = {
   debug(message: string, context?: Record<string, unknown>): void {
-    if (process.env.CODEGRAPH_DEBUG) {
-      console.debug(`[CodeGraph] ${message}`, context ?? '');
+    if (process.env.SPRINGGRAPH_DEBUG) {
+      console.debug(`[Springgraph] ${message}`, context ?? '');
     }
   },
   warn(message: string, context?: Record<string, unknown>): void {
-    console.warn(`[CodeGraph] ${message}`, context ?? '');
+    console.warn(`[Springgraph] ${message}`, context ?? '');
   },
   error(message: string, context?: Record<string, unknown>): void {
-    console.error(`[CodeGraph] ${message}`, context ?? '');
+    console.error(`[Springgraph] ${message}`, context ?? '');
   },
 };
 

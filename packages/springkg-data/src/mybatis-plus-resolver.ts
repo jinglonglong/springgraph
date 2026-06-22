@@ -38,7 +38,7 @@ export class MyBatisPlusResolver {
       const tableNode: SpringKgNode = {
         id: tableId,
         kind: 'table',
-        codegraphNodeId: cls.id,
+        springgraphNodeId: cls.id,
         name: tableName,
         qualifiedName: cls.qualifiedName ? `${cls.qualifiedName}->${tableName}` : tableName,
         filePath: cls.filePath,

@@ -1,7 +1,7 @@
 /**
- * codegraph telemetry ingest — telemetry.getcodegraph.com
+ * springgraph telemetry ingest — telemetry.getspringgraph.com
  *
- * This file is public on purpose: it is the exact code that receives codegraph's
+ * This file is public on purpose: it is the exact code that receives springgraph's
  * anonymous usage telemetry, so anyone can audit what is (and is not) stored.
  * The schema contract lives in docs/design/telemetry.md.
  *
@@ -20,14 +20,14 @@ const TOKEN_RE = /^[A-Za-z0-9_.:+-]+$/;
 // Human-ish labels: MCP clientInfo names like "Claude Code", "cursor-vscode/1.2".
 const LABEL_RE = /^[A-Za-z0-9_.:+/ @()-]+$/;
 
-const INFO_TEXT = `codegraph anonymous-telemetry ingest.
+const INFO_TEXT = `springgraph anonymous-telemetry ingest.
 
 What gets collected (and what never does) is documented field-by-field:
-https://github.com/colbymchenry/codegraph/blob/main/docs/design/telemetry.md
+https://github.com/colbymchenry/springgraph/blob/main/docs/design/telemetry.md
 This endpoint's full source:
-https://github.com/colbymchenry/codegraph/tree/main/telemetry-worker
+https://github.com/colbymchenry/springgraph/tree/main/telemetry-worker
 
-Disable any time: codegraph telemetry off  |  CODEGRAPH_TELEMETRY=0  |  DO_NOT_TRACK=1
+Disable any time: springgraph telemetry off  |  SPRINGGRAPH_TELEMETRY=0  |  DO_NOT_TRACK=1
 `;
 
 type JsonObject = Record<string, unknown>;
@@ -105,7 +105,7 @@ const EVENTS: Record<string, { required: readonly string[]; props: Record<string
 
 /** Envelope fields shared by every event in a batch (sanitized, all optional). */
 const ENVELOPE_PROPS: Record<string, Sanitize> = {
-  codegraph_version: token(32),
+  springgraph_version: token(32),
   os: token(16),
   arch: token(16),
   node_major: nonNegInt(99),
@@ -156,7 +156,7 @@ function sanitizeEvent(raw: unknown, machineId: string, common: JsonObject): Pos
       // Anonymous events: no person profiles, no geo enrichment.
       $process_person_profile: false,
       $geoip_disable: true,
-      $lib: 'codegraph-telemetry-worker',
+      $lib: 'springgraph-telemetry-worker',
     },
   };
   const ts = clampTimestamp(e.ts);

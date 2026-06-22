@@ -14,13 +14,13 @@ import { watchDisabledReason } from '../src/sync/watch-policy';
 import { FileWatcher } from '../src/sync/watcher';
 
 describe('watchDisabledReason', () => {
-  it('returns a reason when CODEGRAPH_NO_WATCH=1', () => {
+  it('returns a reason when SPRINGGRAPH_NO_WATCH=1', () => {
     const reason = watchDisabledReason('/home/me/project', {
-      env: { CODEGRAPH_NO_WATCH: '1' },
+      env: { SPRINGGRAPH_NO_WATCH: '1' },
       isWsl: false,
     });
     expect(reason).toBeTruthy();
-    expect(reason).toMatch(/CODEGRAPH_NO_WATCH/);
+    expect(reason).toMatch(/SPRINGGRAPH_NO_WATCH/);
   });
 
   it('auto-disables on a WSL2 /mnt drive', () => {
@@ -42,17 +42,17 @@ describe('watchDisabledReason', () => {
     expect(watchDisabledReason('/mnt/wsl/project', { env: {}, isWsl: true })).toBeNull();
   });
 
-  it('CODEGRAPH_FORCE_WATCH=1 overrides WSL auto-detect', () => {
+  it('SPRINGGRAPH_FORCE_WATCH=1 overrides WSL auto-detect', () => {
     const reason = watchDisabledReason('/mnt/d/code/project', {
-      env: { CODEGRAPH_FORCE_WATCH: '1' },
+      env: { SPRINGGRAPH_FORCE_WATCH: '1' },
       isWsl: true,
     });
     expect(reason).toBeNull();
   });
 
-  it('CODEGRAPH_NO_WATCH wins over CODEGRAPH_FORCE_WATCH', () => {
+  it('SPRINGGRAPH_NO_WATCH wins over SPRINGGRAPH_FORCE_WATCH', () => {
     const reason = watchDisabledReason('/home/me/project', {
-      env: { CODEGRAPH_NO_WATCH: '1', CODEGRAPH_FORCE_WATCH: '1' },
+      env: { SPRINGGRAPH_NO_WATCH: '1', SPRINGGRAPH_FORCE_WATCH: '1' },
       isWsl: false,
     });
     expect(reason).toBeTruthy();
@@ -63,15 +63,15 @@ describe('FileWatcher honors the watch policy', () => {
   let testDir: string;
 
   afterEach(() => {
-    delete process.env.CODEGRAPH_NO_WATCH;
+    delete process.env.SPRINGGRAPH_NO_WATCH;
     if (testDir && fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
   });
 
-  it('does not start when CODEGRAPH_NO_WATCH=1', () => {
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-nowatch-'));
-    process.env.CODEGRAPH_NO_WATCH = '1';
+  it('does not start when SPRINGGRAPH_NO_WATCH=1', () => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-nowatch-'));
+    process.env.SPRINGGRAPH_NO_WATCH = '1';
 
     const syncFn = vi.fn().mockResolvedValue({ filesChanged: 0, durationMs: 0 });
     const watcher = new FileWatcher(testDir, syncFn);

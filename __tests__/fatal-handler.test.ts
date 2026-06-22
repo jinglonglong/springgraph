@@ -71,14 +71,14 @@ describe('installFatalHandlers', () => {
   it('logs a bounded line and exits non-zero on an uncaught exception', () => {
     const { target, writes, exits } = harness();
     target.emit('uncaughtException', new RangeError('kaboom'));
-    expect(writes).toEqual(['[CodeGraph] Uncaught exception: RangeError: kaboom\n']);
+    expect(writes).toEqual(['[Springgraph] Uncaught exception: RangeError: kaboom\n']);
     expect(exits).toEqual([1]);
   });
 
   it('logs a bounded line and exits non-zero on an unhandled rejection', () => {
     const { target, writes, exits } = harness();
     target.emit('unhandledRejection', 'promise went sideways');
-    expect(writes).toEqual(['[CodeGraph] Unhandled rejection: promise went sideways\n']);
+    expect(writes).toEqual(['[Springgraph] Unhandled rejection: promise went sideways\n']);
     expect(exits).toEqual([1]);
   });
 
@@ -94,7 +94,7 @@ describe('installFatalHandlers', () => {
 
     // Must not throw or hang: the handler renders message-only and exits.
     expect(() => target.emit('uncaughtException', err)).not.toThrow();
-    expect(writes).toEqual(['[CodeGraph] Uncaught exception: Error: wedged\n']);
+    expect(writes).toEqual(['[Springgraph] Uncaught exception: Error: wedged\n']);
     expect(exits).toEqual([1]);
   });
 });

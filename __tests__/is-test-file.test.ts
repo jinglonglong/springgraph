@@ -5,7 +5,7 @@
  * Regression coverage for the cold-query fix: the heuristic previously only
  * knew Java/JS/Python conventions, so Kotlin (`*Test.kt`, `jvmTest/`), Swift
  * (`*Tests.swift`), and camelCase test source-set dirs slipped through — which
- * let OkHttp's tests flood `codegraph_explore` results on a plain-language
+ * let OkHttp's tests flood `springgraph_explore` results on a plain-language
  * query. The false-positive guards matter just as much: `latest.kt` /
  * `manifest.kt` / a `RealCall.kt` production file must NOT be flagged.
  */

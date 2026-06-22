@@ -32,14 +32,14 @@ describe('git sync hooks', () => {
   let repo: string;
 
   beforeEach(() => {
-    repo = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-githooks-'));
+    repo = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-githooks-'));
   });
 
   afterEach(() => {
     if (fs.existsSync(repo)) fs.rmSync(repo, { recursive: true, force: true });
   });
 
-  it('installs all default hooks, executable, invoking codegraph sync', () => {
+  it('installs all default hooks, executable, invoking springgraph sync', () => {
     gitInit(repo);
     const result = installGitSyncHook(repo);
 
@@ -50,8 +50,8 @@ describe('git sync hooks', () => {
       const file = path.join(repo, '.git', 'hooks', hook);
       expect(fs.existsSync(file)).toBe(true);
       const body = fs.readFileSync(file, 'utf8');
-      expect(body).toContain('codegraph sync');
-      expect(body).toContain('command -v codegraph'); // no-op when not on PATH
+      expect(body).toContain('springgraph sync');
+      expect(body).toContain('command -v springgraph'); // no-op when not on PATH
       expect(isExecutable(file)).toBe(true);
     }
     expect(isSyncHookInstalled(repo)).toBe(true);
@@ -63,7 +63,7 @@ describe('git sync hooks', () => {
     installGitSyncHook(repo);
 
     const body = fs.readFileSync(path.join(repo, '.git', 'hooks', 'post-commit'), 'utf8');
-    const occurrences = body.split('# >>> codegraph sync hook >>>').length - 1;
+    const occurrences = body.split('# >>> springgraph sync hook >>>').length - 1;
     expect(occurrences).toBe(1);
   });
 
@@ -76,7 +76,7 @@ describe('git sync hooks', () => {
 
     const body = fs.readFileSync(file, 'utf8');
     expect(body).toContain('echo "my custom hook"');
-    expect(body).toContain('codegraph sync');
+    expect(body).toContain('springgraph sync');
   });
 
   it('remove strips our block; deletes a hook that was only ours', () => {
@@ -102,7 +102,7 @@ describe('git sync hooks', () => {
     expect(fs.existsSync(file)).toBe(true);
     const body = fs.readFileSync(file, 'utf8');
     expect(body).toContain('echo "keep me"');
-    expect(body).not.toContain('codegraph sync');
+    expect(body).not.toContain('springgraph sync');
   });
 
   it('honors core.hooksPath', () => {

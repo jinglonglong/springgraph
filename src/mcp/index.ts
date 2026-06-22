@@ -1,14 +1,14 @@
 /**
- * CodeGraph MCP Server
+ * Springgraph MCP Server
  *
- * Model Context Protocol server that exposes CodeGraph functionality
+ * Model Context Protocol server that exposes Springgraph functionality
  * as tools for AI assistants like Claude.
  *
  * @module mcp
  *
  * @example
  * ```typescript
- * import { MCPServer } from 'codegraph';
+ * import { MCPServer } from 'springgraph';
  *
  * const server = new MCPServer('/path/to/project');
  * await server.start();
@@ -17,14 +17,14 @@
  * Runtime modes (decided in {@link MCPServer.start}):
  *
  * - **Direct** — one process serves one MCP client over stdio. The pre-#411
- *   behavior; used when the user opts out (`CODEGRAPH_NO_DAEMON=1`), no
- *   `.codegraph/` is reachable, or the daemon machinery fails for any reason.
+ *   behavior; used when the user opts out (`SPRINGGRAPH_NO_DAEMON=1`), no
+ *   `.springgraph/` is reachable, or the daemon machinery fails for any reason.
  * - **Proxy** — what an MCP host actually talks to when sharing is on: a thin
  *   stdio↔socket pipe to the shared daemon. The proxy carries the #277 PPID
  *   watchdog, so a SIGKILL'd host reaps its proxy promptly. See {@link ./proxy.ts}.
  * - **Daemon** — a *detached* background process (its own session/process
  *   group) that serves N proxies over a Unix-domain socket / named pipe,
- *   sharing one CodeGraph + watcher + SQLite handle. Spawned on demand; never a
+ *   sharing one Springgraph + watcher + SQLite handle. Spawned on demand; never a
  *   child of any host, so it survives individual sessions and is reaped by
  *   client-refcount + idle timeout. See {@link ./daemon.ts} and issue #411.
  *
@@ -37,7 +37,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawn, StdioOptions } from 'child_process';
-import { findNearestCodeGraphRoot, getCodeGraphDir } from '../directory';
+import { findNearestSpringgraphRoot, getSpringgraphDir } from '../directory';
 import { StdioTransport } from './transport';
 import { MCPEngine } from './engine';
 import { MCPSession } from './session';
@@ -68,7 +68,7 @@ const DEFAULT_PPID_POLL_MS = 5000;
  * `serve --mcp` invocation is a launcher that connects-or-spawns; with it, the
  * process IS the daemon and must never try to spawn another (infinite spawn).
  */
-const DAEMON_INTERNAL_ENV = 'CODEGRAPH_DAEMON_INTERNAL';
+const DAEMON_INTERNAL_ENV = 'SPRINGGRAPH_DAEMON_INTERNAL';
 
 /**
  * Retries for the detached daemon arbitrating the O_EXCL lock against a racing
@@ -89,7 +89,7 @@ const TAKEOVER_RETRY_DELAY_MS = 100;
 // daemon binds, instead of waiting up to a coarse 100ms after — shaves the
 // cold-start handshake (the window the headless agent races). Same ~6s total
 // give-up budget (240 × 25ms), just finer granularity; socket-connect probes
-// are cheap. Paired with deferring the CodeGraph load (engine.ts) off the bind
+// are cheap. Paired with deferring the Springgraph load (engine.ts) off the bind
 // path, this narrows the "No such tool available" race window.
 const DAEMON_CONNECT_MAX_RETRIES = 240;
 const DAEMON_CONNECT_RETRY_DELAY_MS = 25;
@@ -122,9 +122,9 @@ function parseHostPpid(raw: string | undefined): number | null {
   return parsed;
 }
 
-/** Whether `CODEGRAPH_NO_DAEMON` was set to a truthy value. */
+/** Whether `SPRINGGRAPH_NO_DAEMON` was set to a truthy value. */
 function daemonOptOutSet(): boolean {
-  const raw = process.env.CODEGRAPH_NO_DAEMON;
+  const raw = process.env.SPRINGGRAPH_NO_DAEMON;
   if (!raw) return false;
   return raw !== '0' && raw.toLowerCase() !== 'false';
 }
@@ -137,9 +137,9 @@ function daemonInternalSet(): boolean {
 
 /**
  * Resolve the project root the daemon machinery should key on. Returns
- * `null` when no `.codegraph/` is reachable from the candidate path — in
+ * `null` when no `.springgraph/` is reachable from the candidate path — in
  * that case the caller must run in direct mode, since the daemon lockfile
- * and socket both live under `.codegraph/`.
+ * and socket both live under `.springgraph/`.
  *
  * The result is canonicalized with `realpathSync` so every client converges on
  * the same socket/lock path regardless of how it expressed the path: a client
@@ -150,7 +150,7 @@ function daemonInternalSet(): boolean {
  */
 function resolveDaemonRoot(explicitPath: string | null): string | null {
   const candidate = explicitPath ?? process.cwd();
-  const root = findNearestCodeGraphRoot(candidate);
+  const root = findNearestSpringgraphRoot(candidate);
   if (!root) return null;
   try { return fs.realpathSync(root); } catch { return root; }
 }
@@ -159,7 +159,7 @@ function resolveDaemonRoot(explicitPath: string | null): string | null {
  * Spawn the shared daemon as a fully detached background process: its own
  * session/process group (so a SIGHUP/SIGINT to the launcher's terminal can't
  * reach it) with stdio decoupled from the launcher (logs to
- * `.codegraph/daemon.log`). Re-invokes the *same* CLI faithfully across dev and
+ * `.springgraph/daemon.log`). Re-invokes the *same* CLI faithfully across dev and
  * bundled launches by reusing `process.argv[0]` (the right node), the current
  * `process.execArgv` (carries `--liftoff-only`, so the daemon never re-execs)
  * and `process.argv[1]` (this script). The spawned process self-arbitrates the
@@ -177,7 +177,7 @@ function spawnDetachedDaemon(root: string): void {
   let logFd: number | null = null;
   let stdio: StdioOptions = 'ignore';
   try {
-    logFd = fs.openSync(path.join(getCodeGraphDir(root), 'daemon.log'), 'a');
+    logFd = fs.openSync(path.join(getSpringgraphDir(root), 'daemon.log'), 'a');
     stdio = ['ignore', logFd, logFd];
   } catch {
     stdio = 'ignore'; // no log file — discard daemon output rather than fail
@@ -203,9 +203,9 @@ function spawnDetachedDaemon(root: string): void {
 }
 
 /**
- * MCP Server for CodeGraph
+ * MCP Server for Springgraph
  *
- * Implements the Model Context Protocol to expose CodeGraph
+ * Implements the Model Context Protocol to expose Springgraph
  * functionality as tools that can be called by AI assistants.
  *
  * Backwards-compatible constructor and `start()` signature with the
@@ -240,10 +240,10 @@ export class MCPServer {
    * Start the MCP server.
    *
    * Decision order:
-   *   1. `CODEGRAPH_NO_DAEMON=1` → direct mode (unchanged pre-#411 behavior).
-   *   2. `CODEGRAPH_DAEMON_INTERNAL=1` → we ARE the detached daemon; listen.
-   *   3. No `.codegraph/` reachable → direct mode (the daemon's lockfile and
-   *      socket both live under `.codegraph/`).
+   *   1. `SPRINGGRAPH_NO_DAEMON=1` → direct mode (unchanged pre-#411 behavior).
+   *   2. `SPRINGGRAPH_DAEMON_INTERNAL=1` → we ARE the detached daemon; listen.
+   *   3. No `.springgraph/` reachable → direct mode (the daemon's lockfile and
+   *      socket both live under `.springgraph/`).
    *   4. Otherwise connect to (or spawn) the shared daemon and proxy to it.
    *
    * On any unexpected failure in step 4 we transparently fall back to direct
@@ -264,14 +264,14 @@ export class MCPServer {
     // Direct mode if the user opted out. Setting the env var is sufficient to
     // get the pre-#411 single-process behavior.
     if (daemonOptOutSet()) {
-      return this.startDirect('CODEGRAPH_NO_DAEMON set');
+      return this.startDirect('SPRINGGRAPH_NO_DAEMON set');
     }
 
     const root = resolveDaemonRoot(this.projectPath);
     if (!root) {
       // No initialized project found — daemon mode has nowhere to put its
       // socket. The fresh-checkout / outside-project case; behave as before.
-      return this.startDirect('no .codegraph/ root found');
+      return this.startDirect('no .springgraph/ root found');
     }
 
     try {
@@ -287,7 +287,7 @@ export class MCPServer {
       // Belt-and-braces: a throw during proxy SETUP (before the client was served)
       // is still safe to recover from with a direct-mode session.
       const msg = err instanceof Error ? err.message : String(err);
-      process.stderr.write(`[CodeGraph MCP] Proxy path failed (${msg}); falling back to direct mode.\n`);
+      process.stderr.write(`[Springgraph MCP] Proxy path failed (${msg}); falling back to direct mode.\n`);
       return this.startDirect('proxy path threw');
     }
   }
@@ -326,8 +326,8 @@ export class MCPServer {
 
   /** Single-process stdio MCP session — the pre-issue-#411 code path. */
   private async startDirect(reason: string): Promise<void> {
-    if (reason && process.env.CODEGRAPH_MCP_DEBUG) {
-      process.stderr.write(`[CodeGraph MCP] Direct mode: ${reason}.\n`);
+    if (reason && process.env.SPRINGGRAPH_MCP_DEBUG) {
+      process.stderr.write(`[Springgraph MCP] Direct mode: ${reason}.\n`);
     }
     this.engine = new MCPEngine();
     const transport = new StdioTransport();
@@ -358,7 +358,7 @@ export class MCPServer {
 
   /**
    * Run as the detached shared daemon (process spawned with
-   * `CODEGRAPH_DAEMON_INTERNAL=1`). Arbitrate the O_EXCL lock, then either
+   * `SPRINGGRAPH_DAEMON_INTERNAL=1`). Arbitrate the O_EXCL lock, then either
    * become the daemon (bind the socket, serve forever) or — if a live daemon
    * already holds the lock — exit so we don't leak a redundant process.
    *
@@ -387,7 +387,7 @@ export class MCPServer {
       const existing = lock.existing;
       if (existing && existing.pid > 0 && isProcessAlive(existing.pid)) {
         process.stderr.write(
-          `[CodeGraph daemon] Another daemon (pid ${existing.pid}) already holds the lock; exiting.\n`
+          `[Springgraph daemon] Another daemon (pid ${existing.pid}) already holds the lock; exiting.\n`
         );
         process.exit(0);
       }
@@ -398,7 +398,7 @@ export class MCPServer {
       await sleep(TAKEOVER_RETRY_DELAY_MS);
     }
 
-    process.stderr.write('[CodeGraph daemon] Could not acquire the daemon lock; exiting.\n');
+    process.stderr.write('[Springgraph daemon] Could not acquire the daemon lock; exiting.\n');
     process.exit(0);
   }
 
@@ -443,7 +443,7 @@ export class MCPServer {
    */
   private installPpidWatchdog(): void {
     if (this.mode !== 'direct') return;
-    const pollMs = parsePpidPollMs(process.env.CODEGRAPH_PPID_POLL_MS);
+    const pollMs = parsePpidPollMs(process.env.SPRINGGRAPH_PPID_POLL_MS);
     if (pollMs <= 0) return;
     this.ppidWatchdog = setInterval(() => {
       const reason = supervisionLostReason({
@@ -454,7 +454,7 @@ export class MCPServer {
       });
       if (reason) {
         process.stderr.write(
-          `[CodeGraph MCP] Parent process exited (${reason}); shutting down.\n`
+          `[Springgraph MCP] Parent process exited (${reason}); shutting down.\n`
         );
         this.stop();
       }
@@ -476,4 +476,4 @@ export { StdioTransport } from './transport';
 export { tools, ToolHandler } from './tools';
 // Surface a few daemon-mode bits for tests + diagnostics.
 export { Daemon } from './daemon';
-export { CodeGraphPackageVersion } from './version';
+export { SpringgraphPackageVersion } from './version';

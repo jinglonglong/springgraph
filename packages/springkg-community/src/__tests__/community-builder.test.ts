@@ -8,7 +8,7 @@ function node(id: string, kind: SpringKgNode['kind'], qualifiedName: string, fil
   return {
     id,
     kind,
-    codegraphNodeId: `cg:${id}`,
+    springgraphNodeId: `cg:${id}`,
     name: qualifiedName.split('.').at(-1),
     qualifiedName,
     filePath: filePath ?? `src/${qualifiedName.replace(/\./g, '/')}.java`,

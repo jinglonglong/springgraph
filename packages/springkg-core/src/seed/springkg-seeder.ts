@@ -5,7 +5,7 @@ import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
 
-export interface CodeGraphNodeRow {
+export interface SpringgraphNodeRow {
   id: string;
   kind: string;
   name: string;
@@ -18,23 +18,23 @@ export interface CodeGraphNodeRow {
   decorators?: string | null;
 }
 
-export interface CodeGraphEdgeRow {
+export interface SpringgraphEdgeRow {
   source: string;
   target: string;
   kind: string;
 }
 
-export interface CodeGraphContext {
-  nodesByQualifiedName: Map<string, CodeGraphNodeRow>;
-  nodesByFileAndName: Map<string, CodeGraphNodeRow>;
-  edges: CodeGraphEdgeRow[];
+export interface SpringgraphContext {
+  nodesByQualifiedName: Map<string, SpringgraphNodeRow>;
+  nodesByFileAndName: Map<string, SpringgraphNodeRow>;
+  edges: SpringgraphEdgeRow[];
   hasData: boolean;
 }
 
 export interface SeedSymbol {
   id: string;
   kind: string;
-  codegraphNodeId: string;
+  springgraphNodeId: string;
   name: string;
   qualifiedName: string;
   filePath: string;
@@ -155,11 +155,11 @@ export class SpringkgSeeder {
   private db: any = null;
   private projectPath: string = '';
 
-  async seed(db: any, codegraph: any): Promise<SeedResult> {
+  async seed(db: any, springgraph: any): Promise<SeedResult> {
     this.db = db;
-    this.projectPath = typeof codegraph === 'string'
-      ? codegraph
-      : (codegraph.getProjectRoot ? codegraph.getProjectRoot() : (codegraph.projectPath || codegraph.projectRoot || ''));
+    this.projectPath = typeof springgraph === 'string'
+      ? springgraph
+      : (springgraph.getProjectRoot ? springgraph.getProjectRoot() : (springgraph.projectPath || springgraph.projectRoot || ''));
 
     const counts = this.getSeedTableCounts();
     const needsSeed = Object.values(counts).some((count) => count === 0);
@@ -174,8 +174,8 @@ export class SpringkgSeeder {
       };
     }
 
-    const codeGraphContext = this.loadCodeGraphContext(codegraph);
-    const seedBundle = this.buildSeedBundle(codeGraphContext);
+    const springgraphContext = this.loadSpringgraphContext(springgraph);
+    const seedBundle = this.buildSeedBundle(springgraphContext);
     if (seedBundle.symbols.length === 0 && seedBundle.endpoints.length === 0 && seedBundle.configProperties.length === 0) {
       return {
         symbols: 0,
@@ -213,30 +213,30 @@ export class SpringkgSeeder {
     }
   }
 
-  loadCodeGraphContext(codegraph: any): CodeGraphContext {
-    const projectRoot = typeof codegraph === 'string'
-      ? codegraph
-      : (codegraph.getProjectRoot ? codegraph.getProjectRoot() : (codegraph.projectPath || codegraph.projectRoot || ''));
-    const emptyContext: CodeGraphContext = {
+  loadSpringgraphContext(springgraph: any): SpringgraphContext {
+    const projectRoot = typeof springgraph === 'string'
+      ? springgraph
+      : (springgraph.getProjectRoot ? springgraph.getProjectRoot() : (springgraph.projectPath || springgraph.projectRoot || ''));
+    const emptyContext: SpringgraphContext = {
       nodesByQualifiedName: new Map(),
       nodesByFileAndName: new Map(),
       edges: [],
       hasData: false,
     };
-    const codeGraphDbPath = path.join(projectRoot, '.codegraph', 'codegraph.db');
-    if (!fs.existsSync(codeGraphDbPath)) {
+    const springgraphDbPath = path.join(projectRoot, '.springgraph', 'springgraph.db');
+    if (!fs.existsSync(springgraphDbPath)) {
       return emptyContext;
     }
 
-    let codeGraphDb: any = null;
+    let springgraphDb: any = null;
     try {
       const { DatabaseSync } = require('node:sqlite');
-      codeGraphDb = new DatabaseSync(codeGraphDbPath);
-      const nodes = codeGraphDb.prepare(`
+      springgraphDb = new DatabaseSync(springgraphDbPath);
+      const nodes = springgraphDb.prepare(`
         SELECT id, kind, name, qualified_name, file_path, language, start_line, end_line, signature, decorators
         FROM nodes
         WHERE language IN ('java', 'xml', 'yaml', 'yml')
-      `).all() as CodeGraphNodeRow[];
+      `).all() as SpringgraphNodeRow[];
       if (nodes.length === 0) {
         return emptyContext;
       }
@@ -244,15 +244,15 @@ export class SpringkgSeeder {
       const nodeIds = nodes.map((node) => node.id);
       const placeholders = nodeIds.map(() => '?').join(', ');
       const edges = nodeIds.length > 0
-        ? codeGraphDb.prepare(`
+        ? springgraphDb.prepare(`
             SELECT source, target, kind
             FROM edges
             WHERE kind IN ('calls', 'contains') AND source IN (${placeholders}) AND target IN (${placeholders})
-          `).all(...nodeIds, ...nodeIds) as CodeGraphEdgeRow[]
+          `).all(...nodeIds, ...nodeIds) as SpringgraphEdgeRow[]
         : [];
 
-      const nodesByQualifiedName = new Map<string, CodeGraphNodeRow>();
-      const nodesByFileAndName = new Map<string, CodeGraphNodeRow>();
+      const nodesByQualifiedName = new Map<string, SpringgraphNodeRow>();
+      const nodesByFileAndName = new Map<string, SpringgraphNodeRow>();
       for (const node of nodes) {
         nodesByQualifiedName.set(node.qualified_name, node);
         nodesByFileAndName.set(this.makeFileNameKey(node.file_path, node.name), node);
@@ -267,8 +267,8 @@ export class SpringkgSeeder {
     } catch {
       return emptyContext;
     } finally {
-      if (codeGraphDb) {
-        codeGraphDb.close();
+      if (springgraphDb) {
+        springgraphDb.close();
       }
     }
   }
@@ -277,14 +277,14 @@ export class SpringkgSeeder {
     const now = Date.now();
     const insertSymbol = db.prepare(`
       INSERT INTO spring_symbols (
-        id, kind, codegraph_node_id, name, qualified_name, file_path, start_line, end_line, metadata, confidence, created_at, updated_at
+        id, kind, springgraph_node_id, name, qualified_name, file_path, start_line, end_line, metadata, confidence, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const symbol of ctx.symbols) {
       insertSymbol.run(
         symbol.id,
         symbol.kind,
-        symbol.codegraphNodeId,
+        symbol.springgraphNodeId,
         symbol.name,
         symbol.qualifiedName,
         symbol.filePath,
@@ -479,7 +479,7 @@ export class SpringkgSeeder {
     }
   }
 
-  private buildSeedBundle(codeGraphContext: CodeGraphContext): SeedBundle {
+  private buildSeedBundle(springgraphContext: SpringgraphContext): SeedBundle {
     const javaFiles = this.findFiles(this.projectPath, (filePath) => filePath.endsWith('.java'));
     const xmlFiles = this.findFiles(this.projectPath, (filePath) => filePath.endsWith('.xml'));
     const configFiles = this.findFiles(this.projectPath, (filePath) => /\.(ya?ml|properties)$/i.test(filePath));
@@ -509,7 +509,7 @@ export class SpringkgSeeder {
           parsedType.filePath,
           parsedType.startLine,
           parsedType.endLine,
-          codeGraphContext,
+          springgraphContext,
           {
             annotations: parsedType.classAnnotations,
           },
@@ -527,7 +527,7 @@ export class SpringkgSeeder {
           parsedType.filePath,
           method.startLine,
           method.endLine,
-          codeGraphContext,
+          springgraphContext,
           method.metadata,
         );
         symbols.push(methodSymbol);
@@ -540,7 +540,7 @@ export class SpringkgSeeder {
       }
     }
 
-    this.copyCodeGraphEdges(codeGraphContext, symbols, edges);
+    this.copySpringgraphEdges(springgraphContext, symbols, edges);
 
     for (const parsedType of parsedTypes) {
       const classSymbol = symbolByQualifiedName.get(parsedType.qualifiedName);
@@ -605,7 +605,7 @@ export class SpringkgSeeder {
               parsedType.filePath,
               method.startLine,
               method.endLine,
-              codeGraphContext,
+              springgraphContext,
               {
                 sqlText,
                 source: 'annotation',
@@ -636,7 +636,7 @@ export class SpringkgSeeder {
           xmlFile,
           xmlStatement.line,
           xmlStatement.line,
-          codeGraphContext,
+          springgraphContext,
           {
             sqlText: xmlStatement.sql,
             source: 'xml',
@@ -704,19 +704,19 @@ export class SpringkgSeeder {
     };
   }
 
-  private copyCodeGraphEdges(codeGraphContext: CodeGraphContext, symbols: SeedSymbol[], edges: SeedEdge[]): void {
-    if (!codeGraphContext.hasData) {
+  private copySpringgraphEdges(springgraphContext: SpringgraphContext, symbols: SeedSymbol[], edges: SeedEdge[]): void {
+    if (!springgraphContext.hasData) {
       return;
     }
 
-    const springByCodeGraphNodeId = new Map<string, SeedSymbol>();
+    const springBySpringgraphNodeId = new Map<string, SeedSymbol>();
     for (const symbol of symbols) {
-      springByCodeGraphNodeId.set(symbol.codegraphNodeId, symbol);
+      springBySpringgraphNodeId.set(symbol.springgraphNodeId, symbol);
     }
 
-    for (const edge of codeGraphContext.edges) {
-      const source = springByCodeGraphNodeId.get(edge.source);
-      const target = springByCodeGraphNodeId.get(edge.target);
+    for (const edge of springgraphContext.edges) {
+      const source = springBySpringgraphNodeId.get(edge.source);
+      const target = springBySpringgraphNodeId.get(edge.target);
       if (!source || !target) {
         continue;
       }
@@ -726,7 +726,7 @@ export class SpringkgSeeder {
           sourceId: source.id,
           targetId: target.id,
           kind: edge.kind,
-          metadata: { source: 'codegraph-db' },
+          metadata: { source: 'springgraph-db' },
         });
       }
     }
@@ -739,18 +739,18 @@ export class SpringkgSeeder {
     filePath: string,
     startLine: number,
     endLine: number,
-    codeGraphContext: CodeGraphContext,
+    springgraphContext: SpringgraphContext,
     metadata?: Record<string, unknown>,
   ): SeedSymbol {
-    const codeGraphNode = codeGraphContext.nodesByQualifiedName.get(qualifiedName)
-      ?? codeGraphContext.nodesByFileAndName.get(this.makeFileNameKey(filePath, name));
-    const codegraphNodeId = codeGraphNode?.id ?? `seed:${qualifiedName}`;
-    const normalizedStart = codeGraphNode?.start_line ?? startLine;
-    const normalizedEnd = codeGraphNode?.end_line ?? endLine;
+    const springgraphNode = springgraphContext.nodesByQualifiedName.get(qualifiedName)
+      ?? springgraphContext.nodesByFileAndName.get(this.makeFileNameKey(filePath, name));
+    const springgraphNodeId = springgraphNode?.id ?? `seed:${qualifiedName}`;
+    const normalizedStart = springgraphNode?.start_line ?? startLine;
+    const normalizedEnd = springgraphNode?.end_line ?? endLine;
     return {
       id: this.makeSeedId(kind, qualifiedName),
       kind,
-      codegraphNodeId,
+      springgraphNodeId,
       name,
       qualifiedName,
       filePath,
@@ -1178,7 +1178,7 @@ export class SpringkgSeeder {
     const visit = (currentPath: string): void => {
       const entries = fs.readdirSync(currentPath, { withFileTypes: true });
       for (const entry of entries) {
-        if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.codegraph' || entry.name === 'target' || entry.name === 'dist') {
+        if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.springgraph' || entry.name === 'target' || entry.name === 'dist') {
           continue;
         }
 

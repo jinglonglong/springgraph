@@ -1,6 +1,6 @@
 /**
  * WASM runtime flags — the workaround for the V8 turboshaft WASM Zone OOM
- * (`Fatal process out of memory: Zone`) that crashed `codegraph index` on large
+ * (`Fatal process out of memory: Zone`) that crashed `springgraph index` on large
  * polyglot repos under Node >= 22. See issues #293 and #298.
  *
  * The crash was reproduced with the real indexer on the bundled Node 24 runtime;
@@ -56,9 +56,9 @@ describe('processHasWasmRuntimeFlags', () => {
 
 describe('buildRelaunchArgv', () => {
   it('places the wasm flags first, then the script and its args', () => {
-    expect(buildRelaunchArgv('/x/codegraph.js', ['index', '/repo'], [])).toEqual([
+    expect(buildRelaunchArgv('/x/springgraph.js', ['index', '/repo'], [])).toEqual([
       '--liftoff-only',
-      '/x/codegraph.js',
+      '/x/springgraph.js',
       'index',
       '/repo',
     ]);
@@ -66,8 +66,8 @@ describe('buildRelaunchArgv', () => {
 
   it('preserves other existing node flags without duplicating ours', () => {
     expect(
-      buildRelaunchArgv('/x/codegraph.js', ['status'], ['--liftoff-only', '--enable-source-maps'])
-    ).toEqual(['--liftoff-only', '--enable-source-maps', '/x/codegraph.js', 'status']);
+      buildRelaunchArgv('/x/springgraph.js', ['status'], ['--liftoff-only', '--enable-source-maps'])
+    ).toEqual(['--liftoff-only', '--enable-source-maps', '/x/springgraph.js', 'status']);
   });
 
   it('produces an argv that actually launches node WITH the flag applied', () => {

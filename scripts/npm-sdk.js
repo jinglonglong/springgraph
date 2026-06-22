@@ -1,15 +1,15 @@
 'use strict';
 //
-// Programmatic / embedded SDK entry for @colbymchenry/codegraph (issue #354).
+// Programmatic / embedded SDK entry for @colbymchenry/springgraph (issue #354).
 //
 // The CLI/MCP `bin` (npm-shim.js) execs the per-platform bundle's OWN Node 24 so
 // the tool never depends on the user's runtime. Embedded library consumers are
 // the opposite case: they already run their own Node and just want the compiled
-// API — `require("@colbymchenry/codegraph")` returning the CodeGraph class et al.
+// API — `require("@colbymchenry/springgraph")` returning the Springgraph class et al.
 //
 // The compiled library + its production dependencies (web-tree-sitter,
 // tree-sitter-wasms, …) ship INSIDE the per-platform bundle, at
-//   @colbymchenry/codegraph-<platform>-<arch>/lib/dist/index.js
+//   @colbymchenry/springgraph-<platform>-<arch>/lib/dist/index.js
 // (with the deps in the sibling lib/node_modules). Re-exporting that bundle keeps
 // the main package thin — no second 50 MB copy of the grammars — while making the
 // SDK work in the consumer's process. Types are a separate concern: the main
@@ -28,7 +28,7 @@ var os = require('os');
 var fs = require('fs');
 
 var target = process.platform + '-' + process.arch; // e.g. darwin-arm64, linux-x64
-var pkg = '@colbymchenry/codegraph-' + target;
+var pkg = '@colbymchenry/springgraph-' + target;
 
 module.exports = require(resolveLibrary());
 
@@ -51,21 +51,21 @@ function resolveLibrary() {
   if (cached) return cached;
 
   throw new Error(
-    'codegraph: the programmatic API is unavailable because the platform bundle\n' +
+    'springgraph: the programmatic API is unavailable because the platform bundle\n' +
     '(' + pkg + ') is not installed.\n' +
     'The compiled library ships inside that per-platform optional dependency.\n' +
     'Fixes:\n' +
     '  - install from the official npm registry so the matching bundle is fetched:\n' +
-    '      npm i @colbymchenry/codegraph --registry=https://registry.npmjs.org\n' +
-    '  - or run the CLI once (e.g. `npx @colbymchenry/codegraph status`) to\n' +
-    '    self-heal the bundle into ~/.codegraph, then require() will find it.'
+    '      npm i @colbymchenry/springgraph --registry=https://registry.npmjs.org\n' +
+    '  - or run the CLI once (e.g. `npx @colbymchenry/springgraph status`) to\n' +
+    '    self-heal the bundle into ~/.springgraph, then require() will find it.'
   );
 }
 
 function cachedLibrary() {
   try {
     var version = require(path.join(__dirname, 'package.json')).version;
-    var base = process.env.CODEGRAPH_INSTALL_DIR || path.join(os.homedir(), '.codegraph');
+    var base = process.env.SPRINGGRAPH_INSTALL_DIR || path.join(os.homedir(), '.springgraph');
     var lib = path.join(base, 'bundles', target + '-' + version, 'lib', 'dist', 'index.js');
     if (fs.existsSync(lib)) return lib;
   } catch (e) {

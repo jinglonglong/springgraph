@@ -41,7 +41,7 @@ describe('Telemetry', () => {
     });
 
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-telemetry-'));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-telemetry-'));
     calls = [];
     stderrLines = [];
     nowValue = new Date('2026-06-12T08:00:00.000Z');
@@ -58,19 +58,19 @@ describe('Telemetry', () => {
     });
 
     it('DO_NOT_TRACK beats everything, including a forced-on env and config', () => {
-      const t = make({ env: { DO_NOT_TRACK: '1', CODEGRAPH_TELEMETRY: '1' } });
+      const t = make({ env: { DO_NOT_TRACK: '1', SPRINGGRAPH_TELEMETRY: '1' } });
       t.setEnabled(true, 'cli');
       expect(t.getStatus()).toMatchObject({ enabled: false, decidedBy: 'DO_NOT_TRACK' });
     });
 
-    it('CODEGRAPH_TELEMETRY env beats the stored config in both directions', () => {
-      const t = make({ env: { CODEGRAPH_TELEMETRY: '0' } });
+    it('SPRINGGRAPH_TELEMETRY env beats the stored config in both directions', () => {
+      const t = make({ env: { SPRINGGRAPH_TELEMETRY: '0' } });
       t.setEnabled(true, 'cli');
-      expect(t.getStatus()).toMatchObject({ enabled: false, decidedBy: 'CODEGRAPH_TELEMETRY' });
+      expect(t.getStatus()).toMatchObject({ enabled: false, decidedBy: 'SPRINGGRAPH_TELEMETRY' });
 
-      const t2 = make({ env: { CODEGRAPH_TELEMETRY: '1' } });
+      const t2 = make({ env: { SPRINGGRAPH_TELEMETRY: '1' } });
       t2.setEnabled(false, 'cli');
-      expect(t2.getStatus()).toMatchObject({ enabled: true, decidedBy: 'CODEGRAPH_TELEMETRY' });
+      expect(t2.getStatus()).toMatchObject({ enabled: true, decidedBy: 'SPRINGGRAPH_TELEMETRY' });
     });
 
     it('stored config decides when no env is set', () => {
@@ -83,8 +83,8 @@ describe('Telemetry', () => {
   describe('off is off', () => {
     it('disabled: records nothing, sends nothing, creates no files', async () => {
       const fetchSpy = mockFetch(calls);
-      const t = make({ env: { CODEGRAPH_TELEMETRY: '0' }, fetchImpl: fetchSpy });
-      t.recordUsage('mcp_tool', 'codegraph_explore', true);
+      const t = make({ env: { SPRINGGRAPH_TELEMETRY: '0' }, fetchImpl: fetchSpy });
+      t.recordUsage('mcp_tool', 'springgraph_explore', true);
       t.recordLifecycle('install', { scope: 'local', kind: 'fresh' });
       t.persistSync();
       await t.flushNow();
@@ -107,8 +107,8 @@ describe('Telemetry', () => {
   describe('first-run notice & machine id', () => {
     it('recording only buffers — no notice, no config until something is sent', async () => {
       const t = make();
-      t.recordUsage('mcp_tool', 'codegraph_explore', true);
-      t.recordUsage('mcp_tool', 'codegraph_node', true);
+      t.recordUsage('mcp_tool', 'springgraph_explore', true);
+      t.recordUsage('mcp_tool', 'springgraph_node', true);
       expect(stderrLines).toEqual([]); // local buffering is silent
       expect(fs.existsSync(t.configPath)).toBe(false);
       // Same-day rollups aren't sendable yet — even a flush stays silent.
@@ -125,8 +125,8 @@ describe('Telemetry', () => {
       await t.flushNow();
       expect(calls).toHaveLength(2);
       expect(stderrLines).toHaveLength(1);
-      expect(stderrLines[0]).toContain('codegraph telemetry off');
-      expect(stderrLines[0]).toContain('CODEGRAPH_TELEMETRY=0');
+      expect(stderrLines[0]).toContain('springgraph telemetry off');
+      expect(stderrLines[0]).toContain('SPRINGGRAPH_TELEMETRY=0');
       const config = JSON.parse(fs.readFileSync(t.configPath, 'utf8'));
       expect(config.machine_id).toMatch(/^[0-9a-f-]{36}$/);
       expect(config.consent_source).toBe('default-notice');
@@ -157,9 +157,9 @@ describe('Telemetry', () => {
     it('aggregates per (day, kind, name, client) and sends only completed days', async () => {
       const t = make();
       const client = { name: 'Claude Code', version: '2.1' };
-      t.recordUsage('mcp_tool', 'codegraph_explore', true, client);
-      t.recordUsage('mcp_tool', 'codegraph_explore', false, client);
-      t.recordUsage('mcp_tool', 'codegraph_explore', true, client);
+      t.recordUsage('mcp_tool', 'springgraph_explore', true, client);
+      t.recordUsage('mcp_tool', 'springgraph_explore', false, client);
+      t.recordUsage('mcp_tool', 'springgraph_explore', true, client);
       t.recordUsage('cli_command', 'query', true);
 
       // Same day: nothing is sendable yet.
@@ -176,7 +176,7 @@ describe('Telemetry', () => {
       expect(body.schema_version).toBe(1);
       const events = body.events as Array<{ event: string; ts: string; props: Record<string, unknown> }>;
       expect(events).toHaveLength(2);
-      const explore = events.find((e) => e.props.name === 'codegraph_explore')!;
+      const explore = events.find((e) => e.props.name === 'springgraph_explore')!;
       expect(explore).toMatchObject({
         event: 'usage_rollup',
         ts: '2026-06-12T12:00:00.000Z',
@@ -201,7 +201,7 @@ describe('Telemetry', () => {
       await t.flushNow();
       expect(calls[0]!.url).toBe(TELEMETRY_ENDPOINT);
 
-      const t2 = make({ env: { CODEGRAPH_TELEMETRY_ENDPOINT: 'http://localhost:9999/v1/events' } });
+      const t2 = make({ env: { SPRINGGRAPH_TELEMETRY_ENDPOINT: 'http://localhost:9999/v1/events' } });
       t2.recordLifecycle('uninstall', {});
       await t2.flushNow();
       expect(calls[1]!.url).toBe('http://localhost:9999/v1/events');
@@ -279,8 +279,8 @@ describe('Telemetry', () => {
   describe('protocol safety', () => {
     it('never writes to stdout', async () => {
       const stdoutSpy = vi.spyOn(process.stdout, 'write');
-      const t = make({ env: { CODEGRAPH_TELEMETRY_DEBUG: '1' } });
-      t.recordUsage('mcp_tool', 'codegraph_explore', true);
+      const t = make({ env: { SPRINGGRAPH_TELEMETRY_DEBUG: '1' } });
+      t.recordUsage('mcp_tool', 'springgraph_explore', true);
       t.recordLifecycle('install', { scope: 'local', kind: 'fresh' });
       await t.flushNow();
       expect(stdoutSpy).not.toHaveBeenCalled();

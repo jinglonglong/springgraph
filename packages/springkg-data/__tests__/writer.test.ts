@@ -11,7 +11,7 @@ describe('SqlWriter', () => {
     const input: SqlWriterInput = {
       sqlStatement: {
         id: 'stmt:abc123',
-        codegraphNodeId: 'method:xyz',
+        springgraphNodeId: 'method:xyz',
         mapperNamespace: 'demo.UserMapper',
         statementId: 'findAll',
         operation: 'SELECT',
@@ -40,7 +40,7 @@ describe('SqlWriter', () => {
     const input: SqlWriterInput = {
       sqlStatement: {
         id: 'stmt:def',
-        codegraphNodeId: 'method:ins',
+        springgraphNodeId: 'method:ins',
         mapperNamespace: 'demo.UserMapper',
         statementId: 'insert',
         operation: 'INSERT',
@@ -64,7 +64,7 @@ describe('SqlWriter', () => {
     const input: SqlWriterInput = {
       sqlStatement: {
         id: 'stmt:idem',
-        codegraphNodeId: 'method:idm',
+        springgraphNodeId: 'method:idm',
         mapperNamespace: 'demo.UserMapper',
         statementId: 'findById',
         operation: 'SELECT',

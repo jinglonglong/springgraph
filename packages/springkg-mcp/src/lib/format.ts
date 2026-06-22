@@ -30,7 +30,7 @@ export function notIndexedResult(): {
 } {
   return textResult(
     `## Project Not Indexed\n\n` +
-    `No \`.codegraph/springkg.db\` was found. Run \`springkg init && springkg index\` first, then retry.\n\n` +
+    `No \`.springgraph/springkg.db\` was found. Run \`springkg init && springkg index\` first, then retry.\n\n` +
     `This is a SUCCESS-shaped response by design — the server stays queryable in unindexed workspaces.`
   );
 }
@@ -50,7 +50,7 @@ export function parseMeta(raw: unknown): Record<string, unknown> {
 }
 
 /**
- * Helper: format a codegraph-style source location string.
+ * Helper: format a springgraph-style source location string.
  */
 export function fmtLocation(filePath: string | null | undefined, line: number | null | undefined): string {
   if (!filePath) return '(unknown location)';

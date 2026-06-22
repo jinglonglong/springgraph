@@ -3,26 +3,26 @@ title: Your First Graph
 description: Build an index and run your first queries against it.
 ---
 
-Once CodeGraph is installed, building and exploring a graph takes three commands.
+Once Springgraph is installed, building and exploring a graph takes three commands.
 
 ## Index a project
 
 ```bash
 cd your-project
-codegraph init -i      # initialize + index in one step
+springgraph init -i      # initialize + index in one step
 ```
 
-`init` creates the `.codegraph/` directory; `-i` (or `--index`) immediately builds the full index. For an existing project you can re-index any time:
+`init` creates the `.springgraph/` directory; `-i` (or `--index`) immediately builds the full index. For an existing project you can re-index any time:
 
 ```bash
-codegraph index          # full index
-codegraph sync           # incremental update of changed files
+springgraph index          # full index
+springgraph sync           # incremental update of changed files
 ```
 
 ## Check it worked
 
 ```bash
-codegraph status
+springgraph status
 ```
 
 This reports the node/edge/file counts, the active SQLite backend, and the journal mode — a quick health check that the index is ready.
@@ -30,15 +30,15 @@ This reports the node/edge/file counts, the active SQLite backend, and the journ
 ## Run a query
 
 ```bash
-codegraph query UserService          # find symbols by name
-codegraph callers handleRequest      # what calls a function
-codegraph callees handleRequest      # what a function calls
-codegraph impact AuthMiddleware      # what a change would affect
-codegraph context "fix the login flow"   # build task-focused context
+springgraph query UserService          # find symbols by name
+springgraph callers handleRequest      # what calls a function
+springgraph callees handleRequest      # what a function calls
+springgraph impact AuthMiddleware      # what a change would affect
+springgraph context "fix the login flow"   # build task-focused context
 ```
 
-Each accepts `--json` for machine-readable output. See the full [CLI reference](/codegraph/reference/cli/).
+Each accepts `--json` for machine-readable output. See the full [CLI reference](/springgraph/reference/cli/).
 
 ## Hand it to your agent
 
-With a `.codegraph/` directory present and an agent configured (see [Installation](/codegraph/getting-started/installation/)), your agent uses the [MCP tools](/codegraph/reference/mcp-server/) automatically — no extra step.
+With a `.springgraph/` directory present and an agent configured (see [Installation](/springgraph/getting-started/installation/)), your agent uses the [MCP tools](/springgraph/reference/mcp-server/) automatically — no extra step.

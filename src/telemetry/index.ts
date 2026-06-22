@@ -27,8 +27,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { randomUUID } from 'crypto';
 
-export const TELEMETRY_ENDPOINT = 'https://telemetry.getcodegraph.com/v1/events';
-export const TELEMETRY_DOCS = 'https://github.com/colbymchenry/codegraph/blob/main/TELEMETRY.md';
+export const TELEMETRY_ENDPOINT = 'https://telemetry.getspringgraph.com/v1/events';
+export const TELEMETRY_DOCS = 'https://github.com/colbymchenry/springgraph/blob/main/TELEMETRY.md';
 
 const SCHEMA_VERSION = 1;
 const MAX_BUFFER_BYTES = 256 * 1024;
@@ -100,7 +100,7 @@ interface ConfigFile {
 export interface TelemetryStatus {
   enabled: boolean;
   /** What decided the current state — mirrors the precedence order. */
-  decidedBy: 'DO_NOT_TRACK' | 'CODEGRAPH_TELEMETRY' | 'config' | 'default';
+  decidedBy: 'DO_NOT_TRACK' | 'SPRINGGRAPH_TELEMETRY' | 'config' | 'default';
   machineId: string | null;
   configPath: string;
 }
@@ -125,7 +125,7 @@ interface EventLine {
 type BufferLine = CountLine | EventLine;
 
 export interface TelemetryOptions {
-  /** Global state dir; defaults to ~/.codegraph. Tests inject a temp dir. */
+  /** Global state dir; defaults to ~/.springgraph. Tests inject a temp dir. */
   dir?: string;
   fetchImpl?: typeof globalThis.fetch;
   now?: () => Date;
@@ -166,7 +166,7 @@ export class Telemetry {
   private intervalHandle: NodeJS.Timeout | null = null;
 
   constructor(opts: TelemetryOptions = {}) {
-    this.dir = opts.dir ?? path.join(os.homedir(), '.codegraph');
+    this.dir = opts.dir ?? path.join(os.homedir(), '.springgraph');
     this.fetchImpl = opts.fetchImpl ?? globalThis.fetch;
     this.now = opts.now ?? (() => new Date());
     this.env = opts.env ?? process.env;
@@ -185,7 +185,7 @@ export class Telemetry {
 
   /**
    * Resolution order (first match wins) — keep in sync with TELEMETRY.md:
-   * DO_NOT_TRACK=1 > CODEGRAPH_TELEMETRY=0|1 > stored config > default on.
+   * DO_NOT_TRACK=1 > SPRINGGRAPH_TELEMETRY=0|1 > stored config > default on.
    */
   getStatus(): TelemetryStatus {
     const config = this.readConfig();
@@ -194,10 +194,10 @@ export class Telemetry {
     if (dnt !== undefined && dnt !== '' && dnt !== '0' && dnt.toLowerCase() !== 'false') {
       return { enabled: false, decidedBy: 'DO_NOT_TRACK', machineId, configPath: this.configPath };
     }
-    const forced = this.env.CODEGRAPH_TELEMETRY;
+    const forced = this.env.SPRINGGRAPH_TELEMETRY;
     if (forced !== undefined && forced !== '') {
       const on = forced !== '0' && forced.toLowerCase() !== 'false';
-      return { enabled: on, decidedBy: 'CODEGRAPH_TELEMETRY', machineId, configPath: this.configPath };
+      return { enabled: on, decidedBy: 'SPRINGGRAPH_TELEMETRY', machineId, configPath: this.configPath };
     }
     if (config) {
       return { enabled: config.enabled, decidedBy: 'config', machineId, configPath: this.configPath };
@@ -210,7 +210,7 @@ export class Telemetry {
   }
 
   /**
-   * Persist an explicit user choice (installer toggle or `codegraph
+   * Persist an explicit user choice (installer toggle or `springgraph
    * telemetry on|off`). Turning telemetry off also deletes any buffered,
    * unsent data — off means off.
    */
@@ -378,8 +378,8 @@ export class Telemetry {
       this.writeConfig({ ...config, first_run_notice_shown: true, updated_at: this.now().toISOString() });
     }
     this.writeStderr(
-      `codegraph collects anonymous usage stats (no code, paths, or names) — ` +
-      `"codegraph telemetry off" or CODEGRAPH_TELEMETRY=0 disables. Details: ${TELEMETRY_DOCS}\n`,
+      `springgraph collects anonymous usage stats (no code, paths, or names) — ` +
+      `"springgraph telemetry off" or SPRINGGRAPH_TELEMETRY=0 disables. Details: ${TELEMETRY_DOCS}\n`,
     );
   }
 
@@ -392,7 +392,7 @@ export class Telemetry {
     const lines: BufferLine[] = [...this.counts.values(), ...this.events];
     this.counts.clear();
     this.events = [];
-    // Re-check at persist time: `codegraph telemetry off` mid-process must not
+    // Re-check at persist time: `springgraph telemetry off` mid-process must not
     // have its own invocation resurrect the queue file at exit.
     if (!this.isEnabled()) return;
     this.appendLines(lines);
@@ -489,14 +489,14 @@ export class Telemetry {
     );
     const envelope = {
       machine_id: config.machine_id,
-      codegraph_version: this.packageVersion(),
+      springgraph_version: this.packageVersion(),
       os: process.platform,
       arch: process.arch,
       node_major: parseInt(process.versions.node.split('.')[0] ?? '0', 10),
       ci: this.env.CI !== undefined && this.env.CI !== '' && this.env.CI !== '0' && this.env.CI !== 'false',
       schema_version: SCHEMA_VERSION,
     };
-    const endpoint = this.env.CODEGRAPH_TELEMETRY_ENDPOINT || TELEMETRY_ENDPOINT;
+    const endpoint = this.env.SPRINGGRAPH_TELEMETRY_ENDPOINT || TELEMETRY_ENDPOINT;
     for (let i = 0; i < events.length; i += MAX_EVENTS_PER_REQUEST) {
       const chunk = events.slice(i, i + MAX_EVENTS_PER_REQUEST);
       const body = JSON.stringify({ ...envelope, events: chunk });
@@ -534,8 +534,8 @@ export class Telemetry {
   }
 
   private debug(msg: string): void {
-    if (this.env.CODEGRAPH_TELEMETRY_DEBUG === '1') {
-      this.writeStderr(`[codegraph telemetry] ${msg}\n`);
+    if (this.env.SPRINGGRAPH_TELEMETRY_DEBUG === '1') {
+      this.writeStderr(`[springgraph telemetry] ${msg}\n`);
     }
   }
 }

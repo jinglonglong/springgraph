@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 
 /**
  * End-to-end synthesizer test: write a fixture project with a native ObjC
@@ -46,7 +46,7 @@ emitter.addListener('locationUpdate', onLocation);
 `
     );
 
-    const cg = await CodeGraph.init(dir, { silent: true });
+    const cg = await Springgraph.init(dir, { silent: true });
     await cg.indexAll();
 
     const db = (cg as any).db.db;
@@ -101,7 +101,7 @@ export function onMessage(listener: (m: any) => void) {
 `
     );
 
-    const cg = await CodeGraph.init(dir, { silent: true });
+    const cg = await Springgraph.init(dir, { silent: true });
     await cg.indexAll();
 
     const db = (cg as any).db.db;
@@ -143,7 +143,7 @@ export function onMessage(listener: (m: any) => void) {
       "function onBattery() {}\n" +
       "emitter.addListener('myWrapperBatteryEvent', onBattery);\n");
 
-    const cg = await CodeGraph.init(dir, { silent: true });
+    const cg = await Springgraph.init(dir, { silent: true });
     await cg.indexAll();
     const db = (cg as any).db.db;
     const rows = db.prepare(

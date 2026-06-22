@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 
 import { handoffTeam, shouldAdd, shouldReuse } from './policy';
 import type {
-  CodegraphEdgeLike,
-  CodegraphNodeLike,
+  SpringgraphEdgeLike,
+  SpringgraphNodeLike,
   Resolver,
   SpringKgEnhanceInput,
   SpringKgEnhanceOutput,
@@ -14,7 +14,7 @@ import type {
 
 export type SpringEntity = {
   kind: SpringKgNodeKind;
-  codegraphNodeId: string;
+  springgraphNodeId: string;
   name: string;
   filePath: string;
   reuse: boolean;
@@ -22,7 +22,7 @@ export type SpringEntity = {
 };
 
 type ClassifiedEntity = SpringEntity & {
-  sourceNode: CodegraphNodeLike;
+  sourceNode: SpringgraphNodeLike;
 };
 
 function hashId(prefix: string, parts: readonly string[]): string {
@@ -40,7 +40,7 @@ function findDecorator(decorators: readonly string[], annotation: string): strin
   return decorators.find((decorator) => decorator.toLowerCase().includes(normalizedAnnotation));
 }
 
-function classifyNode(node: CodegraphNodeLike): SpringEntity | null {
+function classifyNode(node: SpringgraphNodeLike): SpringEntity | null {
   const decorators = node.decorators ?? [];
 
   if (decorators.length === 0) {
@@ -57,7 +57,7 @@ function classifyNode(node: CodegraphNodeLike): SpringEntity | null {
       const feignName = parseDecoratorValue(feignDecorator, 'name') ?? parseDecoratorValue(feignDecorator, 'value');
       return {
         kind: 'feign_client',
-        codegraphNodeId: node.id,
+        springgraphNodeId: node.id,
         name: node.name,
         filePath: node.filePath,
         reuse: false,
@@ -68,7 +68,7 @@ function classifyNode(node: CodegraphNodeLike): SpringEntity | null {
     if (findDecorator(decorators, '@Mapper')) {
       return {
         kind: 'mapper',
-        codegraphNodeId: node.id,
+        springgraphNodeId: node.id,
         name: node.name,
         filePath: node.filePath,
         reuse: false,
@@ -78,7 +78,7 @@ function classifyNode(node: CodegraphNodeLike): SpringEntity | null {
     if (findDecorator(decorators, '@Configuration')) {
       return {
         kind: 'configuration',
-        codegraphNodeId: node.id,
+        springgraphNodeId: node.id,
         name: node.name,
         filePath: node.filePath,
         reuse: false,
@@ -93,7 +93,7 @@ function classifyNode(node: CodegraphNodeLike): SpringEntity | null {
   if (findDecorator(decorators, '@RestController') || findDecorator(decorators, '@Controller')) {
     return {
       kind: 'controller',
-      codegraphNodeId: node.id,
+      springgraphNodeId: node.id,
       name: node.name,
       filePath: node.filePath,
       reuse: true,
@@ -103,7 +103,7 @@ function classifyNode(node: CodegraphNodeLike): SpringEntity | null {
   if (findDecorator(decorators, '@Service')) {
     return {
       kind: 'service',
-      codegraphNodeId: node.id,
+      springgraphNodeId: node.id,
       name: node.name,
       filePath: node.filePath,
       reuse: true,
@@ -113,7 +113,7 @@ function classifyNode(node: CodegraphNodeLike): SpringEntity | null {
   if (findDecorator(decorators, '@Repository')) {
     return {
       kind: 'repository',
-      codegraphNodeId: node.id,
+      springgraphNodeId: node.id,
       name: node.name,
       filePath: node.filePath,
       reuse: true,
@@ -123,7 +123,7 @@ function classifyNode(node: CodegraphNodeLike): SpringEntity | null {
   if (findDecorator(decorators, '@Component')) {
     return {
       kind: 'component',
-      codegraphNodeId: node.id,
+      springgraphNodeId: node.id,
       name: node.name,
       filePath: node.filePath,
       reuse: true,
@@ -135,9 +135,9 @@ function classifyNode(node: CodegraphNodeLike): SpringEntity | null {
 
 function buildSpringNode(entity: ClassifiedEntity, timestamp: number): SpringKgNode {
   return {
-    id: hashId(entity.kind, [entity.kind, entity.codegraphNodeId, entity.sourceNode.filePath, entity.sourceNode.qualifiedName ?? '']),
+    id: hashId(entity.kind, [entity.kind, entity.springgraphNodeId, entity.sourceNode.filePath, entity.sourceNode.qualifiedName ?? '']),
     kind: entity.kind,
-    codegraphNodeId: entity.codegraphNodeId,
+    springgraphNodeId: entity.springgraphNodeId,
     name: entity.sourceNode.name,
     qualifiedName: entity.sourceNode.qualifiedName,
     filePath: entity.sourceNode.filePath,
@@ -153,18 +153,18 @@ function buildSpringNode(entity: ClassifiedEntity, timestamp: number): SpringKgN
 function buildBelongsToEdges(
   entity: ClassifiedEntity,
   springNode: SpringKgNode,
-  codegraphEdges: readonly CodegraphEdgeLike[],
-  nodesById: ReadonlyMap<string, CodegraphNodeLike>,
+  springgraphEdges: readonly SpringgraphEdgeLike[],
+  nodesById: ReadonlyMap<string, SpringgraphNodeLike>,
   timestamp: number,
 ): SpringKgEdge[] {
-  return codegraphEdges
+  return springgraphEdges
     .filter((edge) => edge.kind === 'contains' && edge.source === entity.sourceNode.id)
     .map((edge) => {
       const child = nodesById.get(edge.target);
       return child ? { edge, child } : null;
     })
     .filter(
-      (value): value is { edge: CodegraphEdgeLike; child: CodegraphNodeLike } =>
+      (value): value is { edge: SpringgraphEdgeLike; child: SpringgraphNodeLike } =>
         value !== null && ['method', 'property', 'field'].includes(value.child.kind),
     )
     .map(({ child }) => ({
@@ -182,8 +182,8 @@ export class AnnotationSemanticEngine implements Resolver {
 
   async enhance(input: SpringKgEnhanceInput): Promise<SpringKgEnhanceOutput> {
     const timestamp = Date.now();
-    const nodesById = new Map(input.codegraphNodes.map((node) => [node.id, node]));
-    const classifiedEntities: ClassifiedEntity[] = input.codegraphNodes
+    const nodesById = new Map(input.springgraphNodes.map((node) => [node.id, node]));
+    const classifiedEntities: ClassifiedEntity[] = input.springgraphNodes
       .filter((node) => ['class', 'interface'].includes(node.kind) && (node.decorators?.length ?? 0) > 0)
       .map((node) => {
         const entity = classifyNode(node);
@@ -192,11 +192,11 @@ export class AnnotationSemanticEngine implements Resolver {
       .filter((entity): entity is ClassifiedEntity => entity !== null);
 
     const nodes = classifiedEntities.map((entity) => buildSpringNode(entity, timestamp));
-    const springNodeByCodegraphId = new Map(nodes.map((node) => [node.codegraphNodeId, node]));
+    const springNodeBySpringgraphId = new Map(nodes.map((node) => [node.springgraphNodeId, node]));
     const edges = classifiedEntities.flatMap((entity) => {
-      const springNode = springNodeByCodegraphId.get(entity.codegraphNodeId);
+      const springNode = springNodeBySpringgraphId.get(entity.springgraphNodeId);
       return springNode
-        ? buildBelongsToEdges(entity, springNode, input.codegraphEdges, nodesById, timestamp)
+        ? buildBelongsToEdges(entity, springNode, input.springgraphEdges, nodesById, timestamp)
         : [];
     });
 

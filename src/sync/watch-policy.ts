@@ -75,17 +75,17 @@ export interface WatchProbe {
  * `null` when it should run normally.
  *
  * Precedence (first match wins):
- *  1. `CODEGRAPH_NO_WATCH=1`    → off  (explicit opt-out always wins)
- *  2. `CODEGRAPH_FORCE_WATCH=1` → on   (overrides auto-detection)
+ *  1. `SPRINGGRAPH_NO_WATCH=1`    → off  (explicit opt-out always wins)
+ *  2. `SPRINGGRAPH_FORCE_WATCH=1` → on   (overrides auto-detection)
  *  3. WSL2 + `/mnt/*` drive     → off  (recursive fs.watch is too slow; #199)
  */
 export function watchDisabledReason(projectRoot: string, probe: WatchProbe = {}): string | null {
   const env = probe.env ?? process.env;
 
-  if (env.CODEGRAPH_NO_WATCH === '1') {
-    return 'CODEGRAPH_NO_WATCH=1 is set';
+  if (env.SPRINGGRAPH_NO_WATCH === '1') {
+    return 'SPRINGGRAPH_NO_WATCH=1 is set';
   }
-  if (env.CODEGRAPH_FORCE_WATCH === '1') {
+  if (env.SPRINGGRAPH_FORCE_WATCH === '1') {
     return null;
   }
 

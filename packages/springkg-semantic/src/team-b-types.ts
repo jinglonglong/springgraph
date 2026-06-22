@@ -16,11 +16,11 @@
 //   3. `SPRINGKG_EDGE_KINDS` does not include `references` or `USES_DTO`.
 //      Team B emits `USES_DTO` per T42 and `references` as the documented
 //      fallback. We local-extend the edge union until Team A promotes them.
-//   4. `SpringKgEnhanceInput` requires `cg` (CodeGraph instance) and a
+//   4. `SpringKgEnhanceInput` requires `cg` (Springgraph instance) and a
 //      non-empty `changedFiles` array. Team B resolvers currently do not use
-//      `cg`, but the contract now mandates it. We expose a `makeCodegraphStub`
+//      `cg`, but the contract now mandates it. We expose a `makeSpringgraphStub`
 //      helper so tests can satisfy the contract without dragging in the
-//      real CodeGraph class.
+//      real Springgraph class.
 
 import type {
   SpringKgEdge as SharedSpringKgEdge,
@@ -77,12 +77,12 @@ export interface TeamBEnhanceOutput extends SharedSpringKgEnhanceOutput {
 }
 
 /**
- * CodeGraph-compatible node shape that Team B resolvers consume. The real
- * shared `SpringKgEnhanceInput.codegraphNodes` uses `[k: string]: unknown`,
+ * Springgraph-compatible node shape that Team B resolvers consume. The real
+ * shared `SpringKgEnhanceInput.springgraphNodes` uses `[k: string]: unknown`,
  * so any extra fields (`decorators`, `signature`, `qualifiedName`,
  * `startLine`, ...) flow through the index signature without TS friction.
  */
-export interface CodegraphNodeLike {
+export interface SpringgraphNodeLike {
   id: string;
   kind: string;
   name: string;
@@ -104,10 +104,10 @@ export interface CodegraphNodeLike {
 }
 
 /**
- * CodeGraph-compatible edge shape. The real shared input uses
+ * Springgraph-compatible edge shape. The real shared input uses
  * `[k: string]: unknown`, so `line`, `column`, `provenance` etc. flow through.
  */
-export interface CodegraphEdgeLike {
+export interface SpringgraphEdgeLike {
   id?: string;
   source: string;
   target: string;
@@ -132,18 +132,18 @@ export interface TeamBResolver {
 
 /** Team B-flavoured enhance input: requires `cg` + non-empty `changedFiles`. */
 export interface TeamBEnhanceInput {
-  codegraphNodes: ReadonlyArray<CodegraphNodeLike>;
-  codegraphEdges: ReadonlyArray<CodegraphEdgeLike>;
+  springgraphNodes: ReadonlyArray<SpringgraphNodeLike>;
+  springgraphEdges: ReadonlyArray<SpringgraphEdgeLike>;
   changedFiles: ReadonlyArray<string>;
-  cg: CodegraphCgStub;
+  cg: SpringgraphCgStub;
 }
 
 /**
- * Minimal stand-in for a real CodeGraph instance. Team B resolvers do not
+ * Minimal stand-in for a real Springgraph instance. Team B resolvers do not
  * currently call into `cg`; once they do, callers should inject the real
- * `CodeGraph` class instance.
+ * `Springgraph` class instance.
  */
-export interface CodegraphCgStub {
+export interface SpringgraphCgStub {
   getNode(id: string): unknown;
   getOutgoingEdges(id: string): unknown[];
   getIncomingEdges(id: string): unknown[];
@@ -154,9 +154,9 @@ export interface CodegraphCgStub {
 /**
  * Build a no-op `cg` stub. Tests inject this when constructing
  * `TeamBEnhanceInput` so they can satisfy the shared input contract without
- * pulling in the real CodeGraph runtime.
+ * pulling in the real Springgraph runtime.
  */
-export function makeCodegraphStub(): CodegraphCgStub {
+export function makeSpringgraphStub(): SpringgraphCgStub {
   return {
     getNode: () => undefined,
     getOutgoingEdges: () => [],

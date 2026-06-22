@@ -3,7 +3,7 @@
  *
  * On Linux, when an MCP host (Claude Code, opencode, …) is SIGKILL'd by the
  * OOM killer / a force-quit / a container teardown, the kernel does NOT
- * propagate the death to its `codegraph serve --mcp` child. The child gets
+ * propagate the death to its `springgraph serve --mcp` child. The child gets
  * reparented to init/systemd, its stdin stays half-open in some
  * configurations, and the existing `stdin.on('end' | 'close')` handlers
  * never fire — the server lingers indefinitely, holding inotify watches,
@@ -11,12 +11,12 @@
  *
  * `src/mcp/index.ts` polls `process.ppid` and shuts down the moment it
  * diverges from the value observed at startup. This test stands up a
- * four-tier process tree (vitest → wrapper → {stdin-holder, codegraph}) and
+ * four-tier process tree (vitest → wrapper → {stdin-holder, springgraph}) and
  * SIGKILL's the wrapper. The stdin-holder is a long-lived sibling whose
- * `stdout` pipe is dup'd into codegraph's `stdin`. After the wrapper dies
+ * `stdout` pipe is dup'd into springgraph's `stdin`. After the wrapper dies
  * the pipe stays open (stdin-holder still owns the write-end), so the
  * existing stdin close handlers do **not** fire — the only thing that can
- * terminate codegraph then is the PPID watchdog.
+ * terminate springgraph then is the PPID watchdog.
  *
  * Windows is excluded — `process.kill(pid, 'SIGKILL')` does not actually
  * deliver SIGKILL there, and the per-OS reparenting semantics the watchdog
@@ -28,7 +28,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-const BIN = path.resolve(__dirname, '../dist/bin/codegraph.js');
+const BIN = path.resolve(__dirname, '../dist/bin/springgraph.js');
 
 function isAlive(pid: number): boolean {
   try {
@@ -74,24 +74,24 @@ describe.skipIf(process.platform === 'win32')('MCP PPID watchdog (#277)', () => 
   it("shuts down when its parent is SIGKILL'd and stdin stays open", async () => {
     // The wrapper:
     //   1. Spawns a "stdin-holder" — a tiny long-lived node process whose
-    //      `stdout` pipe is dup'd into codegraph's `stdin`. As long as the
+    //      `stdout` pipe is dup'd into springgraph's `stdin`. As long as the
     //      stdin-holder is alive (it is — it's an orphan after the wrapper
-    //      dies), codegraph's stdin never sees EOF.
-    //   2. Spawns codegraph with that pipe as fd 0 and its stderr redirected
+    //      dies), springgraph's stdin never sees EOF.
+    //   2. Spawns springgraph with that pipe as fd 0 and its stderr redirected
     //      to a tmp file that survives the wrapper, then reports both PIDs.
     //   3. Idles until SIGKILL'd from the test.
     //
-    // CODEGRAPH_PPID_POLL_MS=200 keeps the watchdog responsive in test; the
+    // SPRINGGRAPH_PPID_POLL_MS=200 keeps the watchdog responsive in test; the
     // production default is 5000ms.
     const stderrLog = path.join(
       fs.mkdtempSync(path.join(os.tmpdir(), 'cg-ppid-watchdog-')),
-      'codegraph.stderr.log',
+      'springgraph.stderr.log',
     );
-    // The wrapper waits 800ms before reporting the PIDs so the codegraph
+    // The wrapper waits 800ms before reporting the PIDs so the springgraph
     // child has time to finish its async start() (dynamic import + transport
     // setup + watchdog registration). Otherwise the test races: it
     // SIGKILL's the wrapper before the watchdog interval is installed, and
-    // nothing terminates codegraph.
+    // nothing terminates springgraph.
     const wrapperSrc = `
       const { spawn } = require('child_process');
       const fs = require('fs');
@@ -108,7 +108,7 @@ describe.skipIf(process.platform === 'win32')('MCP PPID watchdog (#277)', () => 
         // covered separately in mcp-daemon.test.ts ("daemon survives the first
         // client dying"). Without this the spawned process becomes a proxy and
         // also spawns a detached daemon that would outlive the test.
-        env: { ...process.env, CODEGRAPH_PPID_POLL_MS: '200', CODEGRAPH_NO_DAEMON: '1' },
+        env: { ...process.env, SPRINGGRAPH_PPID_POLL_MS: '200', SPRINGGRAPH_NO_DAEMON: '1' },
         detached: true,
       });
       child.unref();
@@ -147,8 +147,8 @@ describe.skipIf(process.platform === 'win32')('MCP PPID watchdog (#277)', () => 
     expect(isAlive(stdinHolderPid)).toBe(true);
 
     // SIGKILL the wrapper — no cleanup runs, just like a real OOM kill.
-    // codegraph and the stdin-holder both get reparented to init/systemd.
-    // Crucially, the pipe between them stays open, so codegraph's stdin
+    // springgraph and the stdin-holder both get reparented to init/systemd.
+    // Crucially, the pipe between them stays open, so springgraph's stdin
     // doesn't close: only the watchdog can take it down.
     wrapper.kill('SIGKILL');
 
@@ -157,7 +157,7 @@ describe.skipIf(process.platform === 'win32')('MCP PPID watchdog (#277)', () => 
     const stderrContent = fs.existsSync(stderrLog) ? fs.readFileSync(stderrLog, 'utf-8') : '<no stderr captured>';
     expect(
       exited,
-      `codegraph child (pid=${childPid}) did not exit within 5s after wrapper was SIGKILL'd.\nstderr:\n${stderrContent}`,
+      `springgraph child (pid=${childPid}) did not exit within 5s after wrapper was SIGKILL'd.\nstderr:\n${stderrContent}`,
     ).toBe(true);
     // The watchdog announces itself before tearing down — assert that the
     // shutdown came from the parent-death path, not from any other signal.

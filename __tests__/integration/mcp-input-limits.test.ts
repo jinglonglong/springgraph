@@ -12,22 +12,22 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import CodeGraph from '../../src/index';
+import Springgraph from '../../src/index';
 import { ToolHandler } from '../../src/mcp/tools';
 
 describe('MCP input size limits', () => {
   let tempDir: string;
-  let cg: CodeGraph;
+  let cg: Springgraph;
   let handler: ToolHandler;
 
   beforeEach(async () => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-mcp-limits-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-mcp-limits-'));
     fs.mkdirSync(path.join(tempDir, 'src'), { recursive: true });
     fs.writeFileSync(
       path.join(tempDir, 'src', 'a.ts'),
       `export function alpha(): number { return 1; }\n`
     );
-    cg = await CodeGraph.init(tempDir, {
+    cg = await Springgraph.init(tempDir, {
       config: { include: ['**/*.ts'], exclude: [] },
     });
     await cg.indexAll();
@@ -42,41 +42,41 @@ describe('MCP input size limits', () => {
   });
 
   it('accepts a normal-sized query', async () => {
-    const result = await handler.execute('codegraph_search', { query: 'alpha' });
+    const result = await handler.execute('springgraph_search', { query: 'alpha' });
     expect(result.isError).toBeFalsy();
   });
 
-  it('rejects an oversize query on codegraph_search', async () => {
+  it('rejects an oversize query on springgraph_search', async () => {
     const huge = 'a'.repeat(20_000);
-    const result = await handler.execute('codegraph_search', { query: huge });
+    const result = await handler.execute('springgraph_search', { query: huge });
     expect(result.isError).toBe(true);
     expect(result.content[0]!.text).toMatch(/maximum length/i);
   });
 
-  it('rejects an oversize query on codegraph_explore', async () => {
+  it('rejects an oversize query on springgraph_explore', async () => {
     const huge = 'b'.repeat(50_000);
-    const result = await handler.execute('codegraph_explore', { query: huge });
+    const result = await handler.execute('springgraph_explore', { query: huge });
     expect(result.isError).toBe(true);
     expect(result.content[0]!.text).toMatch(/maximum length/i);
   });
 
-  it('rejects an oversize symbol on codegraph_callers', async () => {
+  it('rejects an oversize symbol on springgraph_callers', async () => {
     const huge = 'c'.repeat(15_000);
-    const result = await handler.execute('codegraph_callers', { symbol: huge });
+    const result = await handler.execute('springgraph_callers', { symbol: huge });
     expect(result.isError).toBe(true);
     expect(result.content[0]!.text).toMatch(/maximum length/i);
   });
 
-  it('rejects an oversize symbol on codegraph_impact', async () => {
+  it('rejects an oversize symbol on springgraph_impact', async () => {
     const huge = 'd'.repeat(11_000);
-    const result = await handler.execute('codegraph_impact', { symbol: huge });
+    const result = await handler.execute('springgraph_impact', { symbol: huge });
     expect(result.isError).toBe(true);
     expect(result.content[0]!.text).toMatch(/maximum length/i);
   });
 
   it('rejects an oversize projectPath', async () => {
     const hugePath = '/tmp/' + 'x'.repeat(5_000);
-    const result = await handler.execute('codegraph_search', {
+    const result = await handler.execute('springgraph_search', {
       query: 'alpha',
       projectPath: hugePath,
     });
@@ -84,22 +84,22 @@ describe('MCP input size limits', () => {
     expect(result.content[0]!.text).toMatch(/projectPath/);
   });
 
-  it('rejects an oversize path filter on codegraph_files', async () => {
+  it('rejects an oversize path filter on springgraph_files', async () => {
     const hugePath = 'src/' + 'y'.repeat(5_000);
-    const result = await handler.execute('codegraph_files', { path: hugePath });
+    const result = await handler.execute('springgraph_files', { path: hugePath });
     expect(result.isError).toBe(true);
     expect(result.content[0]!.text).toMatch(/path/);
   });
 
-  it('rejects an oversize glob pattern on codegraph_files', async () => {
+  it('rejects an oversize glob pattern on springgraph_files', async () => {
     const hugePattern = '*'.repeat(5_000);
-    const result = await handler.execute('codegraph_files', { pattern: hugePattern });
+    const result = await handler.execute('springgraph_files', { pattern: hugePattern });
     expect(result.isError).toBe(true);
     expect(result.content[0]!.text).toMatch(/pattern/);
   });
 
   it('rejects a non-string projectPath', async () => {
-    const result = await handler.execute('codegraph_search', {
+    const result = await handler.execute('springgraph_search', {
       query: 'alpha',
       projectPath: 12345 as unknown as string,
     });

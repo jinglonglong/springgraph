@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { FeignProviderBridge } from '../src/feign-provider-bridge';
-import type { CodegraphNodeLike } from '../src/shared-types';
-import { makeCodegraphStub } from '../src/shared-types';
+import type { SpringgraphNodeLike } from '../src/shared-types';
+import { makeSpringgraphStub } from '../src/shared-types';
 
-function makeNode(overrides: Partial<CodegraphNodeLike> & Pick<CodegraphNodeLike, 'id' | 'kind' | 'name'>): CodegraphNodeLike {
+function makeNode(overrides: Partial<SpringgraphNodeLike> & Pick<SpringgraphNodeLike, 'id' | 'kind' | 'name'>): SpringgraphNodeLike {
   return {
     id: overrides.id,
     kind: overrides.kind,
@@ -26,9 +26,9 @@ function makeNode(overrides: Partial<CodegraphNodeLike> & Pick<CodegraphNodeLike
   };
 }
 
-async function enhance(nodes: CodegraphNodeLike[]) {
+async function enhance(nodes: SpringgraphNodeLike[]) {
   const resolver = new FeignProviderBridge();
-  return resolver.enhance({ codegraphNodes: nodes, codegraphEdges: [], changedFiles: [], cg: makeCodegraphStub() });
+  return resolver.enhance({ springgraphNodes: nodes, springgraphEdges: [], changedFiles: [], cg: makeSpringgraphStub() });
 }
 
 describe('FeignProviderBridge', () => {

@@ -2,9 +2,9 @@ import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 import { initGrammars, loadAllGrammars } from '../src/extraction/grammars';
-import { removeDirWithRetries, safeCloseCodeGraph } from './setup';
+import { removeDirWithRetries, safeCloseSpringgraph } from './setup';
 
 beforeAll(async () => {
   await initGrammars();
@@ -13,9 +13,9 @@ beforeAll(async () => {
 
 describe('Java interface implementation dispatch', () => {
   let tmpDir: string | undefined;
-  let cg: CodeGraph | undefined;
+  let cg: Springgraph | undefined;
   afterEach(async () => {
-    await safeCloseCodeGraph(cg);
+    await safeCloseSpringgraph(cg);
     cg = undefined;
     await removeDirWithRetries(tmpDir);
     tmpDir = undefined;
@@ -40,7 +40,7 @@ describe('Java interface implementation dispatch', () => {
         '}\n'
     );
 
-    cg = CodeGraph.initSync(tmpDir);
+    cg = Springgraph.initSync(tmpDir);
     await cg.indexAll();
 
     const methods = cg.getNodesByKind('method').filter((n) => n.name === 'greet');
@@ -85,7 +85,7 @@ describe('Java interface implementation dispatch', () => {
         '}\n'
     );
 
-    cg = CodeGraph.initSync(tmpDir);
+    cg = Springgraph.initSync(tmpDir);
     await cg.indexAll();
 
     const ifaceMethod = cg.getNodesByKind('method').find(
@@ -124,7 +124,7 @@ describe('Java interface implementation dispatch', () => {
         '}\n'
     );
 
-    cg = CodeGraph.initSync(tmpDir);
+    cg = Springgraph.initSync(tmpDir);
     await cg.indexAll();
 
     const ifaceMethods = cg.getNodesByKind('method').filter(

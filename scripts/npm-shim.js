@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 'use strict';
 //
-// npm thin-installer launcher for CodeGraph.
+// npm thin-installer launcher for Springgraph.
 //
 // The heavy artifact (a vendored Node runtime + the app) ships as a per-platform
-// optionalDependency: @colbymchenry/codegraph-<platform>-<arch>. npm installs
+// optionalDependency: @colbymchenry/springgraph-<platform>-<arch>. npm installs
 // only the one matching the host, via each package's `os`/`cpu` fields (the
 // esbuild pattern). This shim — run by the user's OWN Node — locates that bundle
 // and execs its launcher, so the real work always runs on the bundled Node 24
@@ -18,12 +18,12 @@
 // the installed bundle can't be resolved, this shim falls back to downloading
 // the matching bundle straight from GitHub Releases — the very archive
 // install.sh uses — into a cache dir, then runs that. Knobs:
-//   CODEGRAPH_NO_DOWNLOAD=1     disable the network fallback (print guidance)
-//   CODEGRAPH_INSTALL_DIR=DIR   cache location (default: ~/.codegraph)
-//   CODEGRAPH_DOWNLOAD_BASE=URL release-download base (for mirrors/air-gapped)
+//   SPRINGGRAPH_NO_DOWNLOAD=1     disable the network fallback (print guidance)
+//   SPRINGGRAPH_INSTALL_DIR=DIR   cache location (default: ~/.springgraph)
+//   SPRINGGRAPH_DOWNLOAD_BASE=URL release-download base (for mirrors/air-gapped)
 //
 // Wired up at release time as the main package's `bin`:
-//   "bin": { "codegraph": "npm-shim.js" }
+//   "bin": { "springgraph": "npm-shim.js" }
 // with the platform packages listed in `optionalDependencies`.
 
 var childProcess = require('child_process');
@@ -32,12 +32,12 @@ var os = require('os');
 var path = require('path');
 
 var target = process.platform + '-' + process.arch; // e.g. darwin-arm64, linux-x64
-var pkg = '@colbymchenry/codegraph-' + target;
+var pkg = '@colbymchenry/springgraph-' + target;
 var isWindows = process.platform === 'win32';
-var REPO = 'colbymchenry/codegraph';
+var REPO = 'colbymchenry/springgraph';
 
 main().catch(function (e) {
-  process.stderr.write('codegraph: ' + (e && e.message ? e.message : String(e)) + '\n');
+  process.stderr.write('springgraph: ' + (e && e.message ? e.message : String(e)) + '\n');
   process.exit(1);
 });
 
@@ -47,7 +47,7 @@ async function main() {
   var resolved = resolveInstalledBundle() || (await selfHealBundle());
   var res = childProcess.spawnSync(resolved.command, resolved.args, { stdio: 'inherit' });
   if (res.error) {
-    process.stderr.write('codegraph: ' + res.error.message + '\n');
+    process.stderr.write('springgraph: ' + res.error.message + '\n');
     process.exit(1);
   }
   process.exit(res.status === null ? 1 : res.status);
@@ -62,10 +62,10 @@ function resolveInstalledBundle() {
       // CVE-2024-27980 hardening on Node 24), so invoke the bundled node.exe
       // against the app entry point and pass --liftoff-only here.
       var nodeExe = require.resolve(pkg + '/node.exe');
-      var entry = require.resolve(pkg + '/lib/dist/bin/codegraph.js');
+      var entry = require.resolve(pkg + '/lib/dist/bin/springgraph.js');
       return { command: nodeExe, args: liftoff(entry) };
     }
-    return { command: require.resolve(pkg + '/bin/codegraph'), args: process.argv.slice(2) };
+    return { command: require.resolve(pkg + '/bin/springgraph'), args: process.argv.slice(2) };
   } catch (e) {
     return null;
   }
@@ -77,19 +77,19 @@ function resolveInstalledBundle() {
 function launcherIn(dir) {
   if (isWindows) {
     var nodeExe = path.join(dir, 'node.exe');
-    var entry = path.join(dir, 'lib', 'dist', 'bin', 'codegraph.js');
+    var entry = path.join(dir, 'lib', 'dist', 'bin', 'springgraph.js');
     if (fs.existsSync(nodeExe) && fs.existsSync(entry)) {
       return { command: nodeExe, args: liftoff(entry) };
     }
   } else {
-    var launcher = path.join(dir, 'bin', 'codegraph');
+    var launcher = path.join(dir, 'bin', 'springgraph');
     if (fs.existsSync(launcher)) return { command: launcher, args: process.argv.slice(2) };
   }
   return null;
 }
 
 // --liftoff-only keeps tree-sitter's WASM grammars off V8's turboshaft tier to
-// avoid the Zone OOM on Node >= 22 (issues #293/#298). The unix bin/codegraph
+// avoid the Zone OOM on Node >= 22 (issues #293/#298). The unix bin/springgraph
 // launcher already passes it; on Windows we invoke node.exe directly so add it.
 function liftoff(entry) {
   return ['--liftoff-only', entry].concat(process.argv.slice(2));
@@ -99,29 +99,29 @@ function liftoff(entry) {
 // {command, args}; exits the process with guidance if it can't.
 async function selfHealBundle() {
   var version = readVersion();
-  var bundlesDir = path.join(process.env.CODEGRAPH_INSTALL_DIR || path.join(os.homedir(), '.codegraph'), 'bundles');
+  var bundlesDir = path.join(process.env.SPRINGGRAPH_INSTALL_DIR || path.join(os.homedir(), '.springgraph'), 'bundles');
   var dest = path.join(bundlesDir, target + '-' + version);
 
   // Already downloaded by a previous run? Use it even when downloads are
-  // disabled — CODEGRAPH_NO_DOWNLOAD blocks fetching, not a cached bundle.
+  // disabled — SPRINGGRAPH_NO_DOWNLOAD blocks fetching, not a cached bundle.
   var cached = launcherIn(dest);
   if (cached) return cached;
 
-  if (process.env.CODEGRAPH_NO_DOWNLOAD) {
-    fail('the network fallback is disabled (CODEGRAPH_NO_DOWNLOAD is set).');
+  if (process.env.SPRINGGRAPH_NO_DOWNLOAD) {
+    fail('the network fallback is disabled (SPRINGGRAPH_NO_DOWNLOAD is set).');
   }
 
-  var asset = 'codegraph-' + target + (isWindows ? '.zip' : '.tar.gz');
-  var base = process.env.CODEGRAPH_DOWNLOAD_BASE || ('https://github.com/' + REPO + '/releases/download');
+  var asset = 'springgraph-' + target + (isWindows ? '.zip' : '.tar.gz');
+  var base = process.env.SPRINGGRAPH_DOWNLOAD_BASE || ('https://github.com/' + REPO + '/releases/download');
   var url = base + '/v' + version + '/' + asset;
 
   process.stderr.write(
-    'codegraph: platform bundle missing (registry did not provide ' + pkg + ').\n' +
-    'codegraph: downloading ' + asset + ' from GitHub Releases (' + version + ')...\n'
+    'springgraph: platform bundle missing (registry did not provide ' + pkg + ').\n' +
+    'springgraph: downloading ' + asset + ' from GitHub Releases (' + version + ')...\n'
   );
 
   // Stage inside bundlesDir so the final rename is on the same filesystem (atomic,
-  // no EXDEV across tmpfs). Strip the archive's top-level codegraph-<target>/ dir.
+  // no EXDEV across tmpfs). Strip the archive's top-level springgraph-<target>/ dir.
   fs.mkdirSync(bundlesDir, { recursive: true });
   var stage = fs.mkdtempSync(path.join(bundlesDir, '.dl-'));
   try {
@@ -149,7 +149,7 @@ async function selfHealBundle() {
 
   var ready = launcherIn(dest);
   if (!ready) fail('downloaded bundle is missing its launcher under ' + dest + '.');
-  process.stderr.write('codegraph: bundle ready.\n');
+  process.stderr.write('springgraph: bundle ready.\n');
   return ready;
 }
 
@@ -168,7 +168,7 @@ function download(url, dest, redirectsLeft) {
     // timeout is an idle/inactivity timeout — it won't kill a slow-but-progressing
     // download, only a stalled connection (so a blocked mirror fails fast with
     // guidance instead of hanging the user's command forever).
-    var req = https.get(url, { headers: { 'User-Agent': 'codegraph-npm-shim' }, timeout: 30000 }, function (res) {
+    var req = https.get(url, { headers: { 'User-Agent': 'springgraph-npm-shim' }, timeout: 30000 }, function (res) {
       var status = res.statusCode;
       if (status >= 300 && status < 400 && res.headers.location) {
         res.resume();
@@ -212,7 +212,7 @@ async function verifyChecksum(archivePath, asset, base, version) {
     throw new Error('checksum mismatch for ' + asset +
       ' (expected ' + expected.slice(0, 12) + '…, got ' + actual.slice(0, 12) + '…)');
   }
-  process.stderr.write('codegraph: checksum verified.\n');
+  process.stderr.write('springgraph: checksum verified.\n');
 }
 
 // Extract via the system tar — present on macOS, Linux, and Windows 10+
@@ -232,13 +232,13 @@ function rmrf(p) {
 
 function fail(reason) {
   process.stderr.write(
-    'codegraph: no prebuilt bundle for ' + target + '.\n' +
-    (reason ? 'codegraph: ' + reason + '\n' : '') +
+    'springgraph: no prebuilt bundle for ' + target + '.\n' +
+    (reason ? 'springgraph: ' + reason + '\n' : '') +
     'Expected the optional package ' + pkg + ' to be installed.\n' +
     'A registry mirror (e.g. npmmirror/cnpm) that did not mirror the per-platform\n' +
     'package is the usual cause. Fixes:\n' +
     '  - install from the official registry:\n' +
-    '      npm i -g @colbymchenry/codegraph --registry=https://registry.npmjs.org\n' +
+    '      npm i -g @colbymchenry/springgraph --registry=https://registry.npmjs.org\n' +
     '  - or use the standalone installer (no Node required):\n' +
     '      curl -fsSL https://raw.githubusercontent.com/' + REPO + '/main/install.sh | sh\n'
   );

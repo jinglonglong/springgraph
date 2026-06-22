@@ -1,5 +1,5 @@
 /**
- * Dynamic-dispatch boundary detection for codegraph_explore (#687).
+ * Dynamic-dispatch boundary detection for springgraph_explore (#687).
  *
  * When the flow an agent asked about does NOT connect statically, the cause is
  * almost always a dynamic-dispatch site: a computed member call, getattr,

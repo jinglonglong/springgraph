@@ -1,13 +1,13 @@
 /**
  * Unindexed-workspace session policy tests.
  *
- * An MCP session attached to a workspace with no .codegraph/ must go quiet
+ * An MCP session attached to a workspace with no .springgraph/ must go quiet
  * rather than fail loudly: `initialize` returns the short "inactive"
  * instructions variant (not the full playbook), `tools/list` returns an
  * EMPTY list, and a tool call that still arrives (cross-project
  * `projectPath`, or a host that skips tools/list) answers with a
  * SUCCESS-shaped guidance message — never `isError: true`. One or two early
- * isError responses teach an agent to abandon codegraph for the whole
+ * isError responses teach an agent to abandon springgraph for the whole
  * session; that observed failure mode is what this suite guards.
  */
 import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
@@ -15,24 +15,24 @@ import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 import { ToolHandler } from '../src/mcp/tools';
 
-const BIN = path.resolve(__dirname, '../dist/bin/codegraph.js');
+const BIN = path.resolve(__dirname, '../dist/bin/springgraph.js');
 
 function spawnServer(cwd: string): ChildProcessWithoutNullStreams {
   return spawn(process.execPath, [BIN, 'serve', '--mcp'], {
     cwd,
     stdio: ['pipe', 'pipe', 'pipe'],
     // Direct (in-process) mode — the unindexed path never has a daemon
-    // anyway (the daemon socket lives in .codegraph/), and this keeps the
+    // anyway (the daemon socket lives in .springgraph/), and this keeps the
     // suite from leaking a detached daemon in the indexed test.
-    // CODEGRAPH_WASM_RELAUNCHED skips the --liftoff-only re-exec: without
+    // SPRINGGRAPH_WASM_RELAUNCHED skips the --liftoff-only re-exec: without
     // it the server runs as a GRANDCHILD that survives child.kill() on
     // Windows and holds the temp cwd/SQLite handles, failing teardown with
     // EPERM no matter how long rmSync retries (the class documented for
     // the mcp-initialize/mcp-roots suites).
-    env: { ...process.env, CODEGRAPH_NO_DAEMON: '1', CODEGRAPH_WASM_RELAUNCHED: '1' },
+    env: { ...process.env, SPRINGGRAPH_NO_DAEMON: '1', SPRINGGRAPH_WASM_RELAUNCHED: '1' },
   }) as ChildProcessWithoutNullStreams;
 }
 
@@ -87,7 +87,7 @@ describe('Unindexed-workspace session policy', () => {
   let child: ChildProcessWithoutNullStreams | null = null;
 
   beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-unindexed-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-unindexed-'));
   });
 
   afterEach(async () => {
@@ -114,10 +114,10 @@ describe('Unindexed-workspace session policy', () => {
     const instructions = (res.result as { instructions: string }).instructions;
 
     expect(instructions).toMatch(/inactive/i);
-    expect(instructions).toMatch(/codegraph init/);
+    expect(instructions).toMatch(/springgraph init/);
     // The full playbook must NOT be sent into a session where every call fails
     expect(instructions).not.toMatch(/Tool selection by intent/);
-    expect(instructions).not.toMatch(/codegraph_explore/);
+    expect(instructions).not.toMatch(/springgraph_explore/);
   });
 
   it('tools/list returns an EMPTY list when the workspace has no index', async () => {
@@ -130,7 +130,7 @@ describe('Unindexed-workspace session policy', () => {
 
   it('an INDEXED workspace still gets the full playbook and all tools', async () => {
     fs.writeFileSync(path.join(tempDir, 'index.ts'), 'export function hello(): string { return "hi"; }\n');
-    const cg = await CodeGraph.init(tempDir, { index: true });
+    const cg = await Springgraph.init(tempDir, { index: true });
     cg.close();
 
     child = spawnServer(tempDir);
@@ -145,7 +145,7 @@ describe('Unindexed-workspace session policy', () => {
     // reduced core set) — the contract under test is "indexed → tools are
     // PRESENT", in contrast to the unindexed empty list above.
     expect(tools.length).toBeGreaterThanOrEqual(3);
-    expect(tools.map((t) => t.name)).toContain('codegraph_explore');
+    expect(tools.map((t) => t.name)).toContain('springgraph_explore');
   });
 
   afterAll(async () => {
@@ -160,7 +160,7 @@ describe('No-error policy on expected conditions', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-noerror-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-noerror-'));
   });
 
   afterEach(() => {
@@ -168,29 +168,29 @@ describe('No-error policy on expected conditions', () => {
   });
 
   it('cross-project query to an unindexed path is SUCCESS-shaped guidance, not isError', async () => {
-    const res = await new ToolHandler(null).execute('codegraph_search', {
+    const res = await new ToolHandler(null).execute('springgraph_search', {
       query: 'anything',
       projectPath: tempDir,
     });
 
     expect(res.isError).toBeUndefined();
     expect(res.content[0]!.text).toMatch(/isn't indexed/);
-    expect(res.content[0]!.text).toMatch(/codegraph init/);
+    expect(res.content[0]!.text).toMatch(/springgraph init/);
     expect(res.content[0]!.text).toMatch(/built-in tools/);
   });
 
   it('no-default-project (working-directory detection miss) is SUCCESS-shaped guidance', async () => {
-    const res = await new ToolHandler(null).execute('codegraph_search', { query: 'anything' });
+    const res = await new ToolHandler(null).execute('springgraph_search', { query: 'anything' });
 
     expect(res.isError).toBeUndefined();
-    expect(res.content[0]!.text).toMatch(/No CodeGraph project is loaded/);
+    expect(res.content[0]!.text).toMatch(/No Springgraph project is loaded/);
     expect(res.content[0]!.text).toMatch(/projectPath/);
   });
 
   it.runIf(process.platform !== 'win32')(
     'sensitive-path refusal stays a hard error (no retry encouragement)',
     async () => {
-      const res = await new ToolHandler(null).execute('codegraph_search', {
+      const res = await new ToolHandler(null).execute('springgraph_search', {
         query: 'anything',
         projectPath: '/etc',
       });
@@ -203,15 +203,15 @@ describe('No-error policy on expected conditions', () => {
 
 describe('search kind filter', () => {
   let tempDir: string;
-  let cg: CodeGraph;
+  let cg: Springgraph;
 
   beforeEach(async () => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-kind-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-kind-'));
     fs.writeFileSync(
       path.join(tempDir, 'types.ts'),
       'export type PaymentMethod = { id: string };\nexport function pay(): void {}\n'
     );
-    cg = await CodeGraph.init(tempDir, { index: true });
+    cg = await Springgraph.init(tempDir, { index: true });
   });
 
   afterEach(() => {
@@ -220,7 +220,7 @@ describe('search kind filter', () => {
   });
 
   it("kind: 'type' (the advertised enum value) finds type aliases", async () => {
-    const res = await new ToolHandler(cg).execute('codegraph_search', {
+    const res = await new ToolHandler(cg).execute('springgraph_search', {
       query: 'PaymentMethod',
       kind: 'type',
     });

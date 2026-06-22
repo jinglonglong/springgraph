@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Does the agent PICK codegraph_node to read a file, vs the built-in Read tool?
-# Build A/B: NEW build (HEAD, codegraph_node has Read parity) vs BASELINE build
-# (a ref where it doesn't), BOTH codegraph-attached + pre-warmed, same task. The
-# metric is tool CHOICE: Read calls vs codegraph_node[file] calls per run.
+# Does the agent PICK springgraph_node to read a file, vs the built-in Read tool?
+# Build A/B: NEW build (HEAD, springgraph_node has Read parity) vs BASELINE build
+# (a ref where it doesn't), BOTH springgraph-attached + pre-warmed, same task. The
+# metric is tool CHOICE: Read calls vs springgraph_node[file] calls per run.
 #
 # Usage: ab-adoption.sh <indexed-repo> "<task>" [runs-per-arm] [baseline-ref]
 # Env: AGENT_EVAL_OUT (default: /tmp/ab-adoption)
@@ -12,11 +12,11 @@ TASK="${2:?task required}"
 RUNS="${3:-2}"
 BASE_REF="${4:-HEAD~1}"
 ENGINE="$(cd "$(dirname "$0")/../.." && pwd)"
-BIN="$ENGINE/dist/bin/codegraph.js"
+BIN="$ENGINE/dist/bin/springgraph.js"
 OUT="${AGENT_EVAL_OUT:-/tmp/ab-adoption}"
 
 command -v claude >/dev/null || { echo "claude CLI not on PATH"; exit 1; }
-[ -d "$TARGET/.codegraph" ] || { echo "target not indexed: run 'codegraph init $TARGET' first"; exit 1; }
+[ -d "$TARGET/.springgraph" ] || { echo "target not indexed: run 'springgraph init $TARGET' first"; exit 1; }
 git -C "$ENGINE" diff --quiet && git -C "$ENGINE" diff --cached --quiet || { echo "engine has uncommitted changes — commit/stash first"; exit 1; }
 CHANGED=$(git -C "$ENGINE" diff --name-only "$BASE_REF" HEAD -- src 2>/dev/null)
 [ -n "$CHANGED" ] || { echo "no src/ changes between $BASE_REF and HEAD"; exit 1; }
@@ -34,27 +34,27 @@ echo "###### task=$TASK"; echo
 
 prewarm() {
   pkill -9 -f "serve --mcp --path $1" 2>/dev/null
-  CODEGRAPH_DAEMON_IDLE_TIMEOUT_MS=1800000 node "$BIN" serve --mcp --path "$1" </dev/null >/dev/null 2>&1 &
-  node -e 'const fs=require("fs");let n=0;const t=setInterval(()=>{if(fs.existsSync(process.argv[1]+"/.codegraph/daemon.sock")){clearInterval(t);process.exit(0)}if(n++>150){clearInterval(t);process.exit(1)}},100)' "$1" >/dev/null 2>&1
+  SPRINGGRAPH_DAEMON_IDLE_TIMEOUT_MS=1800000 node "$BIN" serve --mcp --path "$1" </dev/null >/dev/null 2>&1 &
+  node -e 'const fs=require("fs");let n=0;const t=setInterval(()=>{if(fs.existsSync(process.argv[1]+"/.springgraph/daemon.sock")){clearInterval(t);process.exit(0)}if(n++>150){clearInterval(t);process.exit(1)}},100)' "$1" >/dev/null 2>&1
 }
 
-# Per-run tool-choice counts: Read vs codegraph_node[file] vs [symbol].
+# Per-run tool-choice counts: Read vs springgraph_node[file] vs [symbol].
 count() {
   node -e '
     const fs=require("fs");
     const lines=fs.readFileSync(process.argv[1],"utf8").split("\n").filter(Boolean);
     let read=0,cgFile=0,cgSym=0,cgOther=0,exposed="?";
     for(const l of lines){try{const o=JSON.parse(l);
-      if(o.type==="system"&&o.subtype==="init"){exposed=(o.tools||[]).filter(t=>/codegraph/.test(t)).length;}
+      if(o.type==="system"&&o.subtype==="init"){exposed=(o.tools||[]).filter(t=>/springgraph/.test(t)).length;}
       const blocks=o.message?.content||[];
       for(const b of (Array.isArray(blocks)?blocks:[])){
         if(b.type!=="tool_use")continue;
         if(b.name==="Read")read++;
-        else if(b.name==="mcp__codegraph__codegraph_node"){ if(b.input&&b.input.symbol)cgSym++; else cgFile++; }
-        else if(/mcp__codegraph__/.test(b.name))cgOther++;
+        else if(b.name==="mcp__springgraph__springgraph_node"){ if(b.input&&b.input.symbol)cgSym++; else cgFile++; }
+        else if(/mcp__springgraph__/.test(b.name))cgOther++;
       }
     }catch{}}
-    console.log(`    Read=${read}  codegraph_node[file]=${cgFile}  codegraph_node[symbol]=${cgSym}  other_cg=${cgOther}  (cg exposed=${exposed})`);
+    console.log(`    Read=${read}  springgraph_node[file]=${cgFile}  springgraph_node[symbol]=${cgSym}  other_cg=${cgOther}  (cg exposed=${exposed})`);
   ' "$1"
 }
 
@@ -64,9 +64,9 @@ run_arm() { # label, N
   for i in $(seq 1 "$n"); do
     local tgt="$OUT/t-$label-$i"
     rm -rf "$tgt"
-    rsync -a --exclude node_modules --exclude .git --exclude dist --exclude .codegraph "$TARGET/" "$tgt/"
+    rsync -a --exclude node_modules --exclude .git --exclude dist --exclude .springgraph "$TARGET/" "$tgt/"
     node "$BIN" init "$tgt" >/dev/null 2>&1
-    printf '{"mcpServers":{"codegraph":{"command":"env","args":["CODEGRAPH_WASM_RELAUNCHED=1","node","%s","serve","--mcp","--path","%s"]}}}' "$BIN" "$tgt" > "$c"
+    printf '{"mcpServers":{"springgraph":{"command":"env","args":["SPRINGGRAPH_WASM_RELAUNCHED=1","node","%s","serve","--mcp","--path","%s"]}}}' "$BIN" "$tgt" > "$c"
     prewarm "$tgt"
     echo "----- [$label] run $i -----"
     ( cd "$tgt" && claude -p "$TASK" \
@@ -79,7 +79,7 @@ run_arm() { # label, N
   echo
 }
 
-echo "== NEW build (HEAD: codegraph_node has Read parity) =="
+echo "== NEW build (HEAD: springgraph_node has Read parity) =="
 ( cd "$ENGINE" && npm run build >/dev/null 2>&1 ) && echo "built"
 run_arm new "$RUNS"
 
@@ -88,4 +88,4 @@ git -C "$ENGINE" checkout "$BASE_REF" -- $CHANGED
 ( cd "$ENGINE" && npm run build >/dev/null 2>&1 ) && echo "built"
 run_arm baseline "$RUNS"
 
-echo "###### DONE — compare [new] vs [baseline]: does codegraph_node[file] rise / Read fall? Logs: $OUT"
+echo "###### DONE — compare [new] vs [baseline]: does springgraph_node[file] rise / Read fall? Logs: $OUT"

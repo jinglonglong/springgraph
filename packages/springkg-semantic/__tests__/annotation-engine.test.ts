@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { AnnotationSemanticEngine } from '../src/annotation-engine';
-import type { CodegraphEdgeLike, CodegraphNodeLike, SpringKgNodeKind } from '../src/shared-types';
-import { makeCodegraphStub } from '../src/shared-types';
+import type { SpringgraphEdgeLike, SpringgraphNodeLike, SpringKgNodeKind } from '../src/shared-types';
+import { makeSpringgraphStub } from '../src/shared-types';
 
-function makeClassNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
+function makeClassNode(overrides: Partial<SpringgraphNodeLike> = {}): SpringgraphNodeLike {
   const id = overrides.id ?? 'class-1';
   const name = overrides.name ?? 'DemoType';
 
@@ -29,14 +29,14 @@ function makeClassNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNod
   };
 }
 
-function makeInterfaceNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
+function makeInterfaceNode(overrides: Partial<SpringgraphNodeLike> = {}): SpringgraphNodeLike {
   return {
     ...makeClassNode(overrides),
     kind: 'interface',
   };
 }
 
-function makeChildNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
+function makeChildNode(overrides: Partial<SpringgraphNodeLike> = {}): SpringgraphNodeLike {
   const id = overrides.id ?? 'child-1';
   const name = overrides.name ?? 'handleRequest';
 
@@ -61,9 +61,9 @@ function makeChildNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNod
   };
 }
 
-async function enhance(nodes: CodegraphNodeLike[], edges: CodegraphEdgeLike[] = []) {
+async function enhance(nodes: SpringgraphNodeLike[], edges: SpringgraphEdgeLike[] = []) {
   const engine = new AnnotationSemanticEngine();
-  return engine.enhance({ codegraphNodes: nodes, codegraphEdges: edges, changedFiles: [], cg: makeCodegraphStub() });
+  return engine.enhance({ springgraphNodes: nodes, springgraphEdges: edges, changedFiles: [], cg: makeSpringgraphStub() });
 }
 
 describe('AnnotationSemanticEngine', () => {

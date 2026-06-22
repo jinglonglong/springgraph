@@ -1,7 +1,7 @@
 /**
  * Git worktree index-mismatch detection (issue #155).
  *
- * A CodeGraph index is resolved by walking up to the nearest `.codegraph/`.
+ * A Springgraph index is resolved by walking up to the nearest `.springgraph/`.
  * When a worktree is nested inside the main checkout, that walk reaches the
  * MAIN checkout's index and a query silently returns the main branch's code
  * instead of the worktree's. `detectWorktreeIndexMismatch` spots exactly this
@@ -21,7 +21,7 @@ import {
   worktreeMismatchWarning,
   gitWorktreeRoot,
 } from '../src/sync/worktree';
-import CodeGraph from '../src/index';
+import Springgraph from '../src/index';
 import { ToolHandler } from '../src/mcp/tools';
 
 function git(cwd: string, ...args: string[]): void {
@@ -34,7 +34,7 @@ function real(p: string): string {
 }
 
 describe('detectWorktreeIndexMismatch (issue #155)', () => {
-  let mainRepo: string;   // main checkout — owns the .codegraph index
+  let mainRepo: string;   // main checkout — owns the .springgraph index
   let worktree: string;   // a linked worktree nested inside the main checkout
   let nonGit: string;     // a directory outside any git repo
 
@@ -100,7 +100,7 @@ describe('detectWorktreeIndexMismatch (issue #155)', () => {
     const msg = worktreeMismatchWarning(detectWorktreeIndexMismatch(worktree, mainRepo)!);
     expect(msg).toContain(real(worktree));
     expect(msg).toContain(real(mainRepo));
-    expect(msg).toContain('codegraph init');
+    expect(msg).toContain('springgraph init');
   });
 });
 
@@ -114,7 +114,7 @@ describe('detectWorktreeIndexMismatch (issue #155)', () => {
 describe('worktree mismatch surfaces on hot read tools (issue #155)', () => {
   let mainRepo: string;
   let worktree: string;
-  let cg: CodeGraph;
+  let cg: Springgraph;
   let handler: ToolHandler;
 
   beforeEach(async () => {
@@ -129,7 +129,7 @@ describe('worktree mismatch surfaces on hot read tools (issue #155)', () => {
     git(mainRepo, 'commit', '-q', '-m', 'init');
 
     // The index lives in the MAIN checkout.
-    cg = CodeGraph.initSync(mainRepo);
+    cg = Springgraph.initSync(mainRepo);
     await cg.indexAll();
 
     // Nested worktree, mirroring tools that place them under .claude/worktrees/<name>/.
@@ -145,25 +145,25 @@ describe('worktree mismatch surfaces on hot read tools (issue #155)', () => {
     fs.rmSync(mainRepo, { recursive: true, force: true });
   });
 
-  it('prefixes a compact notice on codegraph_search run from a nested worktree', async () => {
+  it('prefixes a compact notice on springgraph_search run from a nested worktree', async () => {
     handler.setDefaultProjectHint(worktree);
-    const res = await handler.execute('codegraph_search', { query: 'mainOnly' });
+    const res = await handler.execute('springgraph_search', { query: 'mainOnly' });
     const text = res.content[0].text;
     expect(res.isError).toBeFalsy();
     expect(text).toContain('different git worktree');
     expect(text).toContain(real(worktree));
-    expect(text).toContain('codegraph init');
+    expect(text).toContain('springgraph init');
   });
 
   it('does NOT prefix when the default project is the main checkout itself', async () => {
     handler.setDefaultProjectHint(mainRepo);
-    const res = await handler.execute('codegraph_search', { query: 'mainOnly' });
+    const res = await handler.execute('springgraph_search', { query: 'mainOnly' });
     expect(res.content[0].text).not.toContain('different git worktree');
   });
 
-  it('still shows the verbose warning on codegraph_status', async () => {
+  it('still shows the verbose warning on springgraph_status', async () => {
     handler.setDefaultProjectHint(worktree);
-    const res = await handler.execute('codegraph_status', {});
+    const res = await handler.execute('springgraph_status', {});
     const text = res.content[0].text;
     expect(text).toContain('different git working tree');
     expect(text).toContain(real(worktree));
@@ -172,7 +172,7 @@ describe('worktree mismatch surfaces on hot read tools (issue #155)', () => {
   it('caches detection — a later tool call needs no further git spawn', async () => {
     handler.setDefaultProjectHint(worktree);
     // First call computes + caches the mismatch (this is the only git spawn).
-    const first = await handler.execute('codegraph_search', { query: 'mainOnly' });
+    const first = await handler.execute('springgraph_search', { query: 'mainOnly' });
     expect(first.content[0].text).toContain('different git worktree');
 
     // Make git unreachable. A fresh detection would now return null (no notice);
@@ -180,7 +180,7 @@ describe('worktree mismatch surfaces on hot read tools (issue #155)', () => {
     const savedPath = process.env.PATH;
     process.env.PATH = '';
     try {
-      const second = await handler.execute('codegraph_explore', { query: 'mainOnly' });
+      const second = await handler.execute('springgraph_explore', { query: 'mainOnly' });
       expect(second.content[0].text).toContain('different git worktree');
     } finally {
       process.env.PATH = savedPath;

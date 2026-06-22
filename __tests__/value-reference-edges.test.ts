@@ -1,7 +1,7 @@
 /**
  * Value-reference edges (TS/JS): same-file `references` edges from a reader
  * symbol to the file-scope const/var it reads, so impact analysis catches
- * "change this constant, affect its readers". Default on; CODEGRAPH_VALUE_REFS=0
+ * "change this constant, affect its readers". Default on; SPRINGGRAPH_VALUE_REFS=0
  * disables. See TreeSitterExtractor.flushValueRefs.
  */
 
@@ -9,9 +9,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import CodeGraph from '../src';
+import Springgraph from '../src';
 
-function valueRefReaders(cg: CodeGraph, constName: string): string[] {
+function valueRefReaders(cg: Springgraph, constName: string): string[] {
   // Aggregate across ALL nodes of this name — a conditionally-defined module
   // const (`try: X=…; except: X=…`) has more than one, and the edge targets
   // whichever one ended up in the target map.
@@ -30,10 +30,10 @@ function valueRefReaders(cg: CodeGraph, constName: string): string[] {
 
 describe('value-reference edges', () => {
   let dir: string;
-  let cg: CodeGraph | undefined;
+  let cg: Springgraph | undefined;
 
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-valueref-'));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-valueref-'));
   });
   afterEach(() => {
     cg?.destroy();
@@ -41,8 +41,8 @@ describe('value-reference edges', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  function index(): CodeGraph {
-    const g = CodeGraph.initSync(dir, { config: { include: ['**/*.ts', '**/*.tsx'], exclude: [] } });
+  function index(): Springgraph {
+    const g = Springgraph.initSync(dir, { config: { include: ['**/*.ts', '**/*.tsx'], exclude: [] } });
     return g;
   }
 
@@ -705,9 +705,9 @@ describe('value-reference edges', () => {
     expect(valueRefReaders(cg, 'TIMEOUT')).toEqual([]);
   });
 
-  it('emits nothing when CODEGRAPH_VALUE_REFS=0', async () => {
-    const prev = process.env.CODEGRAPH_VALUE_REFS;
-    process.env.CODEGRAPH_VALUE_REFS = '0';
+  it('emits nothing when SPRINGGRAPH_VALUE_REFS=0', async () => {
+    const prev = process.env.SPRINGGRAPH_VALUE_REFS;
+    process.env.SPRINGGRAPH_VALUE_REFS = '0';
     try {
       fs.writeFileSync(
         path.join(dir, 'config.ts'),
@@ -717,8 +717,8 @@ describe('value-reference edges', () => {
       await cg.indexAll();
       expect(valueRefReaders(cg, 'TABLE_CONFIG')).toEqual([]);
     } finally {
-      if (prev === undefined) delete process.env.CODEGRAPH_VALUE_REFS;
-      else process.env.CODEGRAPH_VALUE_REFS = prev;
+      if (prev === undefined) delete process.env.SPRINGGRAPH_VALUE_REFS;
+      else process.env.SPRINGGRAPH_VALUE_REFS = prev;
     }
   });
 });

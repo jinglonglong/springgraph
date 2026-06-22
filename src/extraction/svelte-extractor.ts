@@ -286,7 +286,7 @@ export class SvelteExtractor {
    * PascalCase tags like <Modal>, <Button />, <DevServerPreview> represent
    * component instantiations — analogous to function calls in imperative code.
    * Capturing these creates graph edges from parent to child components and
-   * gives codegraph_explore anchor points in the template markup.
+   * gives springgraph_explore anchor points in the template markup.
    */
   private extractTemplateComponents(componentNodeId: string): void {
     // Build ranges covered by <script> and <style> blocks to skip them

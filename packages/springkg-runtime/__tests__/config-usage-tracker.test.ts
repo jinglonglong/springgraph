@@ -14,7 +14,7 @@ function createMockKg() {
         edges.push(edge);
       }
     },
-    codegraph: {
+    springgraph: {
       findNodes: async ({ decoratorPattern }: { decoratorPattern: string }) => {
         // Return mock nodes based on test fixtures
         return [];
@@ -34,8 +34,8 @@ describe('ConfigPropertyUsageTracker', () => {
   it('case 1: UserService.java with @Value("${spring.datasource.url}") on field -> 1 USED_BY edge', async () => {
     const kg = createMockKg();
 
-    // Mock codegraph nodes with @Value
-    kg.codegraph.findNodes = async () => [
+    // Mock springgraph nodes with @Value
+    kg.springgraph.findNodes = async () => [
       {
         id: 'field:UserService:dbUrl',
         name: 'dbUrl',
@@ -66,8 +66,8 @@ describe('ConfigPropertyUsageTracker', () => {
   it('case 2: AppProperties.java with @ConfigurationProperties(prefix = "app.datasource") and runtime_config_properties has app.datasource.max-pool-size, app.datasource.min-idle -> 2 USED_BY edges', async () => {
     const kg = createMockKg();
 
-    // Mock codegraph nodes with @ConfigurationProperties
-    kg.codegraph.findNodes = async () => [
+    // Mock springgraph nodes with @ConfigurationProperties
+    kg.springgraph.findNodes = async () => [
       {
         id: 'class:AppProperties',
         name: 'AppProperties',

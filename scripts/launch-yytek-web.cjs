@@ -1,16 +1,16 @@
-// Launch the CodeGraph web server for the yytek-iot-cloud project
+// Launch the Springgraph web server for the yytek-iot-cloud project
 // Uses the compiled dist/ to avoid WASM resolution issues
-const { CodeGraph } = require('../dist/index.js');
+const { Springgraph } = require('../dist/index.js');
 const { startWebServer } = require('../dist/web/server.js');
 const path = require('path');
 
 async function main() {
   const projectPath = 'D:/code/yytek-iot-cloud';
-  const port = Number(process.env.CODEGRAPH_WEB_PORT || 7333);
+  const port = Number(process.env.SPRINGGRAPH_WEB_PORT || 7333);
   const publicDir = path.resolve(__dirname, '..', 'dist', 'web', 'public');
 
-  console.log('[launch-web] Opening CodeGraph index for:', projectPath);
-  const cg = await CodeGraph.open(projectPath);
+  console.log('[launch-web] Opening Springgraph index for:', projectPath);
+  const cg = await Springgraph.open(projectPath);
 
   console.log('[launch-web] Starting web server on port', port);
   const { url, close } = await startWebServer(cg, {

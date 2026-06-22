@@ -22,11 +22,11 @@ export type {
   SpringKgNode,
   SpringKgEdge,
   TeamBEnhanceOutput as SpringKgEnhanceOutput,
-  CodegraphNodeLike,
-  CodegraphEdgeLike,
+  SpringgraphNodeLike,
+  SpringgraphEdgeLike,
   TeamBResolver as Resolver,
   TeamBEnhanceInput as SpringKgEnhanceInput,
-  CodegraphCgStub,
+  SpringgraphCgStub,
 } from './team-b-types';
 
-export { makeCodegraphStub } from './team-b-types';
+export { makeSpringgraphStub } from './team-b-types';

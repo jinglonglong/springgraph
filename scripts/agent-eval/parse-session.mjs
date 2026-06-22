@@ -77,10 +77,10 @@ console.log(`session: ${sessionId}`);
 console.log(`\nMAIN thread tools:\n${fmt(mainCounts)}`);
 console.log(`\nSUBAGENT tools (${subAgentFiles} subagent transcript${subAgentFiles === 1 ? '' : 's'}):\n${fmt(subCounts)}`);
 
-const explore = subCounts['mcp__codegraph__codegraph_explore'] || mainCounts['mcp__codegraph__codegraph_explore'] || 0;
+const explore = subCounts['mcp__springgraph__springgraph_explore'] || mainCounts['mcp__springgraph__springgraph_explore'] || 0;
 const reads = (subCounts['Read'] || 0) + (mainCounts['Read'] || 0);
 const greps = (subCounts['Grep'] || 0) + (mainCounts['Grep'] || 0) + (subCounts['Bash'] || 0) + (mainCounts['Bash'] || 0);
-console.log(`\nVERDICT: codegraph_explore used ${explore}x | Read ${reads} | Grep/Bash ${greps}`);
+console.log(`\nVERDICT: springgraph_explore used ${explore}x | Read ${reads} | Grep/Bash ${greps}`);
 
 // Token totals (main + subagents), consistent across main-thread and subagent runs.
 const tok = { gen: 0, fresh: 0, cached: 0 };

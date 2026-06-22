@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Re-run the README "Benchmark Results" A/B (with vs without codegraph) on the
+# Re-run the README "Benchmark Results" A/B (with vs without springgraph) on the
 # current build: the 7 README repos, same queries, RUNS per arm (default 4).
 # Output → /tmp/ab-readme/<repo>/run<n>/run-headless-{with,without}.jsonl
 # Aggregate with parse-bench-readme.mjs. Repos must be cloned + indexed under
-# $CORPUS (default /tmp/codegraph-corpus) by the build under test.
+# $CORPUS (default /tmp/springgraph-corpus) by the build under test.
 set -uo pipefail
 H="$(cd "$(dirname "$0")" && pwd)"
-C="${CORPUS:-/tmp/codegraph-corpus}"
+C="${CORPUS:-/tmp/springgraph-corpus}"
 RUNS="${RUNS:-4}"
 ROWS=(
 "vscode|How does the extension host communicate with the main process?"

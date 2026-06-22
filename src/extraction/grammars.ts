@@ -118,7 +118,7 @@ export const EXTENSION_MAP: Record<string, Language> = {
 };
 
 /**
- * Whether a file is one CodeGraph can parse, based purely on its extension.
+ * Whether a file is one Springgraph can parse, based purely on its extension.
  * This is the single source of truth for "should we index this file" — derived
  * from EXTENSION_MAP so parser support and indexing selection never drift.
  */
@@ -223,7 +223,7 @@ export async function loadGrammarsForLanguages(languages: Language[]): Promise<v
       languageCache.set(lang, language);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[CodeGraph] Failed to load ${lang} grammar — parsing will be unavailable: ${message}`);
+      console.warn(`[Springgraph] Failed to load ${lang} grammar — parsing will be unavailable: ${message}`);
       unavailableGrammarErrors.set(lang, message);
     }
   }

@@ -19,9 +19,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execFileSync } from 'child_process';
-import CodeGraph from '../src/index';
+import Springgraph from '../src/index';
 import { scanDirectory, buildScopeIgnore, discoverEmbeddedRepoRoots } from '../src/extraction';
-import { removeDirWithRetries, safeCloseCodeGraph } from './setup';
+import { removeDirWithRetries, safeCloseSpringgraph } from './setup';
 
 function git(cwd: string, ...args: string[]): void {
   execFileSync('git', args, { cwd, stdio: ['ignore', 'ignore', 'ignore'] });
@@ -41,7 +41,7 @@ function write(file: string, content: string): void {
 
 describe('multi-repo workspaces (#514)', () => {
   let ws: string;
-  let activeCg: CodeGraph | undefined;
+  let activeCg: Springgraph | undefined;
 
   beforeEach(() => {
     ws = fs.mkdtempSync(path.join(os.tmpdir(), 'cg-multirepo-'));
@@ -49,7 +49,7 @@ describe('multi-repo workspaces (#514)', () => {
 
   afterEach(() => {
     return (async () => {
-      await safeCloseCodeGraph(activeCg);
+      await safeCloseSpringgraph(activeCg);
       activeCg = undefined;
       await removeDirWithRetries(ws);
     })();
@@ -215,7 +215,7 @@ describe('multi-repo workspaces (#514)', () => {
     write(path.join(ws, '.gitignore'), '/packages/\n');
     makeRepo(ws);
 
-    activeCg = CodeGraph.initSync(ws, { config: { include: ['**/*.ts'], exclude: [] } });
+    activeCg = Springgraph.initSync(ws, { config: { include: ['**/*.ts'], exclude: [] } });
     try {
       await activeCg.indexAll();
       expect(activeCg.searchNodes('login', { limit: 5 }).length).toBeGreaterThan(0);
@@ -227,7 +227,7 @@ describe('multi-repo workspaces (#514)', () => {
 
       expect(activeCg.searchNodes('logout', { limit: 5 }).length).toBeGreaterThan(0);
     } finally {
-      await safeCloseCodeGraph(activeCg);
+      await safeCloseSpringgraph(activeCg);
       activeCg = undefined;
     }
   }, 15000);

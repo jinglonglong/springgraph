@@ -36,8 +36,8 @@ catches "change this constant / config object / lookup table → affect its read
 of change calls/imports/inheritance edges never captured (a const's consumers used to look
 like "nothing depends on this").
 
-**Where it flows:** straight into `getImpactRadius` → `codegraph impact` and the impact trail
-in `codegraph_explore` / `codegraph_node`. No agent-behaviour change required. **The win is
+**Where it flows:** straight into `getImpactRadius` → `springgraph impact` and the impact trail
+in `springgraph_explore` / `springgraph_node`. No agent-behaviour change required. **The win is
 impact-radius correctness** (a const 90 symbols read going from "1 affected" to "90"), *not*
 agent read-reduction (see §4.3).
 
@@ -46,7 +46,7 @@ agent read-reduction (see §4.3).
 | Symbol | Role |
 |---|---|
 | `VALUE_REF_LANGS` (static Set) | languages the feature runs for. Currently `typescript`, `javascript`, `tsx`, `go`, `python`, `rust`, `ruby`, `c`, `java`, `csharp`, `php`, `scala`, `kotlin`, `swift`, `dart`, `pascal`. **Add the new language here.** |
-| `valueRefsEnabled` | `process.env.CODEGRAPH_VALUE_REFS !== '0'` — default ON, env opts out. |
+| `valueRefsEnabled` | `process.env.SPRINGGRAPH_VALUE_REFS !== '0'` — default ON, env opts out. |
 | `MAX_VALUE_REF_NODES` (20_000) | per-scope traversal cap (and the shadow-scan cap). |
 | `captureValueRefScope(kind, name, id, node)` | called from `createNode` on every node. Records **targets** (file-scope `const`/`var`) and **reader scopes** (`function`/`method`/`const`/`var`). |
 | `flushValueRefs()` | called once at end of `extract()`. Prunes shadowed targets, then for each reader scope walks its subtree for identifiers matching a target name and emits the edges. |
@@ -66,7 +66,7 @@ targets** (see §3).
 
 ## 2. Current state (what's shipped + validated)
 
-- **Default ON** for TS/JS/tsx + Go + Python + Rust + Ruby + C + Java + C# (`CODEGRAPH_VALUE_REFS=0` disables). Shipped in **PR #895**
+- **Default ON** for TS/JS/tsx + Go + Python + Rust + Ruby + C + Java + C# (`SPRINGGRAPH_VALUE_REFS=0` disables). Shipped in **PR #895**
   (flip-on + the shadow prune); Go added in a later PR (the shadow-prune declarator switch +
   `VALUE_REF_LANGS`); C added later still (extractor change to emit the nodes + the bare-identifier
   misparse guard); Java + C# after that (field→constant kind switch for the const subset).
@@ -154,7 +154,7 @@ targets** (see §3).
   miss); not worth normalizing.
 - **Tests:** `__tests__/value-reference-edges.test.ts` — same-file readers edged; surfaced in
   impact radius; shadowed const NOT edged (verified to fail without the guard); JSX-only read
-  edged (tsx); `CODEGRAPH_VALUE_REFS=0` emits nothing.
+  edged (tsx); `SPRINGGRAPH_VALUE_REFS=0` emits nothing.
 - **Memory:** `value-reference-edges-default-on` (the A/B finding + shadow guard rationale).
 
 ---
@@ -269,21 +269,21 @@ reads with no static identifier aren't covered.
 
 ### 4.1 Deterministic probe (the core — finds FPs)
 
-Index the same repo twice (on vs `CODEGRAPH_VALUE_REFS=0`); node count **must be identical**
+Index the same repo twice (on vs `SPRINGGRAPH_VALUE_REFS=0`); node count **must be identical**
 (edges-only feature). Build first: `npm run build`. Save this as `probe.sh`:
 
 ```bash
 #!/usr/bin/env bash
 set -uo pipefail
 SRC="$1"; NAME="$2"; WORK="${WORK:-/tmp/cg-vr}"
-CG="$(pwd)/dist/bin/codegraph.js"
-export CODEGRAPH_TELEMETRY=0 DO_NOT_TRACK=1 CODEGRAPH_NO_DAEMON=1
+CG="$(pwd)/dist/bin/springgraph.js"
+export SPRINGGRAPH_TELEMETRY=0 DO_NOT_TRACK=1 SPRINGGRAPH_NO_DAEMON=1
 ON="$WORK/$NAME-on"; OFF="$WORK/$NAME-off"
 rm -rf "$ON" "$OFF"; mkdir -p "$WORK"
 rsync -a --exclude='.git' "$SRC/" "$ON/"; rsync -a --exclude='.git' "$SRC/" "$OFF/"
 node "$CG" init "$ON"  2>&1 | grep -E "nodes,|Indexed"
-CODEGRAPH_VALUE_REFS=0 node "$CG" init "$OFF" 2>&1 | grep -E "nodes,|Indexed"
-OND="$ON/.codegraph/codegraph.db"; OFD="$OFF/.codegraph/codegraph.db"
+SPRINGGRAPH_VALUE_REFS=0 node "$CG" init "$OFF" 2>&1 | grep -E "nodes,|Indexed"
+OND="$ON/.springgraph/springgraph.db"; OFD="$OFF/.springgraph/springgraph.db"
 echo "nodes on/off: $(sqlite3 "$OND" 'select count(*) from nodes') / $(sqlite3 "$OFD" 'select count(*) from nodes')  (MUST MATCH)"
 # PRECISE filter — do NOT use LIKE '%valueRef%' (it matches filenames like
 # textModelValueReference.ts; see §7). Always: kind='references' AND the exact key.
@@ -320,8 +320,8 @@ Headline metric — value-refs turns a blind impact into a real one:
 ```bash
 for s in SOME_CONST ANOTHER_CONST; do
   printf "%-20s ON %s OFF %s\n" "$s" \
-    "$(node dist/bin/codegraph.js impact "$s" --path "$ON"  2>/dev/null | grep -oE '— [0-9]+ affected' | head -1)" \
-    "$(node dist/bin/codegraph.js impact "$s" --path "$OFF" 2>/dev/null | grep -oE '— [0-9]+ affected' | head -1)"
+    "$(node dist/bin/springgraph.js impact "$s" --path "$ON"  2>/dev/null | grep -oE '— [0-9]+ affected' | head -1)" \
+    "$(node dist/bin/springgraph.js impact "$s" --path "$OFF" 2>/dev/null | grep -oE '— [0-9]+ affected' | head -1)"
 done
 ```
 Pick targets from the probe's "top targets" list. Expect ON ≫ OFF (e.g. 1 → 90).
@@ -336,9 +336,9 @@ index — don't use it as-is for a flag A/B.** (Memories: `agent-eval-nested-att
 
 **The established A/B finding (don't re-derive):** across 12 runs on excalidraw both arms did
 0 Read / 0 Grep — the agent answers impact questions in one call and reaches for
-`codegraph_search`/`callers`, *not* `impact`/`explore`, so it often doesn't query the
+`springgraph_search`/`callers`, *not* `impact`/`explore`, so it often doesn't query the
 value-ref edges at all. ON was never worse than OFF. **So: value-refs does NOT reduce agent
-reads — the win is blast-radius correctness** (impact API / CodeGraph Pro's verdict engine).
+reads — the win is blast-radius correctness** (impact API / Springgraph Pro's verdict engine).
 
 ---
 
@@ -470,7 +470,7 @@ fixed); impact delta shows the blind→real radius win; full test suite green.
   query noise.
 - **`searchNodes` returns `SearchResult[]`** (`.node` wraps the `Node`) — in tests use
   `.map(r => r.node)`. `getImpactRadius().nodes` is a **`Map`** — iterate `.values()`.
-- **`CodeGraph.initSync(dir, opts)` ignores `opts`** — it takes only the path; the default
+- **`Springgraph.initSync(dir, opts)` ignores `opts`** — it takes only the path; the default
   config indexes `.ts`/`.tsx`/`.js`. Don't rely on a passed `include`.
 - **Node count must be identical on/off.** If it isn't, value-refs is (wrongly) creating nodes
   — investigate before anything else.

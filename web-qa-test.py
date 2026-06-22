@@ -56,7 +56,7 @@ with sync_playwright() as p:
     print("5. Testing search functionality...")
     search_input = page.locator('input[type="text"], input[placeholder*="搜索"], input[placeholder*="search"]')
     if search_input.count() > 0:
-        search_input.first.fill('CodeGraph')
+        search_input.first.fill('Springgraph')
         page.wait_for_timeout(500)
         print("   Search input works: YES")
         # Clear
@@ -77,7 +77,7 @@ with sync_playwright() as p:
         for w in warnings[:3]:
             print(f"     - {w}")
 
-    page.screenshot(path='D:/code/codegraph-springcloud/web-qa-screenshot.png', full_page=True)
+    page.screenshot(path='D:/code/springgraph-springcloud/web-qa-screenshot.png', full_page=True)
     print("\n7. Screenshot saved to web-qa-screenshot.png")
 
     browser.close()

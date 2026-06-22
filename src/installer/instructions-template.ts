@@ -11,13 +11,13 @@
  *
  *  - **Task-tool subagents** — they receive the project instructions file
  *    in their context but NOT the MCP initialize instructions. They hold
- *    the codegraph MCP tools only as deferred names and rarely think to
+ *    the springgraph MCP tools only as deferred names and rarely think to
  *    load them: measured on a forced-delegation flow question (excalidraw,
- *    sonnet, high effort), subagents loaded + used codegraph in ~1 of 9
+ *    sonnet, high effort), subagents loaded + used springgraph in ~1 of 9
  *    runs without this block, and consistently with it — including runs
  *    with zero Read/grep fallback.
  *  - **Non-MCP harnesses** — agents with no MCP client at all can still
- *    run the `codegraph explore` / `codegraph node` CLI, which prints the
+ *    run the `springgraph explore` / `springgraph node` CLI, which prints the
  *    same output as the MCP tools.
  *
  * Keep this block SHORT. The main agent reads it every turn on top of the
@@ -26,8 +26,8 @@
  */
 
 /** Markers used by the marker-based section write/removal. */
-export const CODEGRAPH_SECTION_START = '<!-- CODEGRAPH_START -->';
-export const CODEGRAPH_SECTION_END = '<!-- CODEGRAPH_END -->';
+export const SPRINGGRAPH_SECTION_START = '<!-- SPRINGGRAPH_START -->';
+export const SPRINGGRAPH_SECTION_END = '<!-- SPRINGGRAPH_END -->';
 
 /**
  * The full block, markers included, exactly as written to disk.
@@ -36,16 +36,16 @@ export const CODEGRAPH_SECTION_END = '<!-- CODEGRAPH_END -->';
  * a global install writes this into a user-scope file (~/.claude/CLAUDE.md,
  * ~/.codex/AGENTS.md) that applies to every project the user opens —
  * including unindexed ones, where an unconditional "this repository is
- * indexed" claim would send subagents into failing codegraph calls (the
+ * indexed" claim would send subagents into failing springgraph calls (the
  * noise the unindexed-session policy exists to prevent).
  */
-export const CODEGRAPH_INSTRUCTIONS_BLOCK = `${CODEGRAPH_SECTION_START}
-## CodeGraph
+export const SPRINGGRAPH_INSTRUCTIONS_BLOCK = `${SPRINGGRAPH_SECTION_START}
+## Springgraph
 
-In repositories indexed by CodeGraph (a \`.codegraph/\` directory exists at the repo root), reach for it BEFORE grep/find or reading files when you need to understand or locate code:
+In repositories indexed by Springgraph (a \`.springgraph/\` directory exists at the repo root), reach for it BEFORE grep/find or reading files when you need to understand or locate code:
 
-- **MCP tools** (when available): \`codegraph_explore\` answers most code questions in one call — the relevant symbols' verbatim source plus the call paths between them. \`codegraph_node\` returns one symbol's source + callers, or reads a whole file with line numbers. If the tools are listed but deferred, load them by name via tool search.
-- **Shell** (always works): \`codegraph explore "<symbol names or question>"\` and \`codegraph node <symbol-or-file>\` print the same output.
+- **MCP tools** (when available): \`springgraph_explore\` answers most code questions in one call — the relevant symbols' verbatim source plus the call paths between them. \`springgraph_node\` returns one symbol's source + callers, or reads a whole file with line numbers. If the tools are listed but deferred, load them by name via tool search.
+- **Shell** (always works): \`springgraph explore "<symbol names or question>"\` and \`springgraph node <symbol-or-file>\` print the same output.
 
-If there is no \`.codegraph/\` directory, skip CodeGraph entirely — indexing is the user's decision.
-${CODEGRAPH_SECTION_END}`;
+If there is no \`.springgraph/\` directory, skip Springgraph entirely — indexing is the user's decision.
+${SPRINGGRAPH_SECTION_END}`;

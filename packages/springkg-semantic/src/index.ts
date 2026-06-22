@@ -5,8 +5,8 @@
 export type {
   SpringKgNodeKind,
   SpringKgEdgeKind,
-  CodegraphNodeLike,
-  CodegraphEdgeLike,
+  SpringgraphNodeLike,
+  SpringgraphEdgeLike,
   SpringKgNode,
   SpringKgEdge,
   SpringKgEnhanceInput,

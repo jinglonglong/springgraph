@@ -2,7 +2,7 @@
  * Module-qualified symbol lookup (`stage_apply::run`, `Session.request`,
  * `configurator/stage_apply`).
  *
- * Pinned because the lookup vocabulary is what makes codegraph useful
+ * Pinned because the lookup vocabulary is what makes springgraph useful
  * in workspaces with same-named symbols across modules — Rust
  * sub-pipelines, Python `__init__.py` packages, Java packages, etc.
  * See #173 for the original report: a `run` function in
@@ -36,7 +36,7 @@ function hasSqliteBindings(): boolean {
 const HAS_SQLITE = hasSqliteBindings();
 
 function tmpRoot(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-symbol-lookup-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-symbol-lookup-'));
 }
 
 function rmTree(dir: string): void {
@@ -81,9 +81,9 @@ describe.skipIf(!HAS_SQLITE)('matchesSymbol — module-qualified lookups (#173)'
 
   beforeEach(async () => {
     projectRoot = await buildRustWorkspace();
-    const CodeGraph = (await import('../src/index')).default;
+    const Springgraph = (await import('../src/index')).default;
     const { ToolHandler } = await import('../src/mcp/tools');
-    cg = CodeGraph.initSync(projectRoot, {
+    cg = Springgraph.initSync(projectRoot, {
       config: { include: ['**/*.rs'], exclude: [] },
     });
     await cg.indexAll();
@@ -155,10 +155,10 @@ describe.skipIf(!HAS_SQLITE)('matchesSymbol — module-qualified lookups (#173)'
     expect(matches.length).toBe(0);
   });
 
-  it('codegraph_node with a `file` hint pins an overloaded name to that file', async () => {
+  it('springgraph_node with a `file` hint pins an overloaded name to that file', async () => {
     // `run` is defined in BOTH stage_apply.rs and stage_detect.rs. A bare lookup
     // returns both; the `file` hint narrows to the one the caller saw in a trail.
-    const res = await handler.execute('codegraph_node', {
+    const res = await handler.execute('springgraph_node', {
       symbol: 'run',
       includeCode: true,
       file: 'stage_detect.rs',
@@ -184,9 +184,9 @@ describe.skipIf(!HAS_SQLITE)('matchesSymbol — dotted lookups (regression for #
       `export class Session {\n  request(): void { fetch('x'); }\n}\nexport function request(): void {}\n`
     );
 
-    const CodeGraph = (await import('../src/index')).default;
+    const Springgraph = (await import('../src/index')).default;
     const { ToolHandler } = await import('../src/mcp/tools');
-    cg = CodeGraph.initSync(projectRoot, {
+    cg = Springgraph.initSync(projectRoot, {
       config: { include: ['src/**/*.ts'], exclude: [] },
     });
     await cg.indexAll();
@@ -207,11 +207,11 @@ describe.skipIf(!HAS_SQLITE)('matchesSymbol — dotted lookups (regression for #
     expect(matches[0]!.qualifiedName).toContain('Session::request');
   });
 
-  it('codegraph_node on an ambiguous bare name returns ALL overloads with bodies (no guess)', async () => {
+  it('springgraph_node on an ambiguous bare name returns ALL overloads with bodies (no guess)', async () => {
     // `request` is BOTH a method (Session.request) and a free function. The old
     // behavior returned one + a dead-end "Others:" note, forcing a Read to get
     // the other overload; now both bodies come back in one call.
-    const res = await handler.execute('codegraph_node', { symbol: 'request', includeCode: true });
+    const res = await handler.execute('springgraph_node', { symbol: 'request', includeCode: true });
     const text = res.content?.[0]?.text ?? '';
     expect(text).toContain('2 definitions named "request"');
     // Both definitions are rendered (method + function), each with a Location.

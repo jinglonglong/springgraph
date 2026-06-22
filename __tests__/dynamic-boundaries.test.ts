@@ -1,7 +1,7 @@
 /**
  * Dynamic-boundary surfacing (#687).
  *
- * When the flow an agent asked codegraph_explore about does NOT fully connect,
+ * When the flow an agent asked springgraph_explore about does NOT fully connect,
  * the Flow section announces WHERE the static path ends — the dynamic-dispatch
  * site (computed member call, getattr, typed bus, runtime-keyed emit), with
  * candidate targets when a key is statically visible — instead of silently
@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import CodeGraph from '../src/index';
+import Springgraph from '../src/index';
 import { ToolHandler } from '../src/mcp/tools';
 import { scanDynamicDispatch } from '../src/mcp/dynamic-boundaries';
 
@@ -124,22 +124,22 @@ describe('scanDynamicDispatch', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Integration: codegraph_explore output
+// Integration: springgraph_explore output
 // ---------------------------------------------------------------------------
 
-describe('codegraph_explore — dynamic boundaries', () => {
+describe('springgraph_explore — dynamic boundaries', () => {
   let testDir: string;
-  let cg: CodeGraph;
+  let cg: Springgraph;
   let handler: ToolHandler;
 
   const setup = async (files: Record<string, string>, include: string[]) => {
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-boundary-'));
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-boundary-'));
     const src = path.join(testDir, 'src');
     fs.mkdirSync(src, { recursive: true });
     for (const [name, content] of Object.entries(files)) {
       fs.writeFileSync(path.join(src, name), content);
     }
-    cg = CodeGraph.initSync(testDir, { config: { include, exclude: [] } });
+    cg = Springgraph.initSync(testDir, { config: { include, exclude: [] } });
     await cg.indexAll();
     handler = new ToolHandler(cg);
   };
@@ -168,7 +168,7 @@ describe('codegraph_explore — dynamic boundaries', () => {
       ].join('\n'),
     }, ['**/*.ts']);
 
-    const res = await handler.execute('codegraph_explore', { query: 'routeSave onSave' });
+    const res = await handler.execute('springgraph_explore', { query: 'routeSave onSave' });
     const text = res.content[0].text as string;
 
     expect(text).toContain('## Dynamic boundaries');
@@ -196,7 +196,7 @@ describe('codegraph_explore — dynamic boundaries', () => {
       'handlers.ts': 'export function onSave(payload: unknown) { return payload; }',
     }, ['**/*.ts']);
 
-    const res = await handler.execute('codegraph_explore', { query: 'route onSave' });
+    const res = await handler.execute('springgraph_explore', { query: 'route onSave' });
     const text = res.content[0].text as string;
 
     expect(text).toContain('## Dynamic boundaries');
@@ -219,7 +219,7 @@ describe('codegraph_explore — dynamic boundaries', () => {
     }, ['**/*.ts']);
 
     // `processPayment` does not exist anywhere — only `route` resolves.
-    const res = await handler.execute('codegraph_explore', { query: 'route processPayment' });
+    const res = await handler.execute('springgraph_explore', { query: 'route processPayment' });
     const text = res.content[0].text as string;
     expect(text).toContain('## Dynamic boundaries');
   });
@@ -251,7 +251,7 @@ describe('codegraph_explore — dynamic boundaries', () => {
       ].join('\n'),
     }, ['**/*.ts']);
 
-    const res = await handler.execute('codegraph_explore', { query: 'completeCheckout settleInvoice' });
+    const res = await handler.execute('springgraph_explore', { query: 'completeCheckout settleInvoice' });
     const text = res.content[0].text as string;
 
     expect(text).toContain('## Dynamic-dispatch links among your symbols');
@@ -270,7 +270,7 @@ describe('codegraph_explore — dynamic boundaries', () => {
       ].join('\n'),
     }, ['**/*.ts']);
 
-    const res = await handler.execute('codegraph_explore', { query: 'stepOne stepThree' });
+    const res = await handler.execute('springgraph_explore', { query: 'stepOne stepThree' });
     const text = res.content[0].text as string;
     expect(text).toContain('## Flow');
     expect(text).not.toContain('## Dynamic boundaries');
@@ -289,7 +289,7 @@ describe('codegraph_explore — dynamic boundaries', () => {
       ].join('\n'),
     }, ['**/*.py']);
 
-    const res = await handler.execute('codegraph_explore', { query: 'process handle_save' });
+    const res = await handler.execute('springgraph_explore', { query: 'process handle_save' });
     const text = res.content[0].text as string;
 
     expect(text).toContain('## Dynamic boundaries');

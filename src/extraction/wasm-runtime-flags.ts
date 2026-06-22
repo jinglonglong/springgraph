@@ -44,7 +44,7 @@ export const WASM_RUNTIME_FLAGS: readonly string[] = ['--liftoff-only'];
  * Env var set on the relaunched child so a detection slip can never cause an
  * infinite re-exec loop. Also lets users force-disable the relaunch.
  */
-const RELAUNCH_GUARD_ENV = 'CODEGRAPH_WASM_RELAUNCHED';
+const RELAUNCH_GUARD_ENV = 'SPRINGGRAPH_WASM_RELAUNCHED';
 
 /**
  * Env var carrying the *host* PID (the relauncher's own parent) across the
@@ -57,7 +57,7 @@ const RELAUNCH_GUARD_ENV = 'CODEGRAPH_WASM_RELAUNCHED';
  * present), where the server is already a direct child of the host. See
  * src/mcp/index.ts (#277).
  */
-export const HOST_PPID_ENV = 'CODEGRAPH_HOST_PPID';
+export const HOST_PPID_ENV = 'SPRINGGRAPH_HOST_PPID';
 
 /** True when every required WASM runtime flag is already present in `execArgv`. */
 export function processHasWasmRuntimeFlags(
@@ -84,7 +84,7 @@ export function buildRelaunchArgv(
  * If the current process is missing the WASM runtime flags, re-exec it once
  * with them and exit with the child's status. No-op when the flags are already
  * present (the normal bundled-launcher path), when already relaunched, or when
- * disabled via CODEGRAPH_NO_RELAUNCH.
+ * disabled via SPRINGGRAPH_NO_RELAUNCH.
  *
  * On spawn failure, returns so the caller runs in-process anyway — risking the
  * OOM is still better than refusing to start.
@@ -92,7 +92,7 @@ export function buildRelaunchArgv(
 export function relaunchWithWasmRuntimeFlagsIfNeeded(scriptPath: string): void {
   if (processHasWasmRuntimeFlags()) return;
   if (process.env[RELAUNCH_GUARD_ENV]) return;
-  if (process.env.CODEGRAPH_NO_RELAUNCH) return;
+  if (process.env.SPRINGGRAPH_NO_RELAUNCH) return;
 
   const argv = buildRelaunchArgv(scriptPath, process.argv.slice(2));
   const result = spawnSync(process.execPath, argv, {

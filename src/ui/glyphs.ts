@@ -11,16 +11,16 @@
  * ASCII glyphs whenever the terminal is not known to handle UTF-8.
  *
  * Detection is intentionally simple:
- *   - `CODEGRAPH_ASCII=1`  -> ASCII (escape hatch for any terminal)
- *   - `CODEGRAPH_UNICODE=1` -> Unicode (opt-in on Windows)
+ *   - `SPRINGGRAPH_ASCII=1`  -> ASCII (escape hatch for any terminal)
+ *   - `SPRINGGRAPH_UNICODE=1` -> Unicode (opt-in on Windows)
  *   - Windows              -> ASCII by default
  *   - Linux kernel console (`TERM=linux`) -> ASCII
  *   - Everything else      -> Unicode
  */
 
 export function supportsUnicode(): boolean {
-  if (process.env.CODEGRAPH_ASCII === '1') return false;
-  if (process.env.CODEGRAPH_UNICODE === '1') return true;
+  if (process.env.SPRINGGRAPH_ASCII === '1') return false;
+  if (process.env.SPRINGGRAPH_UNICODE === '1') return true;
   if (process.platform === 'win32') return false;
   return process.env.TERM !== 'linux';
 }

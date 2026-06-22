@@ -35,7 +35,7 @@ export function detectArchitectureProfile(
   const allMatches: ArchitectureProfileMatch[] = [];
 
   // Determine project root from database path: db.getPath() is usually:
-  // <projectRoot>/.codegraph/codegraph.db
+  // <projectRoot>/.springgraph/springgraph.db
   const dbPath = db.getPath();
   const projectRoot = path.dirname(path.dirname(dbPath));
 

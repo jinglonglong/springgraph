@@ -1,13 +1,13 @@
 /**
- * CodeGraph Web UI Server
+ * Springgraph Web UI Server
  *
- * Local-only HTTP server that exposes the CodeGraph API over a REST surface and
+ * Local-only HTTP server that exposes the Springgraph API over a REST surface and
  * serves the bundled web UI (Cytoscape.js graph viewer) from src/web/public/.
  *
  * Design notes:
  * - Uses Node's built-in `http` module — no extra runtime dependencies.
  * - All routes are JSON except the static file handler, which streams files.
- * - Path resolution happens once at startup; the running CodeGraph instance is
+ * - Path resolution happens once at startup; the running Springgraph instance is
  *   shared across requests (no re-open per call).
  * - Stays bound to localhost by default — the data on disk can include file
  *   paths, docstrings, and source snippets. `--host 0.0.0.0` is opt-in.
@@ -16,7 +16,7 @@ import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as url from 'url';
-import CodeGraphDefault, { type CodeGraph } from '../index';
+import SpringgraphDefault, { type Springgraph } from '../index';
 import { isInitialized } from '../directory';
 import { NODE_KINDS, type Node, type Edge } from '../types';
 import { handleArchitectureRoute, matchesFilters, parseFilters } from './architecture-api';
@@ -111,12 +111,12 @@ function resolveProjectRootFromInput(input: string): string {
   }
   if (!stat.isDirectory()) throw new Error(`Path is not a directory: ${trimmed}`);
 
-  const projectRoot = fs.existsSync(path.join(resolved, 'codegraph.db'))
+  const projectRoot = fs.existsSync(path.join(resolved, 'springgraph.db'))
     ? path.dirname(resolved)
     : resolved;
 
   if (!isInitialized(projectRoot)) {
-    throw new Error(`CodeGraph index not found. Pass a project root or its .codegraph directory: ${trimmed}`);
+    throw new Error(`Springgraph index not found. Pass a project root or its .springgraph directory: ${trimmed}`);
   }
   return fs.realpathSync(projectRoot);
 }
@@ -136,9 +136,9 @@ function listFilesystemRoots(): Array<{ name: string; path: string }> {
 function listDirectories(currentPath: string): {
   path: string;
   parent: string | null;
-  isCodeGraphProject: boolean;
-  isCodeGraphDir: boolean;
-  entries: Array<{ name: string; path: string; isCodeGraphProject: boolean; isCodeGraphDir: boolean }>;
+  isSpringgraphProject: boolean;
+  isSpringgraphDir: boolean;
+  entries: Array<{ name: string; path: string; isSpringgraphProject: boolean; isSpringgraphDir: boolean }>;
 } {
   const resolved = fs.realpathSync(path.resolve(currentPath));
   const stat = fs.statSync(resolved);
@@ -147,25 +147,25 @@ function listDirectories(currentPath: string): {
     .filter((entry) => entry.isDirectory())
     .map((entry) => {
       const entryPath = path.join(resolved, entry.name);
-      const isCodeGraphDir = fs.existsSync(path.join(entryPath, 'codegraph.db'));
+      const isSpringgraphDir = fs.existsSync(path.join(entryPath, 'springgraph.db'));
       return {
         name: entry.name,
         path: entryPath,
-        isCodeGraphProject: isInitialized(entryPath),
-        isCodeGraphDir,
+        isSpringgraphProject: isInitialized(entryPath),
+        isSpringgraphDir,
       };
     })
     .sort((a, b) => {
-      const aIndexed = a.isCodeGraphProject || a.isCodeGraphDir ? 0 : 1;
-      const bIndexed = b.isCodeGraphProject || b.isCodeGraphDir ? 0 : 1;
+      const aIndexed = a.isSpringgraphProject || a.isSpringgraphDir ? 0 : 1;
+      const bIndexed = b.isSpringgraphProject || b.isSpringgraphDir ? 0 : 1;
       return aIndexed - bIndexed || a.name.localeCompare(b.name);
     });
   const parent = path.dirname(resolved);
   return {
     path: resolved,
     parent: parent === resolved ? null : parent,
-    isCodeGraphProject: isInitialized(resolved),
-    isCodeGraphDir: fs.existsSync(path.join(resolved, 'codegraph.db')),
+    isSpringgraphProject: isInitialized(resolved),
+    isSpringgraphDir: fs.existsSync(path.join(resolved, 'springgraph.db')),
     entries,
   };
 }
@@ -189,15 +189,15 @@ function readFileSlice(
 }
 
 /**
- * HTTP request handler. Pulls the CodeGraph instance from a closure created in
+ * HTTP request handler. Pulls the Springgraph instance from a closure created in
  * `startWebServer` so we don't serialize the project root on every call.
  */
 export function createRequestHandler(
-  cg: CodeGraph,
+  cg: Springgraph,
   projectRoot: string,
   publicDir: string
 ): (req: http.IncomingMessage, res: http.ServerResponse) => void {
-  // `active.toolHandler` is rebuilt whenever the active CodeGraph instance
+  // `active.toolHandler` is rebuilt whenever the active Springgraph instance
   // changes (see `/api/project` below). The web server doesn't have an
   // MCP-style allowlist, so it reuses ToolHandler as-is and exposes the
   // complete `tools` array — the playground is for *testing*, not for
@@ -499,7 +499,7 @@ export function createRequestHandler(
       // ─── /api/decorators?limit=60 ─────────────────────────────────────────
       // Aggregate distinct decorator strings + occurrence counts across every
       // node with decorators. Stored as JSON arrays in SQLite; the
-      // `CodeGraph.getDecorators()` helper walks the column once and tallies
+      // `Springgraph.getDecorators()` helper walks the column once and tallies
       // in-memory. Cap the result list to keep the UI responsive on huge repos.
       if (pathname === '/api/decorators' && req.method === 'GET') {
         const parsed = url.parse(req.url, true);
@@ -534,7 +534,7 @@ export function createRequestHandler(
       }
 
       // ─── /api/mcp/invoke ──────────────────────────────────────────────────
-      // Calls a tool against the active CodeGraph via the shared
+      // Calls a tool against the active Springgraph via the shared
       // ToolHandler. Response is the raw ToolResult so the UI can tell
       // success from `isError:true` and surface the text content verbatim.
       if (pathname === '/api/mcp/invoke' && req.method === 'POST') {
@@ -568,7 +568,7 @@ export function createRequestHandler(
       }
 
       // ─── /api/browse?path=... ─────────────────────────────────────────────
-      // Local directory browser for choosing a project root or .codegraph dir.
+      // Local directory browser for choosing a project root or .springgraph dir.
       if (pathname === '/api/browse' && req.method === 'GET') {
         const parsed = url.parse(req.url, true);
         const requestedPath = (parsed.query.path as string | undefined)?.trim();
@@ -585,8 +585,8 @@ export function createRequestHandler(
       }
 
       // ─── /api/project ─────────────────────────────────────────────────────
-      // Switch to another local CodeGraph index. Accepts either a project root
-      // or that project's .codegraph directory.
+      // Switch to another local Springgraph index. Accepts either a project root
+      // or that project's .springgraph directory.
       if (pathname === '/api/project' && req.method === 'POST') {
         let body: Record<string, unknown>;
         try {
@@ -598,7 +598,7 @@ export function createRequestHandler(
         const requestedPath = typeof body.path === 'string' ? body.path : '';
         try {
           const nextRoot = resolveProjectRootFromInput(requestedPath);
-          const next = await CodeGraphDefault.open(nextRoot);
+          const next = await SpringgraphDefault.open(nextRoot);
           const previous = active.cg;
           active.cg = next;
           active.projectRoot = next.getProjectRoot();
@@ -642,12 +642,12 @@ export function createRequestHandler(
       sendError(res, 500, msg);
     }
   };
-  (handler as typeof handler & { getActiveCodeGraph: () => CodeGraph }).getActiveCodeGraph = () => active.cg;
+  (handler as typeof handler & { getActiveSpringgraph: () => Springgraph }).getActiveSpringgraph = () => active.cg;
   return handler;
 }
 
 function buildOverviewGraph(
-  cg: CodeGraph,
+  cg: Springgraph,
   limit: number,
   snapshot?: ArchitectureSnapshot | null
 ): { nodes: Node[]; edges: Edge[] } {
@@ -768,12 +768,12 @@ function serveStatic(
 }
 
 /**
- * Start the HTTP server bound to the given CodeGraph instance. Returns a
+ * Start the HTTP server bound to the given Springgraph instance. Returns a
  * promise that resolves once the listener is ready, and a `close()` handle for
  * graceful shutdown.
  */
 export async function startWebServer(
-  cg: CodeGraph,
+  cg: Springgraph,
   options: WebServerOptions
 ): Promise<{ server: http.Server; url: string; close: () => Promise<void> }> {
   const projectRoot = cg.getProjectRoot();
@@ -804,7 +804,7 @@ export async function startWebServer(
     const banner = [
       '',
       '  ┌──────────────────────────────────────────────────────────┐',
-      `  │  CodeGraph Web UI  →  ${serverUrl.padEnd(35)}│`,
+      `  │  Springgraph Web UI  →  ${serverUrl.padEnd(35)}│`,
       '  │  Press Ctrl+C to stop                                   │',
       '  └──────────────────────────────────────────────────────────┘',
       '',
@@ -821,7 +821,7 @@ export async function startWebServer(
   const close = (): Promise<void> =>
     new Promise((resolve) => {
       server.close(() => {
-        const activeCg = (handler as typeof handler & { getActiveCodeGraph?: () => CodeGraph }).getActiveCodeGraph?.() ?? cg;
+        const activeCg = (handler as typeof handler & { getActiveSpringgraph?: () => Springgraph }).getActiveSpringgraph?.() ?? cg;
         try { activeCg.close(); } catch { /* already closed */ }
         resolve();
       });

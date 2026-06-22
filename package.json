@@ -1,11 +1,11 @@
 {
-  "name": "@colbymchenry/codegraph",
+  "name": "@colbymchenry/springgraph",
   "version": "1.0.1",
   "description": "Supercharge Claude Code with semantic code intelligence. 94% fewer tool calls • 77% faster exploration • 100% local.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "codegraph": "./dist/bin/codegraph.js"
+    "springgraph": "./dist/bin/springgraph.js"
   },
   "files": [
     "dist",
@@ -16,11 +16,11 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc && npm run copy-assets && node -e \"require('fs').chmodSync('dist/bin/codegraph.js', 0o755)\"",
+    "build": "tsc && npm run copy-assets && node -e \"require('fs').chmodSync('dist/bin/springgraph.js', 0o755)\"",
     "preuninstall": "node dist/bin/uninstall.js",
     "copy-assets": "node -e \"const fs=require('fs'),path=require('path');fs.mkdirSync('dist/db',{recursive:true});fs.copyFileSync('src/db/schema.sql','dist/db/schema.sql');fs.mkdirSync('dist/extraction/wasm',{recursive:true});fs.readdirSync('src/extraction/wasm').filter(f=>f.endsWith('.wasm')).forEach(f=>fs.copyFileSync('src/extraction/wasm/'+f,'dist/extraction/wasm/'+f));const copyDir=(src,dst)=>{if(!fs.existsSync(src))return;fs.mkdirSync(dst,{recursive:true});for(const e of fs.readdirSync(src,{withFileTypes:true})){const s=path.join(src,e.name),d=path.join(dst,e.name);if(e.isDirectory())copyDir(s,d);else fs.copyFileSync(s,d);}};copyDir('src/web/public','dist/web/public')\"",
     "dev": "tsc --watch",
-    "cli": "npm run build && node dist/bin/codegraph.js",
+    "cli": "npm run build && node dist/bin/springgraph.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:eval": "vitest run __tests__/evaluation/",
@@ -30,7 +30,7 @@
     "test:springkg": "vitest run __tests__/team-a"
   },
   "peerDependencies": {
-    "@colbymchenry/codegraph": ">=0.9.0 <1.0.0"
+    "@colbymchenry/springgraph": ">=0.9.0 <1.0.0"
   },
   "keywords": [
     "code-intelligence",

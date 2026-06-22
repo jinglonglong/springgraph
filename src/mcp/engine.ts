@@ -1,6 +1,6 @@
 /**
  * MCP shared engine — the heavyweight, *shared* state for an MCP server:
- * the project's {@link CodeGraph} instance, file watcher, and the
+ * the project's {@link Springgraph} instance, file watcher, and the
  * {@link ToolHandler} cache for cross-project queries.
  *
  * One engine, many sessions:
@@ -10,18 +10,18 @@
  *   inotify watch set — that's the entire point of issue #411.
  */
 
-import type CodeGraph from '../index';
-import { findNearestCodeGraphRoot } from '../directory';
+import type Springgraph from '../index';
+import { findNearestSpringgraphRoot } from '../directory';
 import { watchDisabledReason } from '../sync';
 import { ToolHandler } from './tools';
 
-// Lazy-load the heavy CodeGraph chain (sqlite + query/graph/context layers) OFF
+// Lazy-load the heavy Springgraph chain (sqlite + query/graph/context layers) OFF
 // the MCP startup path. It's only needed once a tool actually opens a project —
 // not to answer initialize/tools-list — so deferring it lets `serve --mcp` (and
 // the daemon it spawns) bind + register tools in ~Node-startup time instead of
 // ~800ms, closing the "No such tool available" cold-start race that made headless
 // agents flounder. require() is sync + cached on the CommonJS build.
-const loadCodeGraph = (): typeof import('../index').default =>
+const loadSpringgraph = (): typeof import('../index').default =>
   (require('../index') as typeof import('../index')).default;
 
 export interface MCPEngineOptions {
@@ -40,10 +40,10 @@ export interface MCPEngineOptions {
  * connect never double-open the SQLite file.
  */
 export class MCPEngine {
-  private cg: CodeGraph | null = null;
+  private cg: Springgraph | null = null;
   private toolHandler: ToolHandler;
   // Project root we resolved to. Null until `ensureInitialized` succeeds
-  // (or null forever if no .codegraph/ ever turned up — that's a valid
+  // (or null forever if no .springgraph/ ever turned up — that's a valid
   // state for the engine, since cross-project queries still work).
   private projectPath: string | null = null;
   // Set on first `ensureInitialized` so subsequent sessions don't redo work.
@@ -78,13 +78,13 @@ export class MCPEngine {
     return this.toolHandler;
   }
 
-  /** Whether the default project's CodeGraph is open. */
-  hasDefaultCodeGraph(): boolean {
-    return this.toolHandler.hasDefaultCodeGraph();
+  /** Whether the default project's Springgraph is open. */
+  hasDefaultSpringgraph(): boolean {
+    return this.toolHandler.hasDefaultSpringgraph();
   }
 
   /**
-   * Walk up from `searchFrom` to find the nearest `.codegraph/` and open it.
+   * Walk up from `searchFrom` to find the nearest `.springgraph/` and open it.
    * Idempotent: concurrent callers share one in-flight init; subsequent
    * callers after success are no-ops.
    *
@@ -94,7 +94,7 @@ export class MCPEngine {
    */
   async ensureInitialized(searchFrom: string): Promise<void> {
     if (this.closed) return;
-    if (this.toolHandler.hasDefaultCodeGraph()) return;
+    if (this.toolHandler.hasDefaultSpringgraph()) return;
     if (this.initPromise) {
       try { await this.initPromise; } catch { /* let caller retry */ }
       return;
@@ -118,9 +118,9 @@ export class MCPEngine {
    */
   retryInitializeSync(searchFrom: string): void {
     if (this.closed) return;
-    if (this.toolHandler.hasDefaultCodeGraph()) return;
+    if (this.toolHandler.hasDefaultSpringgraph()) return;
     this.toolHandler.setDefaultProjectHint(searchFrom);
-    const resolvedRoot = findNearestCodeGraphRoot(searchFrom);
+    const resolvedRoot = findNearestSpringgraphRoot(searchFrom);
     if (!resolvedRoot) return;
     try {
       // Close any previously failed instance to avoid leaking resources.
@@ -128,9 +128,9 @@ export class MCPEngine {
         try { this.cg.close(); } catch { /* ignore */ }
         this.cg = null;
       }
-      this.cg = loadCodeGraph().openSync(resolvedRoot);
+      this.cg = loadSpringgraph().openSync(resolvedRoot);
       this.projectPath = resolvedRoot;
-      this.toolHandler.setDefaultCodeGraph(this.cg);
+      this.toolHandler.setDefaultSpringgraph(this.cg);
       this.startWatching();
       this.catchUpSync();
     } catch {
@@ -155,27 +155,27 @@ export class MCPEngine {
   private async doInitialize(searchFrom: string): Promise<void> {
     this.toolHandler.setDefaultProjectHint(searchFrom);
 
-    const resolvedRoot = findNearestCodeGraphRoot(searchFrom);
+    const resolvedRoot = findNearestSpringgraphRoot(searchFrom);
     if (!resolvedRoot) {
-      // No .codegraph/ above searchFrom. Sessions may still discover one later via roots/list
+      // No .springgraph/ above searchFrom. Sessions may still discover one later via roots/list
       this.projectPath = searchFrom;
       return;
     }
 
     this.projectPath = resolvedRoot;
     try {
-      this.cg = await loadCodeGraph().open(resolvedRoot);
-      this.toolHandler.setDefaultCodeGraph(this.cg);
+      this.cg = await loadSpringgraph().open(resolvedRoot);
+      this.toolHandler.setDefaultSpringgraph(this.cg);
       this.startWatching();
       this.catchUpSync();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      process.stderr.write(`[CodeGraph MCP] Failed to open project at ${resolvedRoot}: ${msg}\n`);
+      process.stderr.write(`[Springgraph MCP] Failed to open project at ${resolvedRoot}: ${msg}\n`);
     }
   }
 
   /**
-   * Start file watching on the active CodeGraph instance. Idempotent — the
+   * Start file watching on the active Springgraph instance. Idempotent — the
    * watcher is per-engine, not per-session, which is why the daemon path
    * collapses N inotify sets to one. The wording of the disabled-reason log
    * exactly matches the prior in-tree implementation so log-driven dashboards
@@ -187,8 +187,8 @@ export class MCPEngine {
     const disabledReason = watchDisabledReason(this.projectPath ?? process.cwd());
     if (disabledReason) {
       process.stderr.write(
-        `[CodeGraph MCP] File watcher disabled — ${disabledReason}. ` +
-        `The graph will not auto-update; run \`codegraph sync\` (or install the git sync hooks via \`codegraph init\`) to refresh.\n`
+        `[Springgraph MCP] File watcher disabled — ${disabledReason}. ` +
+        `The graph will not auto-update; run \`springgraph sync\` (or install the git sync hooks via \`springgraph init\`) to refresh.\n`
       );
       this.watcherStarted = true;
       return;
@@ -199,9 +199,9 @@ export class MCPEngine {
     // large generated outputs) where the 2s default fires too often. Clamped
     // to [100ms, 60s]; out-of-range / non-numeric values fall back to the
     // FileWatcher default. We log the active value so it's discoverable.
-    const debounceMs = parseDebounceEnv(process.env.CODEGRAPH_WATCH_DEBOUNCE_MS);
+    const debounceMs = parseDebounceEnv(process.env.SPRINGGRAPH_WATCH_DEBOUNCE_MS);
     if (debounceMs !== undefined) {
-      process.stderr.write(`[CodeGraph MCP] File watcher debounce: ${debounceMs}ms (CODEGRAPH_WATCH_DEBOUNCE_MS)\n`);
+      process.stderr.write(`[Springgraph MCP] File watcher debounce: ${debounceMs}ms (SPRINGGRAPH_WATCH_DEBOUNCE_MS)\n`);
     }
 
     const started = this.cg.watch({
@@ -209,29 +209,29 @@ export class MCPEngine {
       onSyncComplete: (result) => {
         if (result.filesChanged > 0) {
           process.stderr.write(
-            `[CodeGraph MCP] Auto-synced ${result.filesChanged} file(s) in ${result.durationMs}ms\n`
+            `[Springgraph MCP] Auto-synced ${result.filesChanged} file(s) in ${result.durationMs}ms\n`
           );
         }
       },
       onSyncError: (err) => {
-        process.stderr.write(`[CodeGraph MCP] Auto-sync error: ${err.message}\n`);
+        process.stderr.write(`[Springgraph MCP] Auto-sync error: ${err.message}\n`);
       },
       onDegraded: (reason) => {
         // Live watching gave up permanently (watch-resource exhaustion or a
         // write lock held past the retry budget). Say so loudly and ONCE — the
         // graph will no longer auto-update, so a long-running MCP session must
         // not keep assuming it's fresh. The reason already names the remedy
-        // (`codegraph sync` / git sync hooks).
-        process.stderr.write(`[CodeGraph MCP] File watcher degraded — ${reason}\n`);
+        // (`springgraph sync` / git sync hooks).
+        process.stderr.write(`[Springgraph MCP] File watcher degraded — ${reason}\n`);
       },
     });
 
     this.watcherStarted = true;
     if (started) {
-      process.stderr.write('[CodeGraph MCP] File watcher active — graph will auto-sync on changes\n');
+      process.stderr.write('[Springgraph MCP] File watcher active — graph will auto-sync on changes\n');
     } else {
       process.stderr.write(
-        '[CodeGraph MCP] File watcher unavailable on this platform — run `codegraph sync` to refresh the graph after changes.\n'
+        '[Springgraph MCP] File watcher unavailable on this platform — run `springgraph sync` to refresh the graph after changes.\n'
       );
     }
   }
@@ -254,19 +254,19 @@ export class MCPEngine {
       .then((result) => {
         const changed = result.filesAdded + result.filesModified + result.filesRemoved;
         if (changed > 0) {
-          process.stderr.write(`[CodeGraph MCP] Caught up ${changed} file(s) changed since last run\n`);
+          process.stderr.write(`[Springgraph MCP] Caught up ${changed} file(s) changed since last run\n`);
         }
       })
       .catch((err) => {
         const msg = err instanceof Error ? err.message : String(err);
-        process.stderr.write(`[CodeGraph MCP] Catch-up sync failed: ${msg}\n`);
+        process.stderr.write(`[Springgraph MCP] Catch-up sync failed: ${msg}\n`);
       });
     this.toolHandler.setCatchUpGate(p);
   }
 }
 
 /**
- * Parse and clamp the CODEGRAPH_WATCH_DEBOUNCE_MS env override.
+ * Parse and clamp the SPRINGGRAPH_WATCH_DEBOUNCE_MS env override.
  *
  * Issue #403: workspaces with bursty writes (formatter-on-save, multi-file
  * refactors) sometimes want a longer quiet window before sync. Returns

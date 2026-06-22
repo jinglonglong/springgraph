@@ -41,7 +41,7 @@ const TOOL_LIST = TOOL_SUMMARIES.map(([name, desc]) => `- **${name}** — ${desc
 
 export const SPRINGKG_SERVER_INSTRUCTIONS = `# SpringKg MCP
 
-SpringKg is a read-only knowledge graph for Spring Boot projects. It answers structural questions about HTTP endpoints, Feign clients, MyBatis mappers, runtime config, and inter-service call flows — backed by a SQLite index in \`.codegraph/springkg.db\`.
+SpringKg is a read-only knowledge graph for Spring Boot projects. It answers structural questions about HTTP endpoints, Feign clients, MyBatis mappers, runtime config, and inter-service call flows — backed by a SQLite index in \`.springgraph/springkg.db\`.
 
 ## Available tools
 
@@ -67,7 +67,7 @@ Configuration properties matching password/secret/token/api-key patterns are sto
 
 ## If the project is not indexed
 
-If the workspace has no \`.codegraph/springkg.db\`, every tool returns a SUCCESS-shaped response with guidance: "Project not indexed. Run \`springkg init && springkg index\` first." This is by design — the server stays queryable, never returns \`isError: true\` for the not-indexed case. The user decides when to index; you don't.
+If the workspace has no \`.springgraph/springkg.db\`, every tool returns a SUCCESS-shaped response with guidance: "Project not indexed. Run \`springkg init && springkg index\` first." This is by design — the server stays queryable, never returns \`isError: true\` for the not-indexed case. The user decides when to index; you don't.
 
 ## Trust the results
 

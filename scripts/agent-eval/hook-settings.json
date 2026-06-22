@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash /Users/colby/Development/Personal/codegraph/scripts/agent-eval/block-read-hook.sh"
+            "command": "bash /Users/colby/Development/Personal/springgraph/scripts/agent-eval/block-read-hook.sh"
           }
         ]
       }

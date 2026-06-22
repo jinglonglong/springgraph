@@ -152,7 +152,7 @@ export class FacetEngine {
   runFacets(nodes: Node[], db: DatabaseConnection): NodeArchitectureFacet[] {
     this.signals = [];
 
-    // Derive project root from database path: e.g. path/to/project/.codegraph/codegraph.db -> path/to/project
+    // Derive project root from database path: e.g. path/to/project/.springgraph/springgraph.db -> path/to/project
     const dbPath = db.getPath();
     const projectRoot = path.dirname(path.dirname(dbPath));
 

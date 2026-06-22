@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import CodeGraph from '../src/index';
+import Springgraph from '../src/index';
 import { facetRegistry } from '../src/architecture/facet-engine';
 import { genericProfile, profileRegistry } from '../src/architecture/profile-registry';
 import type {
@@ -115,11 +115,11 @@ function registerToggleProfile(): { profile: ArchitectureProfile; facet: Archite
 
 describe('architecture incremental sync', () => {
   let tempDir: string;
-  let cg: CodeGraph;
+  let cg: Springgraph;
 
   beforeEach(async () => {
     registerToggleProfile();
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-arch-sync-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-arch-sync-'));
     fs.mkdirSync(path.join(tempDir, 'ruoyi-system', 'src'), { recursive: true });
     fs.writeFileSync(path.join(tempDir, 'application.yml'), 'profile.enabled: true\n');
     fs.writeFileSync(
@@ -127,7 +127,7 @@ describe('architecture incremental sync', () => {
       'public class UserService { public void handle() {} }\n',
     );
 
-    cg = CodeGraph.initSync(tempDir);
+    cg = Springgraph.initSync(tempDir);
     await cg.indexAll();
   });
 

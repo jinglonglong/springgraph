@@ -12,7 +12,7 @@ export interface AnnotationSqlExtractorResult {
   symbols: SpringKgNode[];
   sqlStatements: Array<{
     id: string;
-    codegraphNodeId: string;
+    springgraphNodeId: string;
     mapperNamespace: string;
     statementId: string;
     operation: string;
@@ -88,7 +88,7 @@ export class AnnotationSqlExtractor {
 
         sqlStatements.push({
           id: stmtId,
-          codegraphNodeId: nodeId,
+          springgraphNodeId: nodeId,
           mapperNamespace: this.filePath,
           statementId: sqlText.slice(0, 50),
           operation: annotation.replace('@', '').toUpperCase(),
@@ -127,7 +127,7 @@ export class AnnotationSqlExtractor {
         symbols.push(this.buildMethodNode(nodeId, providerMethod, metadata, 0.5, line));
         sqlStatements.push({
           id: stmtId,
-          codegraphNodeId: nodeId,
+          springgraphNodeId: nodeId,
           mapperNamespace: this.filePath,
           statementId: providerMethod,
           operation: annotation.replace('@', '').toUpperCase(),
@@ -157,7 +157,7 @@ export class AnnotationSqlExtractor {
     return {
       id,
       kind: 'mapper_method',
-      codegraphNodeId: id,
+      springgraphNodeId: id,
       name,
       filePath: this.filePath,
       startLine,

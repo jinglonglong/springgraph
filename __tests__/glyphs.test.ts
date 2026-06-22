@@ -55,49 +55,49 @@ describe('supportsUnicode', () => {
   });
 
   it('returns false on Windows by default (mojibake-prone consoles)', () => {
-    withEnv({ CODEGRAPH_ASCII: undefined, CODEGRAPH_UNICODE: undefined, TERM: undefined }, () => {
+    withEnv({ SPRINGGRAPH_ASCII: undefined, SPRINGGRAPH_UNICODE: undefined, TERM: undefined }, () => {
       setPlatform('win32');
       expect(supportsUnicode()).toBe(false);
     });
   });
 
   it('returns true on macOS by default', () => {
-    withEnv({ CODEGRAPH_ASCII: undefined, CODEGRAPH_UNICODE: undefined, TERM: undefined }, () => {
+    withEnv({ SPRINGGRAPH_ASCII: undefined, SPRINGGRAPH_UNICODE: undefined, TERM: undefined }, () => {
       setPlatform('darwin');
       expect(supportsUnicode()).toBe(true);
     });
   });
 
   it('returns true on Linux by default', () => {
-    withEnv({ CODEGRAPH_ASCII: undefined, CODEGRAPH_UNICODE: undefined, TERM: undefined }, () => {
+    withEnv({ SPRINGGRAPH_ASCII: undefined, SPRINGGRAPH_UNICODE: undefined, TERM: undefined }, () => {
       setPlatform('linux');
       expect(supportsUnicode()).toBe(true);
     });
   });
 
   it('returns false on Linux kernel console (TERM=linux)', () => {
-    withEnv({ CODEGRAPH_ASCII: undefined, CODEGRAPH_UNICODE: undefined, TERM: 'linux' }, () => {
+    withEnv({ SPRINGGRAPH_ASCII: undefined, SPRINGGRAPH_UNICODE: undefined, TERM: 'linux' }, () => {
       setPlatform('linux');
       expect(supportsUnicode()).toBe(false);
     });
   });
 
-  it('respects CODEGRAPH_UNICODE=1 on Windows (opt-in escape hatch)', () => {
-    withEnv({ CODEGRAPH_UNICODE: '1', CODEGRAPH_ASCII: undefined }, () => {
+  it('respects SPRINGGRAPH_UNICODE=1 on Windows (opt-in escape hatch)', () => {
+    withEnv({ SPRINGGRAPH_UNICODE: '1', SPRINGGRAPH_ASCII: undefined }, () => {
       setPlatform('win32');
       expect(supportsUnicode()).toBe(true);
     });
   });
 
-  it('respects CODEGRAPH_ASCII=1 on macOS (opt-out escape hatch)', () => {
-    withEnv({ CODEGRAPH_ASCII: '1', CODEGRAPH_UNICODE: undefined }, () => {
+  it('respects SPRINGGRAPH_ASCII=1 on macOS (opt-out escape hatch)', () => {
+    withEnv({ SPRINGGRAPH_ASCII: '1', SPRINGGRAPH_UNICODE: undefined }, () => {
       setPlatform('darwin');
       expect(supportsUnicode()).toBe(false);
     });
   });
 
-  it('CODEGRAPH_ASCII takes precedence over CODEGRAPH_UNICODE', () => {
-    withEnv({ CODEGRAPH_ASCII: '1', CODEGRAPH_UNICODE: '1' }, () => {
+  it('SPRINGGRAPH_ASCII takes precedence over SPRINGGRAPH_UNICODE', () => {
+    withEnv({ SPRINGGRAPH_ASCII: '1', SPRINGGRAPH_UNICODE: '1' }, () => {
       setPlatform('darwin');
       expect(supportsUnicode()).toBe(false);
     });
@@ -118,7 +118,7 @@ describe('getGlyphs', () => {
   });
 
   it('returns ASCII glyphs on Windows', () => {
-    withEnv({ CODEGRAPH_ASCII: undefined, CODEGRAPH_UNICODE: undefined }, () => {
+    withEnv({ SPRINGGRAPH_ASCII: undefined, SPRINGGRAPH_UNICODE: undefined }, () => {
       setPlatform('win32');
       const g = getGlyphs();
       expect(g).toBe(ASCII_GLYPHS);
@@ -130,7 +130,7 @@ describe('getGlyphs', () => {
   });
 
   it('returns Unicode glyphs on macOS', () => {
-    withEnv({ CODEGRAPH_ASCII: undefined, CODEGRAPH_UNICODE: undefined }, () => {
+    withEnv({ SPRINGGRAPH_ASCII: undefined, SPRINGGRAPH_UNICODE: undefined }, () => {
       setPlatform('darwin');
       const g = getGlyphs();
       expect(g).toBe(UNICODE_GLYPHS);
@@ -142,7 +142,7 @@ describe('getGlyphs', () => {
   });
 
   it('caches the result so repeated calls return the same object', () => {
-    withEnv({ CODEGRAPH_ASCII: undefined, CODEGRAPH_UNICODE: undefined }, () => {
+    withEnv({ SPRINGGRAPH_ASCII: undefined, SPRINGGRAPH_UNICODE: undefined }, () => {
       setPlatform('darwin');
       expect(getGlyphs()).toBe(getGlyphs());
     });

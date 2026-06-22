@@ -7,7 +7,7 @@
  *   stdin/stdout. Used by direct-mode MCP servers.
  * - `SocketTransport` — wraps a single `net.Socket`. Used by the shared-daemon
  *   architecture (see {@link ./daemon}) to multiplex multiple MCP clients onto
- *   one CodeGraph instance via per-connection sessions.
+ *   one Springgraph instance via per-connection sessions.
  *
  * Both implement {@link JsonRpcTransport} so the session-level protocol logic
  * (initialize / tools/list / tools/call, plus server-initiated `roots/list`)
@@ -371,7 +371,7 @@ export class SocketTransport extends LineBasedJsonRpcTransport {
     this.socket.on('close', () => this.handleSocketClose());
     this.socket.on('error', (err) => {
       // Don't crash the daemon over a broken pipe; just shut this connection.
-      process.stderr.write(`[CodeGraph daemon] socket error: ${err.message}\n`);
+      process.stderr.write(`[Springgraph daemon] socket error: ${err.message}\n`);
       this.handleSocketClose();
     });
   }

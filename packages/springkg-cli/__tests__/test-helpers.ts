@@ -84,7 +84,7 @@ export function seedFeignClient(db: InstanceType<typeof DatabaseSync>, row: {
 export function seedSymbol(db: InstanceType<typeof DatabaseSync>, row: {
   id: string;
   kind: string;
-  codegraph_node_id?: string;
+  springgraph_node_id?: string;
   name?: string;
   qualified_name?: string;
   file_path?: string;
@@ -94,12 +94,12 @@ export function seedSymbol(db: InstanceType<typeof DatabaseSync>, row: {
   confidence?: number;
 }): void {
   db.prepare(`
-    INSERT OR REPLACE INTO spring_symbols (id, kind, codegraph_node_id, name, qualified_name, file_path, start_line, end_line, metadata, confidence, created_at, updated_at)
+    INSERT OR REPLACE INTO spring_symbols (id, kind, springgraph_node_id, name, qualified_name, file_path, start_line, end_line, metadata, confidence, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     row.id,
     row.kind,
-    row.codegraph_node_id ?? `${row.kind}:${row.id}`,
+    row.springgraph_node_id ?? `${row.kind}:${row.id}`,
     row.name ?? null,
     row.qualified_name ?? null,
     row.file_path ?? null,

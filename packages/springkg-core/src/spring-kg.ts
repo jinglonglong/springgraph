@@ -1,8 +1,8 @@
 /**
- * SpringKg — orchestrator that wraps CodeGraph + SpringDatabase + resolver chain.
+ * SpringKg — orchestrator that wraps Springgraph + SpringDatabase + resolver chain.
  *
  * This is the public entry point for all other teams. It manages:
- * - CodeGraph lifecycle (init/open/close)
+ * - Springgraph lifecycle (init/open/close)
  * - SpringDatabase lifecycle (initialize/open/close)
  * - Resolver registration and ordered execution
  * - File watching with automatic enhanceOnSync bridging
@@ -15,9 +15,9 @@ import { SPRINGKG_CONFIG } from '@colbymchenry/springkg-shared';
 import { SpringDatabase } from './db/spring-db.js';
 import { SummaryGenerator } from './community/summary-generator.js';
 
-// CodeGraph is a peer dependency — import dynamically at runtime
+// Springgraph is a peer dependency — import dynamically at runtime
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyCodeGraph = any;
+type AnySpringgraph = any;
 
 export interface SpringKgOptions {
   projectPath: string;
@@ -28,10 +28,10 @@ export interface SpringKgOptions {
 }
 
 /**
- * Thin facade for resolvers — exposes only read-only CodeGraph query methods.
- * Prevents resolvers from accidentally calling mutating methods on CodeGraph.
+ * Thin facade for resolvers — exposes only read-only Springgraph query methods.
+ * Prevents resolvers from accidentally calling mutating methods on Springgraph.
  */
-function buildCgFacade(cg: AnyCodeGraph) {
+function buildCgFacade(cg: AnySpringgraph) {
   return {
     getNode: (id: string) => cg.getNode(id),
     getOutgoingEdges: (id: string) => cg.getOutgoingEdges(id),
@@ -61,7 +61,7 @@ export class SpringKg {
   private lastEnhanceAt: number = 0;
 
   private constructor(
-    public readonly cg: AnyCodeGraph,
+    public readonly cg: AnySpringgraph,
     public readonly db: SpringDatabase,
     private readonly projectPath: string,
   ) {
@@ -73,16 +73,16 @@ export class SpringKg {
   // -------------------------------------------------------------------------
 
   /**
-   * Create a fresh SpringKg — initializes CodeGraph + SpringDatabase.
+   * Create a fresh SpringKg — initializes Springgraph + SpringDatabase.
    */
   static async init(options: SpringKgOptions): Promise<SpringKg> {
-    // Dynamic import of CodeGraph (peer dependency)
-    const cgModule = await import('@colbymchenry/codegraph');
-    const CodeGraph = (cgModule as any).CodeGraph || (cgModule as any).default?.CodeGraph || (cgModule as any).default;
+    // Dynamic import of Springgraph (peer dependency)
+    const cgModule = await import('@colbymchenry/springgraph');
+    const Springgraph = (cgModule as any).Springgraph || (cgModule as any).default?.Springgraph || (cgModule as any).default;
 
-    const cg = CodeGraph.isInitialized(options.projectPath)
-      ? await CodeGraph.open(options.projectPath)
-      : await CodeGraph.init(options.projectPath);
+    const cg = Springgraph.isInitialized(options.projectPath)
+      ? await Springgraph.open(options.projectPath)
+      : await Springgraph.init(options.projectPath);
     const db = SpringDatabase.initialize(options.projectPath);
     const sk = new SpringKg(cg, db, options.projectPath);
 
@@ -98,13 +98,13 @@ export class SpringKg {
   }
 
   /**
-   * Open an existing SpringKg — opens CodeGraph + SpringDatabase.
+   * Open an existing SpringKg — opens Springgraph + SpringDatabase.
    */
   static async open(options: SpringKgOptions): Promise<SpringKg> {
-    const cgModule = await import('@colbymchenry/codegraph');
-    const CodeGraph = (cgModule as any).CodeGraph || (cgModule as any).default?.CodeGraph || (cgModule as any).default;
+    const cgModule = await import('@colbymchenry/springgraph');
+    const Springgraph = (cgModule as any).Springgraph || (cgModule as any).default?.Springgraph || (cgModule as any).default;
 
-    const cg = await CodeGraph.open(options.projectPath);
+    const cg = await Springgraph.open(options.projectPath);
     const db = SpringDatabase.open(options.projectPath);
     const sk = new SpringKg(cg, db, options.projectPath);
 
@@ -149,7 +149,7 @@ export class SpringKg {
           nodeIds.add(node.id);
         }
       } catch {
-        // File might not be in CodeGraph index yet — skip
+        // File might not be in Springgraph index yet — skip
       }
     }
 
@@ -166,11 +166,11 @@ export class SpringKg {
 
     // Build enhance input
     const input: SpringKgEnhanceInput = {
-      codegraphNodes: [...nodeIds].map((id) => {
+      springgraphNodes: [...nodeIds].map((id) => {
         const node = this.cg.getNode(id);
         return node ?? { id, kind: 'unknown', name: '', filePath: '' };
       }),
-      codegraphEdges: edges as SpringKgEnhanceInput['codegraphEdges'],
+      springgraphEdges: edges as SpringKgEnhanceInput['springgraphEdges'],
       changedFiles: paths,
       cg: buildCgFacade(this.cg) as SpringKgEnhanceInput['cg'],
       since,
@@ -253,7 +253,7 @@ export class SpringKg {
   // -------------------------------------------------------------------------
 
   /**
-   * Index the project (wraps CodeGraph.indexAll, then enhanceOnSync).
+   * Index the project (wraps Springgraph.indexAll, then enhanceOnSync).
    */
   async index(): Promise<{ indexed: number; enhanced: SpringKgEnhanceOutput[] }> {
     const result = await this.cg.indexAll();
@@ -265,7 +265,7 @@ export class SpringKg {
   }
 
   /**
-   * Incremental sync (wraps CodeGraph.sync, then enhanceOnSync with changed files).
+   * Incremental sync (wraps Springgraph.sync, then enhanceOnSync with changed files).
    */
   async sync(): Promise<SpringKgEnhanceOutput[]> {
     await this.cg.sync();
@@ -283,7 +283,7 @@ export class SpringKg {
   // -------------------------------------------------------------------------
 
   /**
-   * Start watcher. Uses CodeGraph.watch + bridges onSyncComplete → enhanceOnSync.
+   * Start watcher. Uses Springgraph.watch + bridges onSyncComplete → enhanceOnSync.
    */
   watch(opts?: { onSyncComplete?: (result: { filesChanged: number; durationMs: number }) => void }): boolean {
     return this.cg.watch({
@@ -329,7 +329,7 @@ export class SpringKg {
   // -------------------------------------------------------------------------
 
   /**
-   * Close CodeGraph + SpringDatabase + SummaryGenerator.
+   * Close Springgraph + SpringDatabase + SummaryGenerator.
    */
   async close(): Promise<void> {
     this.summaryGenerator.stop();

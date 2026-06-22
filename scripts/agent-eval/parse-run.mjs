@@ -12,14 +12,14 @@ for (const line of lines) {
   let ev;
   try { ev = JSON.parse(line); } catch { continue; }
   if (ev.type === 'system' && ev.subtype === 'init') {
-    initTools = (ev.tools || []).filter(t => /codegraph/.test(t));
+    initTools = (ev.tools || []).filter(t => /springgraph/.test(t));
   }
   if (ev.type === 'assistant' && ev.message?.content) {
     for (const block of ev.message.content) {
       if (block.type === 'tool_use') {
         let detail = '';
         if (block.name === 'Task') detail = ` [subagent_type=${block.input?.subagent_type ?? '?'}] ${(block.input?.description ?? '').slice(0,40)}`;
-        else if (/codegraph/.test(block.name)) detail = ` ${JSON.stringify(block.input?.query ?? block.input?.task ?? block.input?.symbol ?? '').slice(0,60)}`;
+        else if (/springgraph/.test(block.name)) detail = ` ${JSON.stringify(block.input?.query ?? block.input?.task ?? block.input?.symbol ?? '').slice(0,60)}`;
         else if (block.name === 'Bash') detail = ` ${(block.input?.command ?? '').slice(0,50)}`;
         else if (block.name === 'Read') detail = ` ${(block.input?.file_path ?? '').split('/').slice(-1)[0]}`;
         toolCalls.push(`${block.name}${detail}`);
@@ -30,7 +30,7 @@ for (const line of lines) {
 }
 
 console.log(`\n=== ${file.split('/').pop()} ===`);
-console.log(`codegraph tools exposed: ${initTools ? initTools.length : '?'}`);
+console.log(`springgraph tools exposed: ${initTools ? initTools.length : '?'}`);
 console.log(`\nTool calls (${toolCalls.length}):`);
 const counts = {};
 for (const tc of toolCalls) { const n = tc.split(' ')[0]; counts[n] = (counts[n]||0)+1; }

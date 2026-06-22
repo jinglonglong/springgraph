@@ -1,5 +1,5 @@
-// Launch the CodeGraph web server for the yytek-iot-cloud project
-import { CodeGraph } from '../src/index.js';
+// Launch the Springgraph web server for the yytek-iot-cloud project
+import { Springgraph } from '../src/index.js';
 import { startWebServer } from '../src/web/server.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -7,12 +7,12 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const projectPath = 'D:/code/yytek-iot-cloud';
-const port = Number(process.env.CODEGRAPH_WEB_PORT || 7333);
+const port = Number(process.env.SPRINGGRAPH_WEB_PORT || 7333);
 const publicDir = path.resolve(__dirname, '..', 'dist', 'web', 'public');
 
 async function main() {
-  console.log('[launch-web] Opening CodeGraph index for:', projectPath);
-  const cg = await CodeGraph.open(projectPath);
+  console.log('[launch-web] Opening Springgraph index for:', projectPath);
+  const cg = await Springgraph.open(projectPath);
 
   console.log('[launch-web] Starting web server on port', port);
   const { url, close } = await startWebServer(cg, {

@@ -41,7 +41,7 @@ export interface ConfigPropertyRow {
   valueMasked: string;
 }
 
-export interface DecoratedCodegraphNode {
+export interface DecoratedSpringgraphNode {
   id: string;
   name: string;
   kind: string;
@@ -62,9 +62,9 @@ export interface SpringKgLike {
   upsertEdge(edge: SpringKgEdgeInput): Promise<void>;
   recordConfigProperty?(property: RuntimeConfigPropertyRecord): Promise<void>;
   getConfigProperties?(): Promise<ConfigPropertyRow[]>;
-  findDecoratedNodes?(): Promise<DecoratedCodegraphNode[]>;
-  codegraph?: {
-    findNodes?(query: { decoratorPattern: string }): Promise<DecoratedCodegraphNode[]>;
+  findDecoratedNodes?(): Promise<DecoratedSpringgraphNode[]>;
+  springgraph?: {
+    findNodes?(query: { decoratorPattern: string }): Promise<DecoratedSpringgraphNode[]>;
   };
 }
 

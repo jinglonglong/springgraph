@@ -1,5 +1,5 @@
 /**
- * Smoke test for the CodeGraph web UI server.
+ * Smoke test for the Springgraph web UI server.
  *
  * Boots the HTTP server against a small temp project, curls every public
  * endpoint, and verifies the shape of the responses the frontend will
@@ -16,15 +16,15 @@
 // Same env vars the CLI tests use: prevents the binary from relaunching under
 // V8's --liftoff-only flag (no-op for unit tests but slow) and keeps the
 // background MCP daemon from spawning during the run.
-process.env.CODEGRAPH_WASM_RELAUNCHED = '1';
-process.env.CODEGRAPH_NO_DAEMON = '1';
+process.env.SPRINGGRAPH_WASM_RELAUNCHED = '1';
+process.env.SPRINGGRAPH_NO_DAEMON = '1';
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as http from 'http';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 import { startWebServer } from '../src/web/server';
 
 function get(port: number, urlPath: string): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {
@@ -88,17 +88,17 @@ describe('web server', () => {
   let tempDir: string;
   let otherDir: string;
   let publicDir: string;
-  let cg: CodeGraph;
+  let cg: Springgraph;
   let port: number;
   let close: () => Promise<void>;
 
   beforeAll(async () => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-web-'));
-    otherDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-web-other-'));
-    publicDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-web-public-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-web-'));
+    otherDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-web-other-'));
+    publicDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-web-public-'));
 
     // Stub UI: just enough so the static file route has something to serve.
-    fs.writeFileSync(path.join(publicDir, 'index.html'), '<!doctype html><title>codegraph</title>');
+    fs.writeFileSync(path.join(publicDir, 'index.html'), '<!doctype html><title>springgraph</title>');
 
     // Tiny project the server can serve: a function called from another.
     // `calc.ts` also carries a decorated class so the decorator-chip tests
@@ -121,7 +121,7 @@ describe('web server', () => {
       "import { add } from './calc';\nexport function total(){ return add(1, 2); }\n",
     );
 
-    cg = CodeGraph.initSync(tempDir);
+    cg = Springgraph.initSync(tempDir);
     await cg.indexAll();
 
     fs.mkdirSync(path.join(otherDir, 'src'));
@@ -129,7 +129,7 @@ describe('web server', () => {
       path.join(otherDir, 'src/subtract.ts'),
       'export function subtract(a: number, b: number): number { return a - b; }\n',
     );
-    const other = CodeGraph.initSync(otherDir);
+    const other = Springgraph.initSync(otherDir);
     await other.indexAll();
     other.close();
 
@@ -154,7 +154,7 @@ describe('web server', () => {
     const res = await get(port, '/');
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/text\/html/);
-    expect(res.body).toContain('codegraph');
+    expect(res.body).toContain('springgraph');
   });
 
   it('GET /api/health returns ok', async () => {
@@ -191,14 +191,14 @@ describe('web server', () => {
     expect(body.nodes[0]).toHaveProperty('color');
   });
 
-  it('GET /api/browse lists local directories and flags .codegraph indexes', async () => {
+  it('GET /api/browse lists local directories and flags .springgraph indexes', async () => {
     const res = await get(port, '/api/browse?path=' + encodeURIComponent(tempDir));
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body);
     expect(body.path).toBe(tempDir);
     expect(Array.isArray(body.entries)).toBe(true);
-    const codegraph = body.entries.find((e: { name: string }) => e.name === '.codegraph');
-    expect(codegraph).toMatchObject({ isCodeGraphDir: true });
+    const springgraph = body.entries.find((e: { name: string }) => e.name === '.springgraph');
+    expect(springgraph).toMatchObject({ isSpringgraphDir: true });
   });
 
   it('GET /api/search?q=add returns the add function', async () => {
@@ -211,9 +211,9 @@ describe('web server', () => {
     expect(names).toContain('add');
   });
 
-  it('POST /api/project switches to another .codegraph directory and back', async () => {
+  it('POST /api/project switches to another .springgraph directory and back', async () => {
     const switchToOther = await postJson(port, '/api/project', {
-      path: path.join(otherDir, '.codegraph'),
+      path: path.join(otherDir, '.springgraph'),
     });
     expect(switchToOther.status).toBe(200);
     expect(JSON.parse(switchToOther.body)).toMatchObject({ projectRoot: otherDir });
@@ -303,7 +303,7 @@ describe('web server', () => {
     // Create a sibling directory next to the project with a sentinel file
     // we can attempt to read — exercises the escape-detection branch (403)
     // rather than the "file not found" branch (404).
-    const sibling = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-web-sibling-'));
+    const sibling = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-web-sibling-'));
     const sentinel = path.join(sibling, 'secret.txt');
     fs.writeFileSync(sentinel, 'should-not-leak');
     try {

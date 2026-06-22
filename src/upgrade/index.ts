@@ -1,5 +1,5 @@
 /**
- * `codegraph upgrade`
+ * `springgraph upgrade`
  *
  * Self-update for the CLI, whatever way it was installed:
  *
@@ -8,13 +8,13 @@
  *     canonical installer script (single source of truth) so the download /
  *     version-resolution / PATH logic never drifts between first-install and
  *     upgrade.
- *   - **npm** — installed via `npm i -g @colbymchenry/codegraph`. Upgrading
+ *   - **npm** — installed via `npm i -g @colbymchenry/springgraph`. Upgrading
  *     shells out to npm.
  *   - **npx** — ephemeral; nothing to upgrade (next `npx` fetches latest).
  *   - **source** — a git checkout running its own `dist/`; `git pull` + rebuild.
  *
  * Detection is structural (see `detectInstallMethod`): a bundle carries a
- * vendored `node` binary and a `bin/codegraph` launcher next to its `lib/`, so
+ * vendored `node` binary and a `bin/springgraph` launcher next to its `lib/`, so
  * we can recognize it from the running file's path without a marker file.
  *
  * Windows wrinkle: a running `node.exe` is locked and can't be deleted, so the
@@ -29,8 +29,8 @@ import * as path from 'path';
 import * as https from 'https';
 import { spawnSync } from 'child_process';
 
-export const REPO = 'colbymchenry/codegraph';
-export const NPM_PACKAGE = '@colbymchenry/codegraph';
+export const REPO = 'colbymchenry/springgraph';
+export const NPM_PACKAGE = '@colbymchenry/springgraph';
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/main`;
 export const INSTALL_SH_URL = `${RAW_BASE}/install.sh`;
 
@@ -46,7 +46,7 @@ export type InstallMethod =
   | { kind: 'unknown'; reason: string };
 
 export interface DetectInput {
-  /** `__filename` of the running CLI module — `<…>/dist/bin/codegraph.js`. */
+  /** `__filename` of the running CLI module — `<…>/dist/bin/springgraph.js`. */
   filename: string;
   platform: NodeJS.Platform;
   cwd: string;
@@ -60,7 +60,7 @@ function toPosix(p: string): string {
 
 /**
  * Where the bundle installer keeps its install root, derived from the bundle
- * dir so an upgrade reuses a custom `CODEGRAPH_INSTALL_DIR`. Returns null when
+ * dir so an upgrade reuses a custom `SPRINGGRAPH_INSTALL_DIR`. Returns null when
  * the layout isn't the one the installer creates (then the installer falls
  * back to its own default).
  *
@@ -99,11 +99,11 @@ export function detectInstallMethod(input: DetectInput): InstallMethod {
   const P = isWin ? path.win32 : path.posix;
   const binDir = P.dirname(input.filename); // <…>/bin
 
-  // Bundle: <root>/lib/dist/bin/codegraph.js → <root> is up 3 from bin/.
+  // Bundle: <root>/lib/dist/bin/springgraph.js → <root> is up 3 from bin/.
   // A bundle has a vendored node + a launcher script as siblings of lib/.
   const bundleRoot = P.resolve(binDir, '..', '..', '..');
   const vendoredNode = P.join(bundleRoot, isWin ? 'node.exe' : 'node');
-  const launcher = P.join(bundleRoot, 'bin', isWin ? 'codegraph.cmd' : 'codegraph');
+  const launcher = P.join(bundleRoot, 'bin', isWin ? 'springgraph.cmd' : 'springgraph');
   if (exists(vendoredNode) && exists(launcher)) {
     const os = isWin ? 'windows' : 'unix';
     return { kind: 'bundle', os, bundleRoot, installDir: deriveInstallDir(bundleRoot, os, exists) };
@@ -111,7 +111,7 @@ export function detectInstallMethod(input: DetectInput): InstallMethod {
 
   const norm = toPosix(input.filename);
 
-  // npx cache: <…>/_npx/<hash>/node_modules/@colbymchenry/codegraph/…
+  // npx cache: <…>/_npx/<hash>/node_modules/@colbymchenry/springgraph/…
   if (norm.includes('/_npx/')) {
     return { kind: 'npx' };
   }
@@ -122,7 +122,7 @@ export function detectInstallMethod(input: DetectInput): InstallMethod {
     return { kind: 'npm', scope: underCwd ? 'local' : 'global' };
   }
 
-  // Source checkout: running <repo>/dist/bin/codegraph.js with a sibling .git.
+  // Source checkout: running <repo>/dist/bin/springgraph.js with a sibling .git.
   const repoRoot = P.resolve(binDir, '..', '..');
   if (exists(P.join(repoRoot, 'package.json')) && exists(P.join(repoRoot, '.git'))) {
     return { kind: 'source', root: repoRoot };
@@ -233,7 +233,7 @@ export async function resolveLatestVersion(repo = REPO, timeoutMs = 12000): Prom
   try {
     const res = await httpsGet(
       `https://github.com/${repo}/releases/latest`,
-      { 'User-Agent': 'codegraph-upgrade' },
+      { 'User-Agent': 'springgraph-upgrade' },
       timeoutMs
     );
     const loc = res.headers.location;
@@ -245,7 +245,7 @@ export async function resolveLatestVersion(repo = REPO, timeoutMs = 12000): Prom
   try {
     const res = await httpsGet(
       `https://api.github.com/repos/${repo}/releases/latest`,
-      { 'User-Agent': 'codegraph-upgrade', Accept: 'application/vnd.github+json' },
+      { 'User-Agent': 'springgraph-upgrade', Accept: 'application/vnd.github+json' },
       timeoutMs
     );
     const tag = JSON.parse(res.body)?.tag_name;
@@ -254,7 +254,7 @@ export async function resolveLatestVersion(repo = REPO, timeoutMs = 12000): Prom
     /* fall through to error */
   }
   throw new Error(
-    'could not resolve the latest version from GitHub. Check your network, or pin a version: `codegraph upgrade <version>`.'
+    'could not resolve the latest version from GitHub. Check your network, or pin a version: `springgraph upgrade <version>`.'
   );
 }
 
@@ -263,7 +263,7 @@ export async function resolveLatestVersion(repo = REPO, timeoutMs = 12000): Prom
 // ---------------------------------------------------------------------------
 
 export interface UpgradeOptions {
-  /** Pin a specific version (positional arg or CODEGRAPH_VERSION). */
+  /** Pin a specific version (positional arg or SPRINGGRAPH_VERSION). */
   version?: string;
   /** Report current vs latest, don't change anything. */
   check?: boolean;
@@ -298,9 +298,9 @@ export function reindexAdvisory(): string {
   return [
     c.dim('Your existing project indexes keep working, but were built by the previous version.'),
     c.dim('To pick up this version’s extraction improvements, refresh each project:'),
-    `  ${c.cyan('codegraph sync')}        ${c.dim('# incremental, fast')}`,
-    `  ${c.cyan('codegraph index -f')}    ${c.dim('# full rebuild')}`,
-    c.dim('(`codegraph status` flags any index that predates the engine you’re running.)'),
+    `  ${c.cyan('springgraph sync')}        ${c.dim('# incremental, fast')}`,
+    `  ${c.cyan('springgraph index -f')}    ${c.dim('# full rebuild')}`,
+    c.dim('(`springgraph status` flags any index that predates the engine you’re running.)'),
   ].join('\n');
 }
 
@@ -320,14 +320,14 @@ export async function runUpgrade(opts: UpgradeOptions, deps: UpgradeDeps): Promi
   }
 
   const currentDisplay = normalizeVersion(currentVersion);
-  deps.log(`${c.bold('CodeGraph')}  current ${c.cyan(currentDisplay)}  ${opts.version ? 'target' : 'latest'} ${c.cyan(latest)}`);
+  deps.log(`${c.bold('Springgraph')}  current ${c.cyan(currentDisplay)}  ${opts.version ? 'target' : 'latest'} ${c.cyan(latest)}`);
 
   const updateAvailable = isUpdateAvailable(currentVersion, latest);
 
   if (opts.check) {
     if (updateAvailable) {
       deps.log(c.yellow(`An update is available: ${currentDisplay} → ${latest}`));
-      deps.log(c.dim('Run `codegraph upgrade` to install it.'));
+      deps.log(c.dim('Run `springgraph upgrade` to install it.'));
     } else {
       deps.log(c.green(`You’re on the latest version (${currentDisplay}).`));
     }
@@ -336,7 +336,7 @@ export async function runUpgrade(opts: UpgradeOptions, deps: UpgradeDeps): Promi
 
   if (!updateAvailable && !opts.force && !opts.version) {
     deps.log(c.green(`Already up to date (${currentDisplay}).`));
-    deps.log(c.dim('Use `--force` to reinstall, or `codegraph upgrade <version>` to change versions.'));
+    deps.log(c.dim('Use `--force` to reinstall, or `springgraph upgrade <version>` to change versions.'));
     return 0;
   }
 
@@ -359,7 +359,7 @@ export async function runUpgrade(opts: UpgradeOptions, deps: UpgradeDeps): Promi
       deps.log(c.dim('Upgrade it with: git pull && npm run build'));
       return 0;
     default:
-      deps.error(`Couldn’t determine how CodeGraph was installed (${method.reason}).`);
+      deps.error(`Couldn’t determine how Springgraph was installed (${method.reason}).`);
       deps.log(c.dim(`Reinstall manually — see https://github.com/${REPO}#install`));
       return 1;
   }
@@ -382,8 +382,8 @@ function upgradeUnixBundle(
   }
 
   const env: NodeJS.ProcessEnv = { ...process.env };
-  if (method.installDir) env.CODEGRAPH_INSTALL_DIR = method.installDir;
-  if (pinned) env.CODEGRAPH_VERSION = pinned;
+  if (method.installDir) env.SPRINGGRAPH_INSTALL_DIR = method.installDir;
+  if (pinned) env.SPRINGGRAPH_VERSION = pinned;
 
   deps.log(c.dim(`Running the installer (${downloader} | sh)…`));
   const code = deps.run('sh', ['-c', `${downloader} | sh`], env);
@@ -400,12 +400,12 @@ function upgradeUnixBundle(
 /** Build the in-place Windows upgrade script (exported for unit-testing). */
 export function buildWindowsUpgradeScript(bundleRoot: string, version: string, arch: string): string {
   const target = `win32-${arch}`;
-  const url = `https://github.com/${REPO}/releases/download/${version}/codegraph-${target}.zip`;
+  const url = `https://github.com/${REPO}/releases/download/${version}/springgraph-${target}.zip`;
   // Windows can't DELETE a running exe but CAN rename it, so we upgrade IN
   // PLACE: download → rename the locked node.exe aside → extract the new bundle
   // over current\. Synchronous, no detached helper (which dies under SSH/job
   // objects and has worse UX). The running process keeps its renamed node.exe
-  // mapped; the NEXT `codegraph` invocation uses the new one. We can't reuse
+  // mapped; the NEXT `springgraph` invocation uses the new one. We can't reuse
   // install.ps1 here — it `Remove-Item`s current\, which fails on the locked exe.
   return [
     `$ErrorActionPreference='Stop'`,
@@ -418,14 +418,14 @@ export function buildWindowsUpgradeScript(bundleRoot: string, version: string, a
     `Invoke-WebRequest -Uri $url -OutFile $zip`,
     `$stage=Join-Path $tmp 'stage'`,
     `Expand-Archive -Path $zip -DestinationPath $stage -Force`,
-    `$inner=Join-Path $stage 'codegraph-${target}'`,
+    `$inner=Join-Path $stage 'springgraph-${target}'`,
     `$src=if(Test-Path $inner){$inner}else{$stage}`,
     `$node=Join-Path $dest 'node.exe'`,
     `if(Test-Path $node){Rename-Item -Path $node -NewName ('node.exe.old-'+[guid]::NewGuid().ToString('N')) -Force}`,
     `Copy-Item -Path (Join-Path $src '*') -Destination $dest -Recurse -Force`,
     `Get-ChildItem -Path $dest -Filter 'node.exe.old-*' -ErrorAction SilentlyContinue | ForEach-Object { try { Remove-Item $_.FullName -Force -ErrorAction Stop } catch {} }`,
     `Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue`,
-    `Write-Host "Installed CodeGraph ${version} to $dest"`,
+    `Write-Host "Installed Springgraph ${version} to $dest"`,
   ].join(';');
 }
 

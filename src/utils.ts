@@ -1,5 +1,5 @@
 /**
- * CodeGraph Utilities
+ * Springgraph Utilities
  *
  * Common utility functions for memory management, concurrency, batching,
  * and security validation.
@@ -8,7 +8,7 @@
  *
  * @example
  * ```typescript
- * import { Mutex, processInBatches, MemoryMonitor, validatePathWithinRoot } from 'codegraph';
+ * import { Mutex, processInBatches, MemoryMonitor, validatePathWithinRoot } from 'springgraph';
  *
  * // Use mutex for concurrent safety
  * const mutex = new Mutex();
@@ -56,7 +56,7 @@ export const CONFIG_LEAF_LANGUAGES: ReadonlySet<string> = new Set(['yaml', 'prop
  * A config-leaf node is a single key lifted out of a pure config/data file —
  * `kind: 'constant'` in a {@link CONFIG_LEAF_LANGUAGES} language. Its on-disk
  * line is `key = <value>`, and that value is routinely a secret (DB password,
- * API key, JDBC URL with embedded creds). CodeGraph must surface the KEY only
+ * API key, JDBC URL with embedded creds). Springgraph must surface the KEY only
  * and never read/return the value, or it pushes secrets into agent context
  * unbidden — the value isn't needed for resolution, and an agent that genuinely
  * needs it can read the file directly. (#383)
@@ -88,7 +88,7 @@ function isWithinDir(child: string, parent: string): boolean {
  * logical path is inside the root but whose real target points outside it
  * (issue #527). A symlink that stays within the root is still allowed, so
  * legitimate in-tree symlinks keep working. Both content-serving read sinks
- * (codegraph_node `includeCode`, codegraph_explore source) go through here, so
+ * (springgraph_node `includeCode`, springgraph_explore source) go through here, so
  * this is the chokepoint that keeps out-of-root file contents from leaking.
  *
  * @param projectRoot - The project root directory
@@ -224,8 +224,8 @@ export class FileLock {
         // Treat locks older than the timeout as stale, regardless of PID
         if (lockAge < FileLock.STALE_TIMEOUT_MS && !isNaN(pid) && this.isProcessAlive(pid)) {
           throw new Error(
-            `CodeGraph database is locked by another process (PID ${pid}). ` +
-            `If this is stale, run 'codegraph unlock' or delete ${this.lockPath}`
+            `Springgraph database is locked by another process (PID ${pid}). ` +
+            `If this is stale, run 'springgraph unlock' or delete ${this.lockPath}`
           );
         }
 
@@ -248,8 +248,8 @@ export class FileLock {
       if (err.code === 'EEXIST') {
         // Race condition: another process grabbed the lock between our check and write
         throw new Error(
-          'CodeGraph database is locked by another process. ' +
-          `If this is stale, run 'codegraph unlock' or delete ${this.lockPath}`
+          'Springgraph database is locked by another process. ' +
+          `If this is stale, run 'springgraph unlock' or delete ${this.lockPath}`
         );
       }
       throw err;

@@ -13,7 +13,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import CodeGraph from '../src';
+import Springgraph from '../src';
 import { ToolHandler } from '../src/mcp/tools';
 import { DatabaseConnection } from '../src/db';
 
@@ -30,7 +30,7 @@ describe('issue #238 — connection PRAGMAs (#1)', () => {
 
   beforeAll(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cg238-pragma-'));
-    conn = DatabaseConnection.initialize(path.join(dir, 'codegraph.db'));
+    conn = DatabaseConnection.initialize(path.join(dir, 'springgraph.db'));
   });
 
   afterAll(() => {
@@ -66,7 +66,7 @@ describe('issue #238 — WAL lets a reader proceed during a writer', () => {
   });
 
   it('a read on a 2nd connection succeeds while a writer holds the lock', () => {
-    const dbPath = path.join(dir, 'codegraph.db');
+    const dbPath = path.join(dir, 'springgraph.db');
     const writer = DatabaseConnection.initialize(dbPath);
     // The property only holds under WAL; skip if the filesystem couldn't enable it.
     if (writer.getJournalMode() !== 'wal') {
@@ -91,7 +91,7 @@ describe('issue #238 — WAL lets a reader proceed during a writer', () => {
 
 describe('issue #238 — ToolHandler reuses the default instance (#2)', () => {
   let dir: string;
-  let cg: CodeGraph;
+  let cg: Springgraph;
   let root: string;
   let handler: ToolHandler;
 
@@ -102,7 +102,7 @@ describe('issue #238 — ToolHandler reuses the default instance (#2)', () => {
       path.join(dir, 'b.ts'),
       "import { helper } from './a';\nexport function main(): number { return helper(); }\n"
     );
-    cg = await CodeGraph.init(dir, { index: true });
+    cg = await Springgraph.init(dir, { index: true });
     root = cg.getProjectRoot();
     handler = new ToolHandler(cg);
   });
@@ -112,13 +112,13 @@ describe('issue #238 — ToolHandler reuses the default instance (#2)', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it('getCodeGraph(defaultRoot) returns the default instance, not a new connection', () => {
-    const openSpy = vi.spyOn(CodeGraph, 'openSync');
+  it('getSpringgraph(defaultRoot) returns the default instance, not a new connection', () => {
+    const openSpy = vi.spyOn(Springgraph, 'openSync');
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const resolved = (handler as any).getCodeGraph(root);
+      const resolved = (handler as any).getSpringgraph(root);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const nested = (handler as any).getCodeGraph(path.join(root, 'does', 'not', 'exist'));
+      const nested = (handler as any).getSpringgraph(path.join(root, 'does', 'not', 'exist'));
       expect(resolved).toBe(cg);
       expect(nested).toBe(cg); // a sub-path resolves up to the same default project
       expect(openSpy).not.toHaveBeenCalled(); // no second connection opened
@@ -128,15 +128,15 @@ describe('issue #238 — ToolHandler reuses the default instance (#2)', () => {
   });
 
   it('concurrent read tool calls (mixed projectPath) all succeed without "database is locked"', async () => {
-    const openSpy = vi.spyOn(CodeGraph, 'openSync');
+    const openSpy = vi.spyOn(Springgraph, 'openSync');
     try {
       const calls: Promise<{ content: Array<{ text: string }>; isError?: boolean }>[] = [
-        handler.execute('codegraph_search', { query: 'helper' }),
-        handler.execute('codegraph_search', { query: 'helper', projectPath: root }),
-        handler.execute('codegraph_callers', { symbol: 'helper', projectPath: root }),
-        handler.execute('codegraph_callees', { symbol: 'main' }),
-        handler.execute('codegraph_files', { projectPath: root }),
-        handler.execute('codegraph_status', { projectPath: root }),
+        handler.execute('springgraph_search', { query: 'helper' }),
+        handler.execute('springgraph_search', { query: 'helper', projectPath: root }),
+        handler.execute('springgraph_callers', { symbol: 'helper', projectPath: root }),
+        handler.execute('springgraph_callees', { symbol: 'main' }),
+        handler.execute('springgraph_files', { projectPath: root }),
+        handler.execute('springgraph_status', { projectPath: root }),
       ];
       const results = await Promise.all(calls);
       for (const r of results) {

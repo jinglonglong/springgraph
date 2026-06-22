@@ -1,7 +1,7 @@
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { CodeGraph } from '../../src/index.js';
+import { Springgraph } from '../../src/index.js';
 import { scoreSearchNodes, scoreFindRelevantContext } from './scoring.js';
 import { testCases } from './test-cases.js';
 import type { EvalReport, EvalResult } from './types.js';
@@ -14,24 +14,24 @@ if (!codebasePath) {
 }
 
 const resolvedPath = path.resolve(codebasePath);
-if (!fs.existsSync(path.join(resolvedPath, '.codegraph', 'codegraph.db'))) {
-  console.error(`No .codegraph/codegraph.db found at ${resolvedPath}`);
+if (!fs.existsSync(path.join(resolvedPath, '.springgraph', 'springgraph.db'))) {
+  console.error(`No .springgraph/springgraph.db found at ${resolvedPath}`);
   process.exit(1);
 }
 
-let codegraphSha = 'unknown';
+let springgraphSha = 'unknown';
 try {
-  codegraphSha = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+  springgraphSha = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
 } catch {}
 
-console.log(`\nCodeGraph Eval — ${path.basename(resolvedPath)}`);
+console.log(`\nSpringgraph Eval — ${path.basename(resolvedPath)}`);
 console.log(`Codebase: ${resolvedPath}`);
-console.log(`Commit:   ${codegraphSha}`);
+console.log(`Commit:   ${springgraphSha}`);
 console.log(`Cases:    ${testCases.length}`);
 console.log('');
 
 async function run() {
-  const cg = CodeGraph.openSync(resolvedPath);
+  const cg = Springgraph.openSync(resolvedPath);
   const results: EvalResult[] = [];
 
   for (const tc of testCases) {
@@ -100,7 +100,7 @@ async function run() {
   const report: EvalReport = {
     timestamp: new Date().toISOString(),
     codebasePath: resolvedPath,
-    codegraphSha,
+    springgraphSha,
     summary: { total: results.length, passed, failed, meanRecall, meanMRR },
     results,
   };

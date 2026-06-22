@@ -1,5 +1,5 @@
 /**
- * codegraph_explore blast-radius section.
+ * springgraph_explore blast-radius section.
  *
  * explore now appends a compact, always-on "Blast radius" for the entry
  * symbols: who depends on each (locations only — no source) and which test
@@ -11,16 +11,16 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import CodeGraph from '../src/index';
+import Springgraph from '../src/index';
 import { ToolHandler } from '../src/mcp/tools';
 
-describe('codegraph_explore — blast radius', () => {
+describe('springgraph_explore — blast radius', () => {
   let testDir: string;
-  let cg: CodeGraph;
+  let cg: Springgraph;
   let handler: ToolHandler;
 
   beforeEach(async () => {
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-blast-'));
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-blast-'));
     const src = path.join(testDir, 'src');
     fs.mkdirSync(src, { recursive: true });
 
@@ -41,7 +41,7 @@ describe('codegraph_explore — blast radius', () => {
       `export function lonelyLeaf() { return 42; }\n`,
     );
 
-    cg = CodeGraph.initSync(testDir, { config: { include: ['**/*.ts'], exclude: [] } });
+    cg = Springgraph.initSync(testDir, { config: { include: ['**/*.ts'], exclude: [] } });
     await cg.indexAll();
     handler = new ToolHandler(cg);
   });
@@ -52,7 +52,7 @@ describe('codegraph_explore — blast radius', () => {
   });
 
   it('lists dependents (locations only) and covering tests for an entry symbol', async () => {
-    const res = await handler.execute('codegraph_explore', { query: 'target' });
+    const res = await handler.execute('springgraph_explore', { query: 'target' });
     const text = res.content[0].text;
 
     expect(text).toContain('### Blast radius');
@@ -65,7 +65,7 @@ describe('codegraph_explore — blast radius', () => {
   });
 
   it('omits symbols that have no dependents from the blast radius', async () => {
-    const res = await handler.execute('codegraph_explore', { query: 'lonelyLeaf' });
+    const res = await handler.execute('springgraph_explore', { query: 'lonelyLeaf' });
     const text = res.content[0].text;
     // lonelyLeaf has zero callers — it must never appear under a blast-radius bullet.
     expect(text).not.toMatch(/Blast radius[\s\S]*`lonelyLeaf`/);

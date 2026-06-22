@@ -9,6 +9,15 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- The project has been renamed from CodeGraph to Springgraph. The CLI is now `springgraph` (was `codegraph`), the per-project data directory is `.springgraph/` (was `.codegraph/`), the SQLite database is `springgraph.db` (was `codegraph.db`), the MCP tools are now `springgraph_search` / `springgraph_explore` / `springgraph_callers` / `springgraph_node` (and the unlisted `springgraph_callees` / `springgraph_impact` / `springgraph_files` / `springgraph_status`), and the npm package is `@colbymchenry/springgraph` (was `@colbymchenry/codegraph`). Environment variables are now `SPRINGGRAPH_*` (e.g. `SPRINGGRAPH_DIR`, `SPRINGGRAPH_NO_DAEMON`, `SPRINGGRAPH_WATCH_DEBOUNCE_MS`, `SPRINGGRAPH_TELEMETRY`, `SPRINGGRAPH_MCP_LOG_ATTACH`). Existing projects need to be re-initialized: run `springgraph uninit` on a project that has an old `.codegraph/` directory, then `springgraph init` to build a fresh `.springgraph/` index. The web UI now ships under the "springgraph" brand (was "SpringKG").
+- Web UI brand updated from "SpringKG" to "springgraph" across the dashboard, header, and static assets.
+
+### Housekeeping
+
+- Local development artifacts are now ignored by git: `.claude/`, `.cursor/`, `.omo/`, `资料/`, `openspec/`, `.playwright-mcp/`, and the old `.codegraph_bak/` backup. These remain on disk for the developer but no longer ship in the repository.
+
 ### New Features
 
 - Java and Kotlin projects now get Spring-aware relationship synthesis: `@Autowired`/`@Resource` field injection, explicit constructor injection, and Lombok `@RequiredArgsConstructor` are modeled as `references` edges from the consuming bean to the injected bean. Interface method dispatch is also bridged with `overrides` edges to concrete implementations, and overloaded methods are disambiguated by arity. MyBatis XML mappers are linked to their Java Mapper methods, SQL table/column hints are extracted, and XML column references are connected to entity fields by naming convention. `application.yml` / `application.properties` keys are indexed as `constant` nodes and wired to `@Value` and `@ConfigurationProperties` bindings. All of these edges are additive, carry `provenance:'heuristic'`, and surface in `codegraph_explore`, `codegraph_node`, `codegraph_callers`, and `codegraph_impact`.

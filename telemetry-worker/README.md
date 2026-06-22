@@ -1,7 +1,7 @@
-# codegraph telemetry ingest worker
+# springgraph telemetry ingest worker
 
-The first-party endpoint behind `telemetry.getcodegraph.com`. This directory is in the
-public repo **on purpose**: it is the exact code that receives codegraph's anonymous usage
+The first-party endpoint behind `telemetry.getspringgraph.com`. This directory is in the
+public repo **on purpose**: it is the exact code that receives springgraph's anonymous usage
 telemetry, so anyone can audit what is stored. The schema contract (every event, every
 field, and everything that is never collected) is in
 [`docs/design/telemetry.md`](../docs/design/telemetry.md).
@@ -13,7 +13,7 @@ with the npm package — the engine's `files` allowlist excludes it.
 
 ## Endpoint contract
 
-- `POST /v1/events` — JSON body: envelope (`machine_id` UUID, `codegraph_version`, `os`,
+- `POST /v1/events` — JSON body: envelope (`machine_id` UUID, `springgraph_version`, `os`,
   `arch`, `node_major`, `ci`, `schema_version`) + `events: [{event, ts?, props?}]`.
   Responds `204` when accepted (including events dropped by the allowlist), honest `4xx`
   for malformed/oversized/rate-limited requests. Clients treat every response as final —
@@ -22,7 +22,7 @@ with the npm package — the engine's `files` allowlist excludes it.
 
 ## Deploy
 
-Prereqs: the `getcodegraph.com` zone on the deploying Cloudflare account (the custom
+Prereqs: the `getspringgraph.com` zone on the deploying Cloudflare account (the custom
 domain route auto-provisions DNS + cert), wrangler ≥ 4.36 (the `ratelimits` binding).
 
 ```bash
@@ -45,10 +45,10 @@ npm run dev                      # http://localhost:8787
 
 curl -i localhost:8787/v1/events -H 'content-type: application/json' -d '{
   "machine_id": "00000000-0000-4000-8000-000000000000",
-  "codegraph_version": "0.9.9", "os": "darwin", "arch": "arm64",
+  "springgraph_version": "0.9.9", "os": "darwin", "arch": "arm64",
   "node_major": 22, "ci": false, "schema_version": 1,
   "events": [{ "event": "usage_rollup",
-               "props": { "kind": "mcp_tool", "name": "codegraph_explore",
+               "props": { "kind": "mcp_tool", "name": "springgraph_explore",
                           "count": 12, "error_count": 0, "client_name": "Claude Code" } }]
 }'
 ```

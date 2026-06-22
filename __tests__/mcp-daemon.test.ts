@@ -14,14 +14,14 @@
  *     down — other attached clients keep working (the must-fix-2 detach: the
  *     in-process daemon used to die with its launcher's process group and
  *     orphan on host SIGKILL, regressing #277).
- *   - A stale lockfile (dead pid) is cleared; `CODEGRAPH_NO_DAEMON=1` opts out;
+ *   - A stale lockfile (dead pid) is cleared; `SPRINGGRAPH_NO_DAEMON=1` opts out;
  *     the proxy refuses to attach across a version mismatch; the daemon
  *     idle-times-out after the last client leaves (so a single session can't
  *     leak a daemon forever).
  *
- * These tests intentionally spawn real `node dist/bin/codegraph.js` processes
+ * These tests intentionally spawn real `node dist/bin/springgraph.js` processes
  * over real sockets/pipes — the same surface a Claude Code / Cursor / Codex
- * install exercises. The daemon logs to `.codegraph/daemon.log` (it has no
+ * install exercises. The daemon logs to `.springgraph/daemon.log` (it has no
  * client stderr of its own), so daemon-side assertions read that file.
  *
  * `realRoot` vs `tempDir`: processes are spawned with the (possibly symlinked)
@@ -37,11 +37,11 @@ import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { CodeGraph } from '../src';
+import { Springgraph } from '../src';
 import { getDaemonSocketPath } from '../src/mcp/daemon-paths';
-import { removeDirWithRetries, safeCloseCodeGraph, terminateChild, waitForChildExit } from './setup';
+import { removeDirWithRetries, safeCloseSpringgraph, terminateChild, waitForChildExit } from './setup';
 
-const BIN = path.resolve(__dirname, '../dist/bin/codegraph.js');
+const BIN = path.resolve(__dirname, '../dist/bin/springgraph.js');
 
 interface SpawnedServer {
   child: ChildProcessWithoutNullStreams;
@@ -54,9 +54,9 @@ function spawnServer(cwd: string, env: NodeJS.ProcessEnv = {}): SpawnedServer {
     cwd,
     stdio: ['pipe', 'pipe', 'pipe'],
     // #618: the daemon-attach log line is now off by default; opt the test
-    // harness into it (CODEGRAPH_MCP_LOG_ATTACH=1) so the attach assertions
+    // harness into it (SPRINGGRAPH_MCP_LOG_ATTACH=1) so the attach assertions
     // below can still observe a successful attach. A per-test env still wins.
-    env: { CODEGRAPH_MCP_LOG_ATTACH: '1', ...process.env, ...env },
+    env: { SPRINGGRAPH_MCP_LOG_ATTACH: '1', ...process.env, ...env },
   }) as ChildProcessWithoutNullStreams;
   // Swallow spawn/EPIPE errors so killing a child mid-write can't surface as an
   // unhandled error that crashes the vitest worker.
@@ -141,19 +141,19 @@ function isAlive(pid: number): boolean {
 
 function readLockPid(root: string): number | null {
   try {
-    const raw = fs.readFileSync(path.join(root, '.codegraph', 'daemon.pid'), 'utf8');
+    const raw = fs.readFileSync(path.join(root, '.springgraph', 'daemon.pid'), 'utf8');
     const info = JSON.parse(raw);
     return typeof info.pid === 'number' ? info.pid : null;
   } catch { return null; }
 }
 
 function readDaemonLog(root: string): string {
-  try { return fs.readFileSync(path.join(root, '.codegraph', 'daemon.log'), 'utf8'); }
+  try { return fs.readFileSync(path.join(root, '.springgraph', 'daemon.log'), 'utf8'); }
   catch { return ''; }
 }
 
 function countListeningLines(root: string): number {
-  return readDaemonLog(root).split('\n').filter((l) => l.includes('[CodeGraph daemon] Listening on')).length;
+  return readDaemonLog(root).split('\n').filter((l) => l.includes('[Springgraph daemon] Listening on')).length;
 }
 
 function killTree(...procs: ChildProcessWithoutNullStreams[]): void {
@@ -172,9 +172,9 @@ describe('Shared MCP daemon (issue #411)', () => {
   const servers: SpawnedServer[] = [];
 
   beforeEach(async () => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-mcp-daemon-'));
-    const cg = await CodeGraph.init(tempDir);
-    await safeCloseCodeGraph(cg);
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-mcp-daemon-'));
+    const cg = await Springgraph.init(tempDir);
+    await safeCloseSpringgraph(cg);
     realRoot = fs.realpathSync(tempDir);
   });
 
@@ -194,19 +194,19 @@ describe('Shared MCP daemon (issue #411)', () => {
   });
 
   it('two invocations share ONE detached daemon; both attach as proxies', async () => {
-    const env = { CODEGRAPH_DAEMON_IDLE_TIMEOUT_MS: '15000' };
+    const env = { SPRINGGRAPH_DAEMON_IDLE_TIMEOUT_MS: '15000' };
 
     const first = spawnServer(tempDir, env);
     servers.push(first);
     sendInitialize(first.child, `file://${tempDir}`, 1);
     const firstResp = await waitFor(() => findResponse(first.stdout, 1), 10000);
-    expect(firstResp.result.serverInfo.name).toBe('codegraph');
+    expect(firstResp.result.serverInfo.name).toBe('springgraph');
 
     // The launcher is a PROXY (not the daemon itself) — that's the detach fix.
     await waitFor(() => first.stderr.some((l) => l.includes('Attached to shared daemon')), 8000);
 
     // A detached daemon came up and recorded itself.
-    await waitFor(() => fs.existsSync(path.join(realRoot, '.codegraph', 'daemon.pid')), 8000);
+    await waitFor(() => fs.existsSync(path.join(realRoot, '.springgraph', 'daemon.pid')), 8000);
     await waitFor(() => countListeningLines(realRoot) >= 1, 8000);
     const daemonPid = readLockPid(realRoot);
     expect(daemonPid).toBeTruthy();
@@ -224,7 +224,7 @@ describe('Shared MCP daemon (issue #411)', () => {
     servers.push(second);
     sendInitialize(second.child, `file://${tempDir}`, 2);
     const secondResp = await waitFor(() => findResponse(second.stdout, 2), 10000);
-    expect(secondResp.result.serverInfo.name).toBe('codegraph');
+    expect(secondResp.result.serverInfo.name).toBe('springgraph');
     await waitFor(() => second.stderr.some((l) => l.includes('Attached to shared daemon')), 8000);
 
     // Exactly one daemon ever bound, and it's the same pid both attached to.
@@ -233,7 +233,7 @@ describe('Shared MCP daemon (issue #411)', () => {
   }, 40000);
 
   it('concurrent launchers converge on a single daemon (lockfile race — must-fix 1)', async () => {
-    const env = { CODEGRAPH_DAEMON_IDLE_TIMEOUT_MS: '15000' };
+    const env = { SPRINGGRAPH_DAEMON_IDLE_TIMEOUT_MS: '15000' };
 
     // Fire three launchers as close to simultaneously as possible — this is the
     // race window where the old code could end up with two daemons.
@@ -243,7 +243,7 @@ describe('Shared MCP daemon (issue #411)', () => {
     // All three get a valid initialize response...
     for (let i = 0; i < procs.length; i++) {
       const resp = await waitFor(() => findResponse(procs[i].stdout, i + 1), 12000);
-      expect(resp.result.serverInfo.name).toBe('codegraph');
+      expect(resp.result.serverInfo.name).toBe('springgraph');
     }
     // ...and all three attached as proxies (none fell back / wedged).
     for (const p of procs) {
@@ -261,7 +261,7 @@ describe('Shared MCP daemon (issue #411)', () => {
   it('daemon survives the first client dying; a second client keeps working (must-fix 2 / #277)', async () => {
     // Idle high so the daemon doesn't reap mid-test; poll fast so proxy 1
     // notices its dead parent quickly.
-    const env = { CODEGRAPH_DAEMON_IDLE_TIMEOUT_MS: '30000', CODEGRAPH_PPID_POLL_MS: '200' };
+    const env = { SPRINGGRAPH_DAEMON_IDLE_TIMEOUT_MS: '30000', SPRINGGRAPH_PPID_POLL_MS: '200' };
 
     const first = spawnServer(tempDir, env);
     servers.push(first);
@@ -292,22 +292,22 @@ describe('Shared MCP daemon (issue #411)', () => {
     expect(toolsResp.result.tools.length).toBeGreaterThan(0);
   }, 45000);
 
-  it('CODEGRAPH_NO_DAEMON=1 keeps each process independent (no socket/pidfile)', async () => {
-    const env = { CODEGRAPH_NO_DAEMON: '1' };
+  it('SPRINGGRAPH_NO_DAEMON=1 keeps each process independent (no socket/pidfile)', async () => {
+    const env = { SPRINGGRAPH_NO_DAEMON: '1' };
     const first = spawnServer(tempDir, env);
     servers.push(first);
     sendInitialize(first.child, `file://${tempDir}`, 1);
     await waitFor(() => findResponse(first.stdout, 1), 10000);
     // Direct mode — no daemon machinery touched.
     expect(first.stderr.some((l) => l.includes('Attached to shared daemon'))).toBe(false);
-    expect(fs.existsSync(path.join(realRoot, '.codegraph', 'daemon.pid'))).toBe(false);
-    expect(fs.existsSync(path.join(realRoot, '.codegraph', 'daemon.log'))).toBe(false);
+    expect(fs.existsSync(path.join(realRoot, '.springgraph', 'daemon.pid'))).toBe(false);
+    expect(fs.existsSync(path.join(realRoot, '.springgraph', 'daemon.log'))).toBe(false);
   }, 20000);
 
   it('clears a stale (dead-pid) lockfile and a fresh daemon takes over', async () => {
     // Plant a lockfile pointing at a definitely-dead pid + the real socket path.
     fs.writeFileSync(
-      path.join(realRoot, '.codegraph', 'daemon.pid'),
+      path.join(realRoot, '.springgraph', 'daemon.pid'),
       JSON.stringify({
         pid: 999_999,
         version: '0.0.0-fake',
@@ -316,14 +316,14 @@ describe('Shared MCP daemon (issue #411)', () => {
       }),
     );
 
-    const env = { CODEGRAPH_DAEMON_IDLE_TIMEOUT_MS: '15000' };
+    const env = { SPRINGGRAPH_DAEMON_IDLE_TIMEOUT_MS: '15000' };
     const server = spawnServer(tempDir, env);
     servers.push(server);
     sendInitialize(server.child, `file://${tempDir}`, 1);
     const resp = await waitFor(() => findResponse(server.stdout, 1), 10000).catch((e) => {
       throw new Error(`${(e as Error).message}\nstderr:\n${server.stderr.join('\n')}\ndaemon.log:\n${readDaemonLog(realRoot)}`);
     });
-    expect(resp.result.serverInfo.name).toBe('codegraph');
+    expect(resp.result.serverInfo.name).toBe('springgraph');
     await waitFor(() => countListeningLines(realRoot) >= 1, 10000);
     // The pidfile now names a live daemon, not the planted-dead 999999.
     const livePid = readLockPid(realRoot);
@@ -337,11 +337,11 @@ describe('Shared MCP daemon (issue #411)', () => {
     // Plant a live-pid lockfile so the launcher treats the lock as held, and a
     // mini-server that answers with a mismatched-version hello.
     fs.writeFileSync(
-      path.join(realRoot, '.codegraph', 'daemon.pid'),
+      path.join(realRoot, '.springgraph', 'daemon.pid'),
       JSON.stringify({ pid: process.pid, version: '0.0.0-mismatch', socketPath: sockPath, startedAt: Date.now() }),
     );
     const miniServer = net.createServer((sock) => {
-      sock.write(JSON.stringify({ codegraph: '0.0.0-mismatch', pid: 1, socketPath: sockPath, protocol: 1 }) + '\n');
+      sock.write(JSON.stringify({ springgraph: '0.0.0-mismatch', pid: 1, socketPath: sockPath, protocol: 1 }) + '\n');
     });
     await new Promise<void>((resolve) => miniServer.listen(sockPath, () => resolve()));
 
@@ -353,7 +353,7 @@ describe('Shared MCP daemon (issue #411)', () => {
       // response — the proxy answers the handshake locally and, refusing to
       // attach across the version mismatch, serves the session in-process.
       const resp = await waitFor(() => findResponse(server.stdout, 1), 10000);
-      expect(resp.result.serverInfo.name).toBe('codegraph');
+      expect(resp.result.serverInfo.name).toBe('springgraph');
       await waitFor(
         () => server.stderr.some((l) => l.includes('serving this session in-process')),
         6000,
@@ -371,7 +371,7 @@ describe('Shared MCP daemon (issue #411)', () => {
   it('exits on the inactivity backstop even while a client stays connected (#692)', async () => {
     // Backstop short, idle timeout long: with a client connected the idle timer
     // never arms, so only the inactivity backstop can take the daemon down.
-    const env = { CODEGRAPH_DAEMON_MAX_IDLE_MS: '1500', CODEGRAPH_DAEMON_IDLE_TIMEOUT_MS: '60000' };
+    const env = { SPRINGGRAPH_DAEMON_MAX_IDLE_MS: '1500', SPRINGGRAPH_DAEMON_IDLE_TIMEOUT_MS: '60000' };
     const server = spawnServer(tempDir, env);
     servers.push(server);
     sendInitialize(server.child, `file://${tempDir}`, 1);
@@ -384,11 +384,11 @@ describe('Shared MCP daemon (issue #411)', () => {
     // should fire and the daemon should exit and clean up its lockfile.
     expect(await waitProcessExit(daemonPid, 12000)).toBe(true);
     expect(readDaemonLog(realRoot)).toContain('inactivity backstop');
-    expect(fs.existsSync(path.join(realRoot, '.codegraph', 'daemon.pid'))).toBe(false);
+    expect(fs.existsSync(path.join(realRoot, '.springgraph', 'daemon.pid'))).toBe(false);
   }, 30000);
 
   it('daemon idle-times-out after the last client disconnects', async () => {
-    const env = { CODEGRAPH_DAEMON_IDLE_TIMEOUT_MS: '800', CODEGRAPH_PPID_POLL_MS: '200' };
+    const env = { SPRINGGRAPH_DAEMON_IDLE_TIMEOUT_MS: '800', SPRINGGRAPH_PPID_POLL_MS: '200' };
     const server = spawnServer(tempDir, env);
     servers.push(server);
     sendInitialize(server.child, `file://${tempDir}`, 1);
@@ -402,14 +402,14 @@ describe('Shared MCP daemon (issue #411)', () => {
     expect(await waitForChildExit(server.child, 5000)).toBe(true);
 
     expect(await waitProcessExit(daemonPid, 10000)).toBe(true);
-    expect(fs.existsSync(path.join(realRoot, '.codegraph', 'daemon.pid'))).toBe(false);
+    expect(fs.existsSync(path.join(realRoot, '.springgraph', 'daemon.pid'))).toBe(false);
   }, 30000);
 
   it('proxy survives the daemon dying mid-session and keeps serving (#662)', async () => {
     // The #662 scenario: an MCP host SIGTERM's the shared daemon while a session
-    // is live. The proxy must NOT exit (losing CodeGraph for that session) — it
+    // is live. The proxy must NOT exit (losing Springgraph for that session) — it
     // falls back to an in-process engine and keeps answering.
-    const env = { CODEGRAPH_DAEMON_IDLE_TIMEOUT_MS: '30000', CODEGRAPH_PPID_POLL_MS: '5000' };
+    const env = { SPRINGGRAPH_DAEMON_IDLE_TIMEOUT_MS: '30000', SPRINGGRAPH_PPID_POLL_MS: '5000' };
     const server = spawnServer(tempDir, env);
     servers.push(server);
     sendInitialize(server.child, `file://${tempDir}`, 1);
@@ -419,7 +419,7 @@ describe('Shared MCP daemon (issue #411)', () => {
     const daemonPid = readLockPid(realRoot)!;
 
     // A warm call goes through the daemon.
-    sendMessage(server.child, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'codegraph_status', arguments: {} } });
+    sendMessage(server.child, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'springgraph_status', arguments: {} } });
     await waitFor(() => findResponse(server.stdout, 2), 20000);
 
     // Kill the daemon out from under the live proxy.
@@ -428,7 +428,7 @@ describe('Shared MCP daemon (issue #411)', () => {
 
     // The proxy must still be alive and still answer — served in-process now.
     expect(isAlive(server.child.pid!)).toBe(true);
-    sendMessage(server.child, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'codegraph_status', arguments: {} } });
+    sendMessage(server.child, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'springgraph_status', arguments: {} } });
     await waitFor(() => server.stderr.some((l) => l.includes('serving this session in-process')), 25000);
     const resp = await waitFor(() => findResponse(server.stdout, 3), 25000);
     expect(resp.result !== undefined || resp.error !== undefined).toBe(true);

@@ -10,7 +10,7 @@
  *   inspect               — query symbols (endpoint/feign/mapper/config)
  *   watch                 — file watcher with auto-sync
  *   rebuild-community     — regenerate feature community summaries
- *   uninit                — remove springkg.db (NOT codegraph.db)
+ *   uninit                — remove springkg.db (NOT springgraph.db)
  */
 
 import { Command } from 'commander';
@@ -214,14 +214,14 @@ export function buildProgram(): Command {
 
   program
     .command('uninit')
-    .description('Remove SpringKg from a project (deletes springkg.db only, NOT codegraph.db)')
+    .description('Remove SpringKg from a project (deletes springkg.db only, NOT springgraph.db)')
     .option('--force', 'Skip confirmation prompt', false)
     .action(async (opts) => {
       const projectPath = program.opts().projectPath || process.cwd();
       try {
         if (!opts.force) {
-          console.log(`This will delete .codegraph/springkg.db under: ${projectPath}`);
-          console.log('(codegraph.db will NOT be touched. Use --force to skip this prompt.)');
+          console.log(`This will delete .springgraph/springkg.db under: ${projectPath}`);
+          console.log('(springgraph.db will NOT be touched. Use --force to skip this prompt.)');
         }
         await runUninit(projectPath);
         process.exit(0);

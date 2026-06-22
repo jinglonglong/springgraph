@@ -7,11 +7,11 @@ observer / event-emitter / signal patterns, where a *dispatcher* invokes callbac
 registered elsewhere through a shared store — so flows like "how does an update
 reach the screen" actually exist in the graph.
 
-> **Update (2026-06-01):** the `codegraph_trace` and `codegraph_context` MCP tools
-> were since **removed** — `codegraph_explore` is the single surfacing tool now. Its
-> "Flow" section (`buildFlowFromNamedSymbols`) and the `codegraph_node` trail surface
+> **Update (2026-06-01):** the `springgraph_trace` and `springgraph_context` MCP tools
+> were since **removed** — `springgraph_explore` is the single surfacing tool now. Its
+> "Flow" section (`buildFlowFromNamedSymbols`) and the `springgraph_node` trail surface
 > these synthesized edges; the `trace(a, b)` notation below means "the a→b flow,"
-> which you now verify with `codegraph_explore` / `probe-explore.mjs` (the
+> which you now verify with `springgraph_explore` / `probe-explore.mjs` (the
 > `probe-trace.mjs` / `probe-context.mjs` dev probes went away with the tools).
 
 ---
@@ -36,14 +36,14 @@ We synthesize `dispatcher → callback` edges that static parsing misses. It wor
 **How to reproduce / test:**
 ```bash
 npm run build
-rm -rf /tmp/codegraph-corpus/excalidraw/.codegraph
-( cd /tmp/codegraph-corpus/excalidraw && codegraph init -i )
+rm -rf /tmp/springgraph-corpus/excalidraw/.springgraph
+( cd /tmp/springgraph-corpus/excalidraw && springgraph init -i )
 # synthesized edges (provenance='heuristic', metadata.synthesizedBy in {callback,event-emitter}):
-sqlite3 /tmp/codegraph-corpus/excalidraw/.codegraph/codegraph.db \
+sqlite3 /tmp/springgraph-corpus/excalidraw/.springgraph/springgraph.db \
   "select s.name||' → '||t.name||'  '||coalesce(e.metadata,'') from edges e \
    join nodes s on e.source=s.id join nodes t on e.target=t.id where e.provenance='heuristic';"
 # end-to-end flow (the synthesized edge shows up in explore's Flow section + node trail):
-node scripts/agent-eval/probe-explore.mjs /tmp/codegraph-corpus/excalidraw "triggerUpdate triggerRender"
+node scripts/agent-eval/probe-explore.mjs /tmp/springgraph-corpus/excalidraw "triggerUpdate triggerRender"
 ```
 Probe scripts (dev-only, in `scripts/agent-eval/`): `probe-node.mjs` (symbol + trail),
 `probe-explore.mjs` (relevant source + the flow among named symbols). EventEmitter
@@ -180,8 +180,8 @@ This is one half of closing dynamic-dispatch coverage. The other artifacts on `m
   `_iterable_class` → `ModelIterable.__iter__`).
 - **Retrieval/UX changes** (separate from coverage): `explore` whole-small-file + glue
   fixes, the `explore` Flow section (`buildFlowFromNamedSymbols`), and `node`-with-trail
-  — all in `src/mcp/tools.ts`. (`codegraph_trace` / `codegraph_context` were later
+  — all in `src/mcp/tools.ts`. (`springgraph_trace` / `springgraph_context` were later
   removed; explore is the one surfacing tool.)
 - **Full investigation context + findings:** auto-memory
-  `project_codegraph_read_displacement` (why coverage — not prompting/hooks/new-tools —
-  is the lever for getting agents to use codegraph over Read).
+  `project_springgraph_read_displacement` (why coverage — not prompting/hooks/new-tools —
+  is the lever for getting agents to use springgraph over Read).

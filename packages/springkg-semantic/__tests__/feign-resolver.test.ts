@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { FeignResolver } from '../src/feign-resolver';
-import type { CodegraphEdgeLike, CodegraphNodeLike, SpringKgNode } from '../src/shared-types';
-import { makeCodegraphStub } from '../src/shared-types';
+import type { SpringgraphEdgeLike, SpringgraphNodeLike, SpringKgNode } from '../src/shared-types';
+import { makeSpringgraphStub } from '../src/shared-types';
 
-function makeInterfaceNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
+function makeInterfaceNode(overrides: Partial<SpringgraphNodeLike> = {}): SpringgraphNodeLike {
   const id = overrides.id ?? 'feign-client-1';
   const name = overrides.name ?? 'UserClient';
 
@@ -29,7 +29,7 @@ function makeInterfaceNode(overrides: Partial<CodegraphNodeLike> = {}): Codegrap
   };
 }
 
-function makeMethodNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
+function makeMethodNode(overrides: Partial<SpringgraphNodeLike> = {}): SpringgraphNodeLike {
   const id = overrides.id ?? 'method-1';
   const name = overrides.name ?? 'list';
 
@@ -54,7 +54,7 @@ function makeMethodNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNo
   };
 }
 
-function makeParameterNode(overrides: Partial<CodegraphNodeLike> = {}): CodegraphNodeLike {
+function makeParameterNode(overrides: Partial<SpringgraphNodeLike> = {}): SpringgraphNodeLike {
   const id = overrides.id ?? 'param-1';
   const name = overrides.name ?? 'filter';
 
@@ -79,9 +79,9 @@ function makeParameterNode(overrides: Partial<CodegraphNodeLike> = {}): Codegrap
   };
 }
 
-async function enhance(nodes: CodegraphNodeLike[], edges: CodegraphEdgeLike[] = []) {
+async function enhance(nodes: SpringgraphNodeLike[], edges: SpringgraphEdgeLike[] = []) {
   const resolver = new FeignResolver();
-  return resolver.enhance({ codegraphNodes: nodes, codegraphEdges: edges, changedFiles: [], cg: makeCodegraphStub() });
+  return resolver.enhance({ springgraphNodes: nodes, springgraphEdges: edges, changedFiles: [], cg: makeSpringgraphStub() });
 }
 
 function findNode(nodes: SpringKgNode[], kind: SpringKgNode['kind']): SpringKgNode {

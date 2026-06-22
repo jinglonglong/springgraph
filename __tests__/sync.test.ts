@@ -2,7 +2,7 @@
  * Sync Module Tests
  *
  * Tests for sync functionality (incremental updates).
- * Note: Git hooks functionality has been removed in favor of codegraph's
+ * Note: Git hooks functionality has been removed in favor of springgraph's
  * Claude Code hooks integration.
  */
 
@@ -11,15 +11,15 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execFileSync } from 'child_process';
-import CodeGraph from '../src/index';
+import Springgraph from '../src/index';
 
 describe('Sync Module', () => {
   describe('Sync Functionality', () => {
     let testDir: string;
-    let cg: CodeGraph;
+    let cg: Springgraph;
 
     beforeEach(async () => {
-      testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-sync-func-'));
+      testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-sync-func-'));
 
       // Create initial source files
       const srcDir = path.join(testDir, 'src');
@@ -30,7 +30,7 @@ describe('Sync Module', () => {
       );
 
       // Initialize and index
-      cg = CodeGraph.initSync(testDir, {
+      cg = Springgraph.initSync(testDir, {
         config: {
           include: ['**/*.ts'],
           exclude: [],
@@ -154,14 +154,14 @@ describe('Sync Module', () => {
 
   describe('Git-based sync', () => {
     let testDir: string;
-    let cg: CodeGraph;
+    let cg: Springgraph;
 
     function git(...args: string[]) {
       execFileSync('git', args, { cwd: testDir, stdio: 'pipe' });
     }
 
     beforeEach(async () => {
-      testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraph-git-sync-'));
+      testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'springgraph-git-sync-'));
 
       // Initialize a git repo with an initial commit
       git('init');
@@ -178,8 +178,8 @@ describe('Sync Module', () => {
       git('add', '-A');
       git('commit', '-m', 'initial');
 
-      // Initialize CodeGraph and index
-      cg = CodeGraph.initSync(testDir, {
+      // Initialize Springgraph and index
+      cg = Springgraph.initSync(testDir, {
         config: {
           include: ['**/*.ts'],
           exclude: [],
@@ -226,7 +226,7 @@ describe('Sync Module', () => {
     });
 
     it('should stop reporting untracked files once they are indexed (issue #206)', async () => {
-      // Untracked files stay `??` in git status even after codegraph indexes
+      // Untracked files stay `??` in git status even after springgraph indexes
       // them. Change detection must compare them against the DB by hash, not
       // report every untracked file as "added" on every sync/status.
       fs.writeFileSync(

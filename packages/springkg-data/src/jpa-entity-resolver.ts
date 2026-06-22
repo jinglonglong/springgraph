@@ -36,7 +36,7 @@ export class JPAEntityResolver {
       symbols.push({
         id: tableId,
         kind: 'table',
-        codegraphNodeId: entity.id,
+        springgraphNodeId: entity.id,
         name: tableName,
         qualifiedName: entity.qualifiedName ? `${entity.qualifiedName}->${tableName}` : tableName,
         filePath: entity.filePath,

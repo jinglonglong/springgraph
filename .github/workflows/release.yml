@@ -124,7 +124,7 @@ jobs:
         # Published as a release asset; the npm launcher verifies downloaded
         # bundles against it (basenames only, so its path.basename match works).
         run: |
-          ( cd release && sha256sum codegraph-* > SHA256SUMS )
+          ( cd release && sha256sum springgraph-* > SHA256SUMS )
           cat release/SHA256SUMS
 
       - name: Release notes from CHANGELOG.md
@@ -148,9 +148,9 @@ jobs:
           TAG="v${{ steps.ver.outputs.version }}"
           # Idempotent: create the release once, otherwise (re-run) refresh assets.
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" release/codegraph-* release/SHA256SUMS --clobber
+            gh release upload "$TAG" release/springgraph-* release/SHA256SUMS --clobber
           else
-            gh release create "$TAG" release/codegraph-* release/SHA256SUMS --title "$TAG" --notes-file notes.md
+            gh release create "$TAG" release/springgraph-* release/SHA256SUMS --title "$TAG" --notes-file notes.md
           fi
 
       - name: Publish to npm
@@ -161,7 +161,7 @@ jobs:
           bash scripts/pack-npm.sh "$V"
           # Platform packages first, then the main shim (which depends on them).
           # Skip any already on the registry so a re-run only fills in gaps.
-          for dir in release/npm/codegraph-* release/npm/main; do
+          for dir in release/npm/springgraph-* release/npm/main; do
             name=$(node -p "require('./$dir/package.json').name")
             if npm view "$name@$V" version >/dev/null 2>&1; then
               echo "skip $name@$V (already published)"
@@ -176,7 +176,7 @@ jobs:
           V="${{ steps.ver.outputs.version }}"
           # npm publish can print success without persisting; confirm against the
           # registry (with retries for propagation) so green means really shipped.
-          for dir in release/npm/codegraph-* release/npm/main; do
+          for dir in release/npm/springgraph-* release/npm/main; do
             name=$(node -p "require('./$dir/package.json').name")
             ok=
             for i in 1 2 3 4 5 6; do
@@ -195,7 +195,7 @@ jobs:
         # from GitHub Releases — so a mirror hiccup never fails the release.
         continue-on-error: true
         run: |
-          for dir in release/npm/codegraph-* release/npm/main; do
+          for dir in release/npm/springgraph-* release/npm/main; do
             name=$(node -p "require('./$dir/package.json').name")
             enc=$(node -p "encodeURIComponent(require('./$dir/package.json').name)")
             echo "sync $name"

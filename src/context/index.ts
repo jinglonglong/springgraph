@@ -292,15 +292,15 @@ export class ContextBuilder {
       if (dirs.length >= 4) break;
     }
     const dirLine = dirs.length
-      ? `\n- \`codegraph_files\` a likely area: ${dirs.map(d => `\`${d}\``).join(', ')}`
+      ? `\n- \`springgraph_files\` a likely area: ${dirs.map(d => `\`${d}\``).join(', ')}`
       : '';
     return `\n\n${LOW_CONFIDENCE_MARKER}\n\n`
       + 'This query matched mostly on common words, so the entry points above may '
       + 'be off-target — treat them as a starting point, not a complete answer. '
       + 'For a reliable result:\n'
-      + '- `codegraph_explore` with the **exact symbol names** you are after '
+      + '- `springgraph_explore` with the **exact symbol names** you are after '
       + '(class / function / method names), or\n'
-      + '- `codegraph_search <name>` for one specific symbol'
+      + '- `springgraph_search <name>` for one specific symbol'
       + dirLine
       + '\n\nDo not assume the list above is comprehensive.';
   }
@@ -315,7 +315,7 @@ export class ContextBuilder {
    * already know). Delivering the flow here means "how does X reach Y" is
    * answered without the agent needing to find, load, or choose a new tool.
    * Chains stop where the static call graph ends (e.g. dynamic dispatch) — that
-   * truncation is honest, and the agent can codegraph_node the last hop to bridge.
+   * truncation is honest, and the agent can springgraph_node the last hop to bridge.
    */
   private buildCallPathsSection(subgraph: Subgraph): string {
     const adj = new Map<string, string[]>();
@@ -409,8 +409,8 @@ export class ContextBuilder {
       ...kept.map((c) => `- ${renderChain(c)}`),
       '',
       hasSynth
-        ? '_Hops marked `[callback/event …]` are dynamic dispatch bridged by codegraph (with the registration site); the rest are direct calls. codegraph_node any symbol for its body._'
-        : '_codegraph_node any symbol above for its source + its own callers/callees._',
+        ? '_Hops marked `[callback/event …]` are dynamic dispatch bridged by springgraph (with the registration site); the rest are direct calls. springgraph_node any symbol for its body._'
+        : '_springgraph_node any symbol above for its source + its own callers/callees._',
     ];
     return '\n' + lines.join('\n') + '\n';
   }

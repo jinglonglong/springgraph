@@ -181,7 +181,7 @@ export class QueryBuilder {
   // Project-name tokens (go.mod / package.json / repo dir), normalized. A query
   // word matching one is dropped from path-relevance scoring — it names the
   // whole project, not a symbol, so it carries no discriminative signal (#720).
-  // Set once by the CodeGraph instance; empty by default (no down-weighting).
+  // Set once by the Springgraph instance; empty by default (no down-weighting).
   private projectNameTokens: Set<string> = new Set();
 
   // Node cache for frequently accessed nodes (LRU-style, max 1000 entries)
@@ -266,7 +266,7 @@ export class QueryBuilder {
 
     // Validate required fields to prevent SQLite bind errors
     if (!node.id || !node.kind || !node.name || !node.filePath || !node.language) {
-      console.error('[CodeGraph] Skipping node with missing required fields:', {
+      console.error('[Springgraph] Skipping node with missing required fields:', {
         id: node.id,
         kind: node.kind,
         name: node.name,
@@ -356,7 +356,7 @@ export class QueryBuilder {
 
     // Validate required fields
     if (!node.id || !node.kind || !node.name || !node.filePath || !node.language) {
-      console.error('[CodeGraph] Skipping node update with missing required fields:', node.id);
+      console.error('[Springgraph] Skipping node update with missing required fields:', node.id);
       return;
     }
 
@@ -598,7 +598,7 @@ export class QueryBuilder {
    * `route` nodes (framework-emitted: Express/Gin/Flask/Rails/Drupal/etc.).
    * Used by handleContext on small repos to inline the project's routing
    * config when the agent's query is about request flow — eliminating the
-   * "Glob + Read routes.rb" pattern that beats codegraph on tiny realworld
+   * "Glob + Read routes.rb" pattern that beats springgraph on tiny realworld
    * template repos.
    *
    * Excludes test/generated files from candidacy. Returns null if there

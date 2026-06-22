@@ -1,8 +1,8 @@
-# CodeGraph Language Verification Guide
+# Springgraph Language Verification Guide
 
-You are verifying that CodeGraph fully supports a specific programming language. The user will give you a path to a real-world, popular open-source codebase cloned locally. Your job is to run a battery of realistic prompts against it using CodeGraph's API and verify the results are good enough to say that language is **covered and supported**.
+You are verifying that Springgraph fully supports a specific programming language. The user will give you a path to a real-world, popular open-source codebase cloned locally. Your job is to run a battery of realistic prompts against it using Springgraph's API and verify the results are good enough to say that language is **covered and supported**.
 
-A language is NOT verified until an LLM can reliably use CodeGraph's MCP tools to navigate that codebase — finding the right symbols, understanding call chains, exploring subsystems, and getting useful context for real tasks.
+A language is NOT verified until an LLM can reliably use Springgraph's MCP tools to navigate that codebase — finding the right symbols, understanding call chains, exploring subsystems, and getting useful context for real tasks.
 
 ## Setup
 
@@ -10,8 +10,8 @@ A language is NOT verified until an LLM can reliably use CodeGraph's MCP tools t
 
 ```bash
 npm run build
-rm -rf <codebase_path>/.codegraph
-node dist/bin/codegraph.js init -iv <codebase_path>
+rm -rf <codebase_path>/.springgraph
+node dist/bin/springgraph.js init -iv <codebase_path>
 ```
 
 The `-iv` flag gives verbose output showing extraction progress, node/edge counts, and timing.
@@ -20,18 +20,18 @@ The `-iv` flag gives verbose output showing extraction progress, node/edge count
 
 ```bash
 # Verify nodes were extracted with proper qualified names
-sqlite3 <codebase_path>/.codegraph/codegraph.db \
+sqlite3 <codebase_path>/.springgraph/springgraph.db \
   "SELECT name, kind, qualified_name FROM nodes WHERE kind = 'method' LIMIT 10;"
 
 # GOOD: file.go::StructName::method_name  (owner type present)
 # BAD:  file.go::file.go::method_name     (owner type missing — needs getReceiverType)
 
 # Check edge counts
-sqlite3 <codebase_path>/.codegraph/codegraph.db \
+sqlite3 <codebase_path>/.springgraph/springgraph.db \
   "SELECT kind, COUNT(*) FROM edges GROUP BY kind ORDER BY COUNT(*) DESC;"
 
 # Check node kind distribution
-sqlite3 <codebase_path>/.codegraph/codegraph.db \
+sqlite3 <codebase_path>/.springgraph/springgraph.db \
   "SELECT kind, COUNT(*) FROM nodes GROUP BY kind ORDER BY COUNT(*) DESC;"
 ```
 
@@ -45,15 +45,15 @@ Run **all** of the following test categories against the codebase. Use the Node.
 
 ---
 
-### Test 1: `codegraph_explore` — Deep Exploration (MOST IMPORTANT)
+### Test 1: `springgraph_explore` — Deep Exploration (MOST IMPORTANT)
 
 This is the primary tool LLMs use. It must return relevant source code grouped by file, with correct relationships, for a natural language query. Test it with **at least 5 different query types**:
 
 ```bash
 node -e "
-const { CodeGraph } = require('./dist/index.js');
+const { Springgraph } = require('./dist/index.js');
 async function test() {
-  const cg = await CodeGraph.open('<codebase_path>');
+  const cg = await Springgraph.open('<codebase_path>');
 
   const queries = [
     // A. Subsystem exploration — broad topic, should find the right files and key classes
@@ -126,15 +126,15 @@ test().catch(console.error);
 
 ---
 
-### Test 2: `codegraph_search` — Symbol Lookup
+### Test 2: `springgraph_search` — Symbol Lookup
 
 Test that searching for specific symbols returns the right results ranked correctly.
 
 ```bash
 node -e "
-const { CodeGraph } = require('./dist/index.js');
+const { Springgraph } = require('./dist/index.js');
 async function test() {
-  const cg = await CodeGraph.open('<codebase_path>');
+  const cg = await Springgraph.open('<codebase_path>');
 
   const searches = [
     // A. Class by name
@@ -175,15 +175,15 @@ test().catch(console.error);
 
 ---
 
-### Test 3: `codegraph_callers` / `codegraph_callees` — Call Chain Tracing
+### Test 3: `springgraph_callers` / `springgraph_callees` — Call Chain Tracing
 
 Test that call relationships were extracted correctly.
 
 ```bash
 node -e "
-const { CodeGraph } = require('./dist/index.js');
+const { Springgraph } = require('./dist/index.js');
 async function test() {
-  const cg = await CodeGraph.open('<codebase_path>');
+  const cg = await Springgraph.open('<codebase_path>');
 
   // Pick 3-4 important methods and check their call graphs
   const symbols = ['build', 'get', 'put', 'invalidate'];
@@ -218,15 +218,15 @@ test().catch(console.error);
 
 ---
 
-### Test 4: `codegraph_impact` — Change Impact Analysis
+### Test 4: `springgraph_impact` — Change Impact Analysis
 
 Test that the impact radius correctly identifies affected code.
 
 ```bash
 node -e "
-const { CodeGraph } = require('./dist/index.js');
+const { Springgraph } = require('./dist/index.js');
 async function test() {
-  const cg = await CodeGraph.open('<codebase_path>');
+  const cg = await Springgraph.open('<codebase_path>');
 
   // Pick a core class or interface that many things depend on
   const results = cg.searchNodes('<CoreClass>', { limit: 1, kinds: ['class', 'interface'] });
@@ -269,9 +269,9 @@ Directly verify that the major edge types are being extracted for this language.
 
 ```bash
 node -e "
-const { CodeGraph } = require('./dist/index.js');
+const { Springgraph } = require('./dist/index.js');
 async function test() {
-  const cg = await CodeGraph.open('<codebase_path>');
+  const cg = await Springgraph.open('<codebase_path>');
 
   // Check overall edge distribution
   console.log('=== Edge distribution ===');
@@ -303,7 +303,7 @@ test().catch(console.error);
 ```
 
 ```bash
-sqlite3 <codebase_path>/.codegraph/codegraph.db "
+sqlite3 <codebase_path>/.springgraph/springgraph.db "
   SELECT kind, COUNT(*) as cnt FROM edges GROUP BY kind ORDER BY cnt DESC;
 "
 ```
@@ -321,7 +321,7 @@ sqlite3 <codebase_path>/.codegraph/codegraph.db "
 Verify all expected node kinds are being extracted.
 
 ```bash
-sqlite3 <codebase_path>/.codegraph/codegraph.db "
+sqlite3 <codebase_path>/.springgraph/springgraph.db "
   SELECT kind, COUNT(*) as cnt FROM nodes GROUP BY kind ORDER BY cnt DESC;
 "
 ```
@@ -348,15 +348,15 @@ If an expected node kind has 0 count, the language extractor is missing that AST
 
 ### Test 7: Real-World LLM Prompts
 
-This is the final and most important test. Simulate the kinds of questions a developer would actually ask an LLM that's using CodeGraph. For each prompt, run `findRelevantContext` (which powers `codegraph_explore`) and evaluate whether the returned context would let an LLM give a correct, complete answer.
+This is the final and most important test. Simulate the kinds of questions a developer would actually ask an LLM that's using Springgraph. For each prompt, run `findRelevantContext` (which powers `springgraph_explore`) and evaluate whether the returned context would let an LLM give a correct, complete answer.
 
 **Run at least 5 of these prompt styles, adapted to the actual codebase:**
 
 ```bash
 node -e "
-const { CodeGraph } = require('./dist/index.js');
+const { Springgraph } = require('./dist/index.js');
 async function test() {
-  const cg = await CodeGraph.open('<codebase_path>');
+  const cg = await Springgraph.open('<codebase_path>');
 
   const prompts = [
     // 1. \"How does X work?\" — subsystem understanding
@@ -438,7 +438,7 @@ test().catch(console.error);
 | Symptom | Likely Cause | Where to Fix |
 |---------|-------------|--------------|
 | Method missing owner type in `qualified_name` | Language needs `getReceiverType` | `src/extraction/languages/<lang>.ts` |
-| `codegraph_explore` returns irrelevant files | Common names flooding FTS; co-location boost not helping | `src/db/queries.ts: findNodesByExactName`, `src/context/index.ts` |
+| `springgraph_explore` returns irrelevant files | Common names flooding FTS; co-location boost not helping | `src/db/queries.ts: findNodesByExactName`, `src/context/index.ts` |
 | Zero `calls` edges | `callTypes` missing or wrong AST node type | `src/extraction/languages/<lang>.ts: callTypes` |
 | Zero `extends`/`implements` edges | `extractInheritance()` doesn't handle this language's AST | `src/extraction/tree-sitter.ts: extractInheritance()` |
 | Missing node kinds (no enums, no interfaces) | AST type not listed in extractor | `src/extraction/languages/<lang>.ts: enumTypes`, `interfaceTypes`, etc. |
@@ -469,8 +469,8 @@ test().catch(console.error);
 
 ```bash
 npm run build
-rm -rf <codebase_path>/.codegraph
-node dist/bin/codegraph.js init -iv <codebase_path>
+rm -rf <codebase_path>/.springgraph
+node dist/bin/springgraph.js init -iv <codebase_path>
 # Re-run the failing tests from above
 ```
 
@@ -532,7 +532,7 @@ if (receiverType) {
 | `src/search/query-utils.ts` | `STOP_WORDS`, `extractSearchTerms`, `scorePathRelevance` |
 | `src/db/queries.ts` | `searchNodesFTS` (BM25), `findNodesByExactName` (co-location boost) |
 | `src/context/index.ts` | `findRelevantContext` — hybrid search + graph traversal |
-| `src/mcp/tools.ts` | MCP tool handlers — `codegraph_explore` implementation |
+| `src/mcp/tools.ts` | MCP tool handlers — `springgraph_explore` implementation |
 
 ## Language Status
 

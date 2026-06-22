@@ -1,6 +1,6 @@
 ---
 title: Languages
-description: Every language CodeGraph parses, and the extensions it recognizes.
+description: Every language Springgraph parses, and the extensions it recognizes.
 ---
 
 Language support is automatic from the file extension — there's nothing to configure.

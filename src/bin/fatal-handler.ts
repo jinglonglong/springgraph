@@ -82,12 +82,12 @@ export function installFatalHandlers(deps: FatalHandlerDeps = {}): void {
   const write = deps.write ?? writeStderr;
 
   target.on('uncaughtException', (error: unknown) => {
-    write(`[CodeGraph] Uncaught exception: ${describeFatal(error)}\n`);
+    write(`[Springgraph] Uncaught exception: ${describeFatal(error)}\n`);
     exit(1);
   });
 
   target.on('unhandledRejection', (reason: unknown) => {
-    write(`[CodeGraph] Unhandled rejection: ${describeFatal(reason)}\n`);
+    write(`[Springgraph] Unhandled rejection: ${describeFatal(reason)}\n`);
     exit(1);
   });
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the current branch and link it as the global `codegraph` for
+# Build the current branch and link it as the global `springgraph` for
 # hands-on testing. Replaces any existing global install for as long
 # as the symlink is in place.
 #
@@ -20,7 +20,7 @@ if [ "${1:-}" = "--undo" ]; then
   npm unlink -g "${PKG}" >/dev/null 2>&1 || true
   echo "→ reinstalling published ${PKG}"
   npm install -g "${PKG}"
-  echo "done: global codegraph -> $(command -v codegraph)"
+  echo "done: global springgraph -> $(command -v springgraph)"
   exit 0
 fi
 
@@ -30,9 +30,9 @@ npm run build
 echo "→ linking globally"
 npm link
 
-LINKED=$(command -v codegraph || echo "(not on PATH)")
+LINKED=$(command -v springgraph || echo "(not on PATH)")
 echo
-echo "✓ global codegraph now points to this branch"
+echo "✓ global springgraph now points to this branch"
 echo "  binary:  ${LINKED}"
 echo "  branch:  ${BRANCH}"
 echo "  version: ${VERSION}"

@@ -1,6 +1,6 @@
 # SpringKg Database Schema
 
-`springkg.db` lives inside the project's `.codegraph/` directory alongside `codegraph.db`. It is initialized by `SpringDatabase.initialize()` using the migration at `packages/springkg-core/src/db/migrations/001_initial_8_tables.sql`.
+`springkg.db` lives inside the project's `.springgraph/` directory alongside `springgraph.db`. It is initialized by `SpringDatabase.initialize()` using the migration at `packages/springkg-core/src/db/migrations/001_initial_8_tables.sql`.
 
 ## Entity-Relationship Diagram
 
@@ -9,7 +9,7 @@ erDiagram
     SPRING_SYMBOLS {
         text id PK
         text kind
-        text codegraph_node_id UK NN
+        text springgraph_node_id UK NN
         text name
         text qualified_name
         text file_path
@@ -105,7 +105,7 @@ The central node table. Stores every Spring semantic symbol emitted by a resolve
 |--------|------|------------|-------------|
 | `id` | TEXT | PRIMARY KEY | Deterministic: `${kind}:${sha256(...).slice(0,32)}` |
 | `kind` | TEXT | NOT NULL | One of SPRINGKG_NODE_KINDS |
-| `codegraph_node_id` | TEXT | UNIQUE, NOT NULL | FK into CodeGraph `nodes.id` |
+| `springgraph_node_id` | TEXT | UNIQUE, NOT NULL | FK into Springgraph `nodes.id` |
 | `name` | TEXT | - | Short display name |
 | `qualified_name` | TEXT | - | Fully-qualified name when available |
 | `file_path` | TEXT | - | Source file path |
@@ -120,7 +120,7 @@ The central node table. Stores every Spring semantic symbol emitted by a resolve
 - `idx_spring_symbols_kind` on `kind`
 - `idx_spring_symbols_file_path` on `file_path`
 - `idx_spring_symbols_confidence` on `confidence`
-- `idx_spring_symbols_codegraph_node_id` on `codegraph_node_id`
+- `idx_spring_symbols_springgraph_node_id` on `springgraph_node_id`
 
 ---
 
@@ -269,14 +269,14 @@ Tracks which migrations have been applied.
 
 ## Cross-Database Linking
 
-SpringKg nodes link to CodeGraph nodes via the `codegraph_node_id` column in `spring_symbols`. This column stores the exact `id` value from CodeGraph's `nodes` table, enabling joins:
+SpringKg nodes link to Springgraph nodes via the `springgraph_node_id` column in `spring_symbols`. This column stores the exact `id` value from Springgraph's `nodes` table, enabling joins:
 
 ```sql
--- Find all Spring endpoints whose handler method maps to a given CodeGraph symbol
+-- Find all Spring endpoints whose handler method maps to a given Springgraph symbol
 SELECT se.method, se.path, ss.name, ss.file_path
 FROM spring_endpoints se
 JOIN spring_symbols ss ON se.handler_method_id = ss.id
-WHERE ss.codegraph_node_id = 'method:sha256...abc123';
+WHERE ss.springgraph_node_id = 'method:sha256...abc123';
 ```
 
-This linkage is the recommended pattern for tools that need to reference CodeGraph nodes from SpringKg data.
+This linkage is the recommended pattern for tools that need to reference Springgraph nodes from SpringKg data.

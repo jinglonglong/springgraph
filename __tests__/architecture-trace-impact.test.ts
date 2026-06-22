@@ -48,11 +48,11 @@ describe('ArchitectureTraceEngine', () => {
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
-    const codegraphDir = path.join(tempDir, '.codegraph');
-    if (!fs.existsSync(codegraphDir)) {
-      fs.mkdirSync(codegraphDir, { recursive: true });
+    const springgraphDir = path.join(tempDir, '.springgraph');
+    if (!fs.existsSync(springgraphDir)) {
+      fs.mkdirSync(springgraphDir, { recursive: true });
     }
-    dbPath = path.join(codegraphDir, 'codegraph.db');
+    dbPath = path.join(springgraphDir, 'springgraph.db');
     if (fs.existsSync(dbPath)) {
       try { fs.unlinkSync(dbPath); } catch {}
     }
@@ -179,11 +179,11 @@ describe('ArchitectureImpactEngine', () => {
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
-    const codegraphDir = path.join(tempDir, '.codegraph');
-    if (!fs.existsSync(codegraphDir)) {
-      fs.mkdirSync(codegraphDir, { recursive: true });
+    const springgraphDir = path.join(tempDir, '.springgraph');
+    if (!fs.existsSync(springgraphDir)) {
+      fs.mkdirSync(springgraphDir, { recursive: true });
     }
-    dbPath = path.join(codegraphDir, 'codegraph.db');
+    dbPath = path.join(springgraphDir, 'springgraph.db');
     if (fs.existsSync(dbPath)) {
       try { fs.unlinkSync(dbPath); } catch {}
     }

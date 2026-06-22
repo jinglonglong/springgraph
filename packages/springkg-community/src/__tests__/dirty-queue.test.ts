@@ -11,7 +11,7 @@ import type { SpringDatabase } from '../types.js';
 const SCHEMA = `
 CREATE TABLE feature_communities (id TEXT PRIMARY KEY, label TEXT, summary TEXT DEFAULT '', member_count INTEGER DEFAULT 0, dirty INTEGER DEFAULT 1, last_summarized_at INTEGER, keywords TEXT);
 CREATE TABLE feature_community_members (id TEXT PRIMARY KEY, community_id TEXT, spring_node_id TEXT, membership_score REAL);
-CREATE TABLE spring_symbols (id TEXT PRIMARY KEY, kind TEXT, codegraph_node_id TEXT, name TEXT, qualified_name TEXT, file_path TEXT, start_line INTEGER, end_line INTEGER, metadata TEXT, confidence REAL, created_at INTEGER, updated_at INTEGER);
+CREATE TABLE spring_symbols (id TEXT PRIMARY KEY, kind TEXT, springgraph_node_id TEXT, name TEXT, qualified_name TEXT, file_path TEXT, start_line INTEGER, end_line INTEGER, metadata TEXT, confidence REAL, created_at INTEGER, updated_at INTEGER);
 CREATE TABLE spring_edges (id TEXT PRIMARY KEY, source_id TEXT, target_id TEXT, kind TEXT, metadata TEXT, confidence REAL, created_at INTEGER);
 CREATE TABLE spring_endpoints (id TEXT PRIMARY KEY, method TEXT, path TEXT, handler_class_id TEXT, handler_method_id TEXT, source_file_path TEXT, source_line INTEGER);
 CREATE TABLE spring_sql_statements (id TEXT PRIMARY KEY, mapper_id TEXT, sql_hash TEXT, sql_text TEXT, parameter_count INTEGER, tables TEXT, source_file_path TEXT, source_line INTEGER);
@@ -37,7 +37,7 @@ function graph(): { nodes: SpringKgNode[]; edges: SpringKgEdge[] } {
       {
         id: 'controller',
         kind: 'controller',
-        codegraphNodeId: 'cg:1',
+        springgraphNodeId: 'cg:1',
         name: 'OrderController',
         qualifiedName: 'com.example.order.OrderController',
         filePath: 'OrderController.java',
@@ -49,7 +49,7 @@ function graph(): { nodes: SpringKgNode[]; edges: SpringKgEdge[] } {
       {
         id: 'service',
         kind: 'service',
-        codegraphNodeId: 'cg:2',
+        springgraphNodeId: 'cg:2',
         name: 'OrderService',
         qualifiedName: 'com.example.order.OrderService',
         filePath: 'OrderService.java',

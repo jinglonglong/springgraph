@@ -4,7 +4,7 @@
  *   - MCP server entry to `~/.cursor/mcp.json` (global) or
  *     `./.cursor/mcp.json` (local). Same `{mcpServers: {...}}` shape
  *     as Claude.
- *   - Instructions to `./.cursor/rules/codegraph.mdc` (project-local
+ *   - Instructions to `./.cursor/rules/springgraph.mdc` (project-local
  *     ONLY). Cursor's rules system is a project-scoped surface;
  *     global cursor rules aren't a stable convention as of 2026-05.
  *     For `--location=global`, only mcp.json is written.
@@ -13,9 +13,9 @@
  *
  * Cursor launches MCP-server subprocesses with a working directory
  * that ISN'T the workspace root AND doesn't pass `rootUri` /
- * `workspaceFolders` in the MCP initialize call. The codegraph MCP
+ * `workspaceFolders` in the MCP initialize call. The springgraph MCP
  * server's `process.cwd()` fallback therefore misses the workspace's
- * `.codegraph/` and reports "not initialized" on every tool call.
+ * `.springgraph/` and reports "not initialized" on every tool call.
  *
  * So we inject `--path` into the args ourselves:
  *
@@ -49,8 +49,8 @@ import {
   writeJsonFile,
 } from './shared';
 import {
-  CODEGRAPH_SECTION_END,
-  CODEGRAPH_SECTION_START,
+  SPRINGGRAPH_SECTION_END,
+  SPRINGGRAPH_SECTION_START,
 } from '../instructions-template';
 
 function mcpJsonPath(loc: Location): string {
@@ -64,7 +64,7 @@ function mcpJsonPath(loc: Location): string {
  * root. There is no global equivalent.
  */
 function rulesPath(): string {
-  return path.join(process.cwd(), '.cursor', 'rules', 'codegraph.mdc');
+  return path.join(process.cwd(), '.cursor', 'rules', 'springgraph.mdc');
 }
 
 /**
@@ -75,7 +75,7 @@ function rulesPath(): string {
  */
 const MDC_FRONTMATTER = [
   '---',
-  'description: CodeGraph MCP usage guide — when to use which tool',
+  'description: Springgraph MCP usage guide — when to use which tool',
   'alwaysApply: true',
   '---',
   '',
@@ -96,7 +96,7 @@ class CursorTarget implements AgentTarget {
   detect(loc: Location): DetectionResult {
     const mcpPath = mcpJsonPath(loc);
     const config = readJsonFile(mcpPath);
-    const alreadyConfigured = !!config.mcpServers?.codegraph;
+    const alreadyConfigured = !!config.mcpServers?.springgraph;
     // "Installed" heuristic: does ~/.cursor exist (global) or has the
     // user opted into a project-local cursor config dir?
     const installed = loc === 'global'
@@ -110,7 +110,7 @@ class CursorTarget implements AgentTarget {
 
     files.push(writeMcpEntry(loc));
 
-    // We no longer write `.cursor/rules/codegraph.mdc` — the codegraph
+    // We no longer write `.cursor/rules/springgraph.mdc` — the springgraph
     // usage guidance ships in the MCP server's `initialize` response,
     // the single source of truth (issue #529). Strip a rules file a
     // previous install created so an upgrade self-heals.
@@ -130,8 +130,8 @@ class CursorTarget implements AgentTarget {
 
     const mcpPath = mcpJsonPath(loc);
     const config = readJsonFile(mcpPath);
-    if (config.mcpServers?.codegraph) {
-      delete config.mcpServers.codegraph;
+    if (config.mcpServers?.springgraph) {
+      delete config.mcpServers.springgraph;
       if (Object.keys(config.mcpServers).length === 0) {
         delete config.mcpServers;
       }
@@ -150,7 +150,7 @@ class CursorTarget implements AgentTarget {
 
   printConfig(loc: Location): string {
     const target = mcpJsonPath(loc);
-    const snippet = JSON.stringify({ mcpServers: { codegraph: buildCursorMcpConfig(loc) } }, null, 2);
+    const snippet = JSON.stringify({ mcpServers: { springgraph: buildCursorMcpConfig(loc) } }, null, 2);
     return `# Add to ${target}\n\n${snippet}\n`;
   }
 
@@ -162,7 +162,7 @@ class CursorTarget implements AgentTarget {
 }
 
 /**
- * Build the codegraph MCP-server config for Cursor at the given
+ * Build the springgraph MCP-server config for Cursor at the given
  * location. Inherits the shared shape ({type, command, args}) and
  * appends `--path` so the spawned MCP server resolves the workspace
  * correctly regardless of Cursor's launch cwd. See file header for
@@ -177,7 +177,7 @@ function buildCursorMcpConfig(loc: Location): { type: string; command: string; a
 function writeMcpEntry(loc: Location): WriteResult['files'][number] {
   const file = mcpJsonPath(loc);
   const existing = readJsonFile(file);
-  const before = existing.mcpServers?.codegraph;
+  const before = existing.mcpServers?.springgraph;
   const after = buildCursorMcpConfig(loc);
 
   if (jsonDeepEqual(before, after)) {
@@ -185,7 +185,7 @@ function writeMcpEntry(loc: Location): WriteResult['files'][number] {
   }
   const action: 'created' | 'updated' = before ? 'updated' : (fs.existsSync(file) ? 'updated' : 'created');
   if (!existing.mcpServers) existing.mcpServers = {};
-  existing.mcpServers.codegraph = after;
+  existing.mcpServers.springgraph = after;
   writeJsonFile(file, existing);
   return { path: file, action };
 }
@@ -194,12 +194,12 @@ function writeMcpEntry(loc: Location): WriteResult['files'][number] {
  * Remove the Cursor rules file on uninstall (and as a self-heal on
  * install — see issue #529).
  *
- * Unlike the shared CLAUDE.md / AGENTS.md files (where codegraph owns
- * only a marker-delimited section), `.cursor/rules/codegraph.mdc` is a
+ * Unlike the shared CLAUDE.md / AGENTS.md files (where springgraph owns
+ * only a marker-delimited section), `.cursor/rules/springgraph.mdc` is a
  * file we create OUTRIGHT — the frontmatter is ours too. So a plain
  * `removeMarkedSection` is wrong here: it would strip our instruction
- * block but leave the orphaned `description: CodeGraph ...` frontmatter
- * behind, so the file lingers and still "mentions" codegraph.
+ * block but leave the orphaned `description: Springgraph ...` frontmatter
+ * behind, so the file lingers and still "mentions" springgraph.
  *
  * Instead: strip our block, and if nothing but our own frontmatter
  * remains, delete the whole file. Only when the user has added their
@@ -217,13 +217,13 @@ function removeRulesEntry(): WriteResult['files'][number] {
   }
 
   const ourFrontmatter = MDC_FRONTMATTER.trim();
-  const startIdx = content.indexOf(CODEGRAPH_SECTION_START);
-  const endIdx = content.indexOf(CODEGRAPH_SECTION_END);
+  const startIdx = content.indexOf(SPRINGGRAPH_SECTION_START);
+  const endIdx = content.indexOf(SPRINGGRAPH_SECTION_END);
 
   // Our marked block is present — strip it, then decide what's left.
   if (startIdx !== -1 && endIdx > startIdx) {
     const before = content.substring(0, startIdx).trimEnd();
-    const after = content.substring(endIdx + CODEGRAPH_SECTION_END.length).trimStart();
+    const after = content.substring(endIdx + SPRINGGRAPH_SECTION_END.length).trimStart();
     const remainder = (before + (before && after ? '\n\n' : '') + after).trim();
     if (remainder === '' || remainder === ourFrontmatter) {
       try { fs.unlinkSync(file); } catch { /* ignore */ }

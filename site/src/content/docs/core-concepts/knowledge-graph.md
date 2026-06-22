@@ -3,7 +3,7 @@ title: The Knowledge Graph
 description: The node and edge kinds the graph is built from.
 ---
 
-CodeGraph stores three things: **nodes** (symbols and files), **edges** (relationships between them), and **files**. Every node and edge carries an exact `kind`, drawn from a fixed vocabulary so queries are consistent across languages.
+Springgraph stores three things: **nodes** (symbols and files), **edges** (relationships between them), and **files**. Every node and edge carries an exact `kind`, drawn from a fixed vocabulary so queries are consistent across languages.
 
 ## Node kinds
 
@@ -24,4 +24,4 @@ Most edges come straight from the AST. A few — at dynamic-dispatch boundaries 
 - **Impact** computes the transitive radius affected by a change.
 - **Explore** returns source for several related symbols grouped by file, plus the call path among them, in one call.
 
-See the [CLI](/codegraph/reference/cli/) and [MCP Server](/codegraph/reference/mcp-server/) references for how to run these.
+See the [CLI](/springgraph/reference/cli/) and [MCP Server](/springgraph/reference/mcp-server/) references for how to run these.

@@ -1,6 +1,8 @@
-# SpringKg MCP Tools
+# Springgraph MCP — Spring Tools
 
-The `springkg-mcp` server exposes four tools over stdio. Each tool accepts a JSON input and returns a structured JSON result. All tools operate on the active SpringKg session (project path resolved from the MCP root URI).
+The `springgraph-mcp` server exposes four Spring-aware tools over stdio (alongside the upstream `springgraph_*` tools exposed by the main `springgraph serve --mcp` server). Each tool accepts a JSON input and returns a structured JSON result. All tools operate on the active SpringKg session (project path resolved from the MCP root URI).
+
+The exposed surface is intentionally narrow: the four tools cover the entry point lookup, project-wide overview, full-stack trace, and pre-change impact analysis that an agent most often needs when working on a Spring Boot codebase. Lower-level lookups (mappers, configs, gateways, communities, Nacos, env diff, runtime dependencies, change surface) still exist as indexable data — the agent can reach them through the upstream `springgraph_search` / `springgraph_explore` / `springgraph_node` tools when needed.
 
 ## Tool Reference
 
@@ -49,9 +51,9 @@ Finds Spring Boot controllers and their endpoint methods, optionally filtered by
 
 ---
 
-### 2. spring_find_feign
+### 2. spring_method_impact
 
-Finds Feign client interfaces and their target services, optionally filtered by client name or target service name.
+Analyzes a method's impact across the Spring graph: callers, callees, endpoints, transaction boundaries, exception handlers, and downstream SQL operations. Use this before changing a method to understand what else will be affected.
 
 **Input schema:**
 
@@ -59,16 +61,17 @@ Finds Feign client interfaces and their target services, optionally filtered by 
 {
   "type": "object",
   "properties": {
-    "query": {
+    "methodName": {
       "type": "string",
-      "description": "Optional search query to filter by client name or target service."
+      "description": "Method name or qualified method name to analyze (e.g. 'com.example.user.UserService.findAll')."
     },
-    "limit": {
+    "depth": {
       "type": "number",
-      "description": "Maximum results (default: 20).",
-      "default": 20
+      "description": "Traversal depth for upstream/downstream relationships (default: 2).",
+      "default": 2
     }
-  }
+  },
+  "required": ["methodName"]
 }
 ```
 

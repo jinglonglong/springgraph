@@ -23,7 +23,7 @@
 
 - [二开新增能力](#二开新增能力)
 - [SpringKg: Spring Cloud 语义知识图谱](#springkg--spring-cloud-语义知识图谱)
-- [SpringKg MCP 工具 (15 个)](#springkg-mcp-工具-15-个)
+- [Spring MCP 工具 (4 个)](#spring-mcp-工具-4-个)
 - [架构剖面引擎](#架构剖面引擎-architecture-profile-engine)
 - [Spring Bean 自动装配解析](#spring-bean-自动装配解析)
 - [Web UI 可视化](#web-ui-可视化)
@@ -45,7 +45,7 @@
 | 模块 | 路径 | 作用 |
 |---|---|---|
 | **SpringKg 知识图谱** | `packages/springkg-*` | 专为 Spring Boot / Spring Cloud 构建的语义层 |
-| **SpringKg MCP Server** | `packages/springkg-mcp` | 暴露 15 个 Spring 专用 MCP 工具 |
+| **SpringKg MCP Server** | `packages/springkg-mcp` | 暴露 4 个 Spring 专用 MCP 工具 |
 | **架构剖面引擎** | `src/architecture/` | 6 层 + 15 角色 + 多 Facet 检测 |
 | **Spring Bean 装配解析** | `src/resolution/` | `@Autowired`、`@Resource`、构造注入、接口派发、MyBatis XML 链路 |
 | **Web UI 可视化** | `src/web/` | Cytoscape.js 图浏览器, REST API `/api/architecture/*` |
@@ -81,27 +81,18 @@ SpringKg 在 Springgraph 的 Java 抽取之上构建,专门针对 Spring Boot / 
 
 ---
 
-## SpringKg MCP 工具 (15 个)
+## Spring MCP 工具 (4 个)
 
-通过 `springgraph serve --mcp` 启动的 MCP 服务器对外暴露 15 个 Spring 专用 MCP 工具。AI Agent 可以像调用普通工具一样调用它们来回答架构问题。
+通过 `springgraph serve --mcp` 启动的 MCP 服务器对外暴露 **4 个** Spring 专用 MCP 工具,服务于 vibe coding 场景下"快速拿到答案"的核心诉求:
 
 | 工具 | 用途 |
 |---|---|
-| `spring_find_entry` | 查找 Spring Boot 控制器及其端点方法 |
-| `spring_find_feign` | 查找 Feign 客户端接口及目标服务 |
-| `spring_find_mapper` | 查找 MyBatis mapper 命名空间、方法、SQL |
-| `spring_find_config` | 查找运行时配置属性(敏感值不返回) |
-| `spring_nacos_overview` | Nacos 配置/注册中心概览 |
-| `spring_gateway_route` | Spring Gateway 路由、谓词、过滤器 |
-| `spring_search_feature` | 按标签搜索功能社区 |
-| `spring_assets_overview` | 服务、中间件、敏感配置总览 |
+| `spring_find_entry` | 按 URL/Controller 类/Feign 名/MQ topic/Scheduler 名称查找入口点;返回端点符号、handler 的 file:line,以及调用链头 |
+| `spring_assets_overview` | 服务、中间件、敏感配置总览(敏感值不返回) |
 | `spring_trace_flow` | 全链路追踪:Endpoint → Controller → Service → Mapper → SQL → Table |
-| `spring_method_impact` | 方法影响分析:调用链、事务边界、异常处理 |
-| `spring_field_impact` | 字段影响分析:跨 mapper SQL、读写站点 |
-| `spring_module_summary` | 模块摘要:控制器、服务、mapper、配置 |
-| `spring_find_change_surface` | 变更影响面:受影响符号、端点、候选测试 |
-| `spring_runtime_dependency` | 运行时依赖:DB、Redis、MQ、HTTP、Feign |
-| `spring_env_diff` | 环境差异对比(敏感值脱敏) |
+| `spring_method_impact` | 方法影响分析:调用链、事务边界、异常处理、SQL 依赖 |
+
+**工具精简的理由**:经过 A/B 评估,工具数量超过 4 个会显著增加 agent 选错工具的概率,所以这里把 SpringKg 的 MCP 接口收窄到 4 个高频工具。被精简掉的工具(MyBatis mapper 查询、运行配置查询、Nacos/Gateway 概览、功能社区搜索、字段影响、模块摘要、变更影响面、运行时依赖、环境差异对比)在底层数据层仍然存在,可以通过上游 `springgraph_search` / `springgraph_explore` / `springgraph_node` 间接访问。
 
 每个工具的入参/出参字段定义见 [`docs/mcp-tools.md`](docs/mcp-tools.md)。
 
@@ -194,7 +185,7 @@ SpringKg 在 Springgraph 的 Java 抽取之上构建,专门针对 Spring Boot / 
 | `springkg-runtime` | 运行时配置抽取与绑定分析 |
 | `springkg-community` | 功能社区与服务画像 |
 | `springkg-installer` | SpringKg 工具的安装器 |
-| `springkg-mcp` | 暴露 15 个 Spring 专用 MCP 工具(通过 `springgraph serve --mcp` 统一启动) |
+| `springkg-mcp` | 暴露 4 个 Spring 专用 MCP 工具(通过 `springgraph serve --mcp` 统一启动) |
 | `springkg-cli` | SpringKg 内部模块(CLI 统一使用 `springgraph` 命令) |
 
 ---
@@ -221,7 +212,7 @@ springgraph init
 springgraph index
 ```
 
-**启动 MCP 服务器**（供 AI Agent 调用 15 个 `spring_*` 工具）:
+**启动 MCP 服务器**（供 AI Agent 调用 4 个 `spring_*` 工具）:
 
 ```bash
 springgraph serve --mcp --path /path/to/springcloud-project
@@ -351,7 +342,7 @@ codegraph-springcloud/
 │   ├── springkg-runtime/
 │   ├── springkg-community/
 │   ├── springkg-installer/
-│   ├── springkg-mcp/             #   15 个 spring_* MCP 工具
+│   ├── springkg-mcp/             #   4 个 spring_* MCP 工具
 │   └── springkg-cli/
 │
 ├── examples/

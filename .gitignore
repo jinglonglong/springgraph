@@ -44,8 +44,8 @@ npm-debug.log*
 # Parallels Windows VM SSH/connection config (local machine, see CLAUDE.md)
 .parallels
 
-# CodeGraph data directories (in test projects)
-.codegraph/
+# Springgraph data directories (in test projects)
+.springgraph/
 
 test_frameworks
 
@@ -63,3 +63,7 @@ tmux-web/
 assets/__pycache__/
 
 assets/generate-waitlist.py
+
+# SpringKg local demo project (not for commit — used for local validation only)
+examples/springcloud-demo/
+

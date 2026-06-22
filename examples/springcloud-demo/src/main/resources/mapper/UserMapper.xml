@@ -1,5 +1,0 @@
-<mapper namespace="com.example.user.UserMapper">
-  <select id="findAll" resultType="com.example.user.UserEntity">select id,name,email from users</select>
-  <insert id="insertUser" parameterType="com.example.user.UserEntity">insert into users(name,email) values(#{name},#{email})</insert>
-  <update id="updateUser" parameterType="com.example.user.UserEntity">update users set name=#{name},email=#{email} where id=#{id}</update>
-</mapper>

@@ -1,6 +1,0 @@
-spring:
-  profiles: { active: dev }
-  config:
-    import: optional:nacos:${spring.application.name}.yaml
-  cloud:
-    nacos: { config: { group: DEFAULT_GROUP, namespace: demo } }

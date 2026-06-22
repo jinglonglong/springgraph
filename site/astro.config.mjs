@@ -13,6 +13,13 @@ export default defineConfig({
 			description:
 				'A local-first code-intelligence tool that turns any codebase into a queryable knowledge graph for AI coding agents.',
 			favicon: '/favicon.svg',
+			defaultLocale: 'root',
+			locales: {
+				root: {
+					label: '简体中文',
+					lang: 'zh-CN',
+				},
+			},
 			head: [
 				{
 					// Default to the light / paper theme on first visit; the toggle still
@@ -76,6 +83,7 @@ export default defineConfig({
 						{ label: '项目索引建档', slug: 'guides/indexing' },
 						{ label: '框架路由解析', slug: 'guides/framework-routes' },
 						{ label: 'CI 受影响测试分析', slug: 'guides/affected-tests' },
+						{ label: 'Web UI 可视化', slug: 'guides/web-ui' },
 					],
 				},
 				{

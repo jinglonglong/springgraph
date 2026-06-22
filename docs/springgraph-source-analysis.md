@@ -1,8 +1,8 @@
-# CodeGraph Source Analysis
+# Springgraph Source Analysis
 
 ## 1. Database Schema
 
-CodeGraph stores its knowledge graph in a SQLite database (`.codegraph/codegraph.db`). The schema consists of five core tables, a virtual FTS5 table for full-text search, supporting indices, and trigger-based synchronization.
+Springgraph stores its knowledge graph in a SQLite database (`.springgraph/springgraph.db`). The schema consists of five core tables, a virtual FTS5 table for full-text search, supporting indices, and trigger-based synchronization.
 
 ---
 
@@ -155,7 +155,7 @@ Used to store project-level facts such as the last indexed commit hash, branch n
 
 ### 1.2 FTS5 Virtual Table: `nodes_fts`
 
-CodeGraph provides full-text search over all indexed symbols via a virtual FTS5 table.
+Springgraph provides full-text search over all indexed symbols via a virtual FTS5 table.
 
 ```sql
 CREATE VIRTUAL TABLE IF NOT EXISTS nodes_fts USING fts5(
@@ -241,14 +241,14 @@ route:3a2b1c4d5e6f7a8b9c0d1e2f3a4b5c6d
 
 #### Integration with springkg
 
-In springkg (the Spring Knowledge Graph project), the `codegraph_node_id` field on any node entity uses this same format to create a direct, resolvable link from a springkg node to its originating CodeGraph symbol.
+In springkg (the Spring Knowledge Graph project), the `springgraph_node_id` field on any node entity uses this same format to create a direct, resolvable link from a springkg node to its originating Springgraph symbol.
 
 **Mapping strategy:**
 
-1. When springkg imports or references a CodeGraph node, it stores the full `codegraph_node_id` string as the `codegraph_node_id` property on its own domain node.
-2. To resolve the link, springkg parses the `codegraph_node_id` into its two components:
+1. When springkg imports or references a Springgraph node, it stores the full `springgraph_node_id` string as the `springgraph_node_id` property on its own domain node.
+2. To resolve the link, springkg parses the `springgraph_node_id` into its two components:
    - Extract `kind` to understand the symbol type
-   - Use `sha256truncated_32chars` to verify or look up the node in CodeGraph's `nodes` table via `SELECT * FROM nodes WHERE id = '${kind}:${sha256truncated_32chars}'`
+   - Use `sha256truncated_32chars` to verify or look up the node in Springgraph's `nodes` table via `SELECT * FROM nodes WHERE id = '${kind}:${sha256truncated_32chars}'`
 3. Optionally, springkg can use the `kind` prefix as a first-pass filter before attempting the full ID lookup.
 
 **Example springkg entity definition:**
@@ -257,7 +257,7 @@ In springkg (the Spring Knowledge Graph project), the `codegraph_node_id` field 
 {
   "id": "springkg:spring-service-UserService",
   "type": "SpringService",
-  "codegraph_node_id": "class:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+  "springgraph_node_id": "class:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
   "name": "UserService",
   "springkg_metadata": {
     "framework": "spring-boot",
@@ -269,7 +269,7 @@ In springkg (the Spring Knowledge Graph project), the `codegraph_node_id` field 
 This scheme provides:
 
 - **Uniqueness** — the 128-bit hash component makes collisions vanishingly unlikely even across multiple projects
-- **Verifiability** — springkg can confirm a CodeGraph node still exists and has not been invalidated
+- **Verifiability** — springkg can confirm a Springgraph node still exists and has not been invalidated
 - **Provenance** — the `kind` prefix tells springkg the symbol type without requiring a lookup
 - **Stability** — the hash is derived from position+name, so the ID remains stable across re-indexing unless the symbol itself moves or is renamed
 
@@ -340,9 +340,9 @@ The QueryBuilder uses prepared statements for all hot paths and an LRU node cach
 
 ## 4. MCP Architecture
 
-### 4.1 Server Entry Point (`codegraph serve --mcp`)
+### 4.1 Server Entry Point (`springgraph serve --mcp`)
 
-`src/bin/codegraph.ts` exposes `codegraph serve` (hidden from `--help` — it is the stdio entry point an AI agent launches for itself, not a human command). The `--mcp` flag triggers MCP server mode:
+`src/bin/springgraph.ts` exposes `springgraph serve` (hidden from `--help` — it is the stdio entry point an AI agent launches for itself, not a human command). The `--mcp` flag triggers MCP server mode:
 
 ```typescript
 .command('serve', { hidden: true })
@@ -359,13 +359,13 @@ The `MCPServer` class is imported lazily (`await import('../mcp/index')`) so the
 
 | Mode | Trigger | Description |
 |---|---|---|
-| `direct` | `CODEGRAPH_NO_DAEMON=1`, or no `.codegraph/` reachable | Single-process stdio session. Pre-#411 behavior. |
-| `proxy` | Default when `.codegraph/` is reachable | Local handshake + forwards calls to a shared daemon over a Unix socket / named pipe. Handshake is instant; daemon connects in background. |
+| `direct` | `SPRINGGRAPH_NO_DAEMON=1`, or no `.springgraph/` reachable | Single-process stdio session. Pre-#411 behavior. |
+| `proxy` | Default when `.springgraph/` is reachable | Local handshake + forwards calls to a shared daemon over a Unix socket / named pipe. Handshake is instant; daemon connects in background. |
 | `daemon` | Spawned by proxy when no daemon is running | Detached background process holding the shared SQLite + watcher. Survives session ends; reaped by idle timeout or refcount. |
 
 The proxy mode answers the MCP handshake (tool schemas) instantly from the local process while forwarding actual tool calls to the background daemon, eliminating the ~600ms cold-start penalty that previously raced with the agent's first query.
 
-The daemon is spawned via `spawnDetachedDaemon()` which re-invokes the CLI with `CODEGRAPH_DAEMON_INTERNAL=1`, ensuring the same binary (bundled or npm) serves as both CLI and daemon.
+The daemon is spawned via `spawnDetachedDaemon()` which re-invokes the CLI with `SPRINGGRAPH_DAEMON_INTERNAL=1`, ensuring the same binary (bundled or npm) serves as both CLI and daemon.
 
 ### 4.3 Tool Registration (`tools[]` at `src/mcp/tools.ts` line 415)
 
@@ -375,40 +375,40 @@ All tool definitions live in the `tools` array (line 415), a `ToolDefinition[]` 
 
 | Tool | Name | Purpose |
 |---|---|---|
-| `codegraph_explore` | PRIMARY | Any question / flow / "how does X work" — one call returns verbatim source of relevant symbols plus the call path |
-| `codegraph_node` | SECONDARY | One symbol's full source + caller/callee trail, or read a whole file with line numbers (drop-in replacement for Read) |
-| `codegraph_search` | Lookup | Find symbols by name across the codebase |
-| `codegraph_callers` | Enumeration | Every call site of a function, including callback registrations and multiple same-named definitions |
+| `springgraph_explore` | PRIMARY | Any question / flow / "how does X work" — one call returns verbatim source of relevant symbols plus the call path |
+| `springgraph_node` | SECONDARY | One symbol's full source + caller/callee trail, or read a whole file with line numbers (drop-in replacement for Read) |
+| `springgraph_search` | Lookup | Find symbols by name across the codebase |
+| `springgraph_callers` | Enumeration | Every call site of a function, including callback registrations and multiple same-named definitions |
 
 **Four unlisted tools** (`callees`, `impact`, `files`, `status`) remain fully functional via CLI and library API but are not shown to agents. The evidence for cutting them: `impact` appears in zero recorded eval runs (its blast-radius info already arrives inline on explore/node), `callees` is redundant by construction (a symbol's body IS its callee list), and `files`/`status` reduce to one grep.
 
-**Tool allowlist — `CODEGRAPH_MCP_TOOLS` env var:**
+**Tool allowlist — `SPRINGGRAPH_MCP_TOOLS` env var:**
 
 ```typescript
 // src/mcp/tools.ts line 625-631
 export function getStaticTools(): ToolDefinition[] {
-  const raw = process.env.CODEGRAPH_MCP_TOOLS;
+  const raw = process.env.SPRINGGRAPH_MCP_TOOLS;
   if (!raw || !raw.trim()) {
-    return tools.filter(t => DEFAULT_MCP_TOOLS.has(t.name.replace(/^codegraph_/, '')));
+    return tools.filter(t => DEFAULT_MCP_TOOLS.has(t.name.replace(/^springgraph_/, '')));
   }
-  const allow = new Set(raw.split(',').map(s => s.trim().replace(/^codegraph_/, '')).filter(Boolean));
-  return allow.size ? tools.filter(t => allow.has(t.name.replace(/^codegraph_/, ''))) : tools;
+  const allow = new Set(raw.split(',').map(s => s.trim().replace(/^springgraph_/, '')).filter(Boolean));
+  return allow.size ? tools.filter(t => allow.has(t.name.replace(/^springgraph_/, ''))) : tools;
 }
 ```
 
-Set `CODEGRAPH_MCP_TOOLS=explore,node,search,callers,impact` to re-enable unlisted tools. The allowlist is checked at both `tools/list` (so disallowed tools are genuinely absent from the schema) and at `execute()` (so a client that cached the old list gets a clear error).
+Set `SPRINGGRAPH_MCP_TOOLS=explore,node,search,callers,impact` to re-enable unlisted tools. The allowlist is checked at both `tools/list` (so disallowed tools are genuinely absent from the schema) and at `execute()` (so a client that cached the old list gets a clear error).
 
 ### 4.4 No Plugin Mechanism
 
-CodeGraph has **no plugin mechanism**. Adding a new tool requires modifying `src/mcp/tools.ts` directly — adding an entry to the `tools[]` array and implementing its handler in `ToolHandler`. There is no plugin API, hook system, or external loader.
+Springgraph has **no plugin mechanism**. Adding a new tool requires modifying `src/mcp/tools.ts` directly — adding an entry to the `tools[]` array and implementing its handler in `ToolHandler`. There is no plugin API, hook system, or external loader.
 
-**Recommended integration pattern for custom tools:** run a **separate MCP server** alongside CodeGraph rather than extending it. The agent's MCP config can list multiple servers:
+**Recommended integration pattern for custom tools:** run a **separate MCP server** alongside Springgraph rather than extending it. The agent's MCP config can list multiple servers:
 
 ```json
 {
   "mcpServers": {
-    "codegraph": {
-      "command": "codegraph",
+    "springgraph": {
+      "command": "springgraph",
       "args": ["serve", "--mcp"]
     },
     "my-custom-server": {
@@ -421,10 +421,10 @@ CodeGraph has **no plugin mechanism**. Adding a new tool requires modifying `src
 
 ### 4.5 ToolHandler and Execution Flow
 
-`ToolHandler` (line 664) wraps a `CodeGraph` instance and implements all tool handlers. Key design points:
+`ToolHandler` (line 664) wraps a `Springgraph` instance and implements all tool handlers. Key design points:
 
-- **Lazy CodeGraph loading:** `loadCodeGraph()` uses `require()` (cached, synchronous) to pull in the SQLite/grammar chain only when a tool actually runs, not on server startup. This keeps `tools/list` fast.
-- **Cross-project queries:** `getCodeGraph(projectPath?)` walks up directories to find `.codegraph/`, caches by resolved root, and refuses sensitive system paths via `validateProjectPath`.
+- **Lazy Springgraph loading:** `loadSpringgraph()` uses `require()` (cached, synchronous) to pull in the SQLite/grammar chain only when a tool actually runs, not on server startup. This keeps `tools/list` fast.
+- **Cross-project queries:** `getSpringgraph(projectPath?)` walks up directories to find `.springgraph/`, caches by resolved root, and refuses sensitive system paths via `validateProjectPath`.
 - **Input validation:** `validateString()` and `validateOptionalPath()` enforce `MAX_INPUT_LENGTH` (10,000 chars) and `MAX_PATH_LENGTH` (4,096 chars) centrally, before any tool-specific logic runs.
 - **Error handling:** `NotIndexedError` returns a SUCCESS-shaped response with guidance (not `isError: true`) so one unindexed workspace never teaches the agent to abandon the whole toolset. `PathRefusalError` is the one `isError: true` case — a genuine security refusal.
 - **Staleness banners:** `withStalenessNotice()` prepends a per-file warning when the response references files that the watcher has not yet synced. A footer lists pending files elsewhere in the project.
@@ -437,7 +437,7 @@ The `execute()` switch (line 1146) routes to `handleSearch`, `handleCallers`, `h
 
 - **Under 500 files:** only `explore`, `search`, `node` are exposed (not even `callers` — at this scale it reduces to one grep). Empirical floor: cutting below 5 tools caused regressions on single-file-framework repos.
 - **500+ files:** the full default 4-tool surface.
-- **`codegraph_explore` description** is augmented with a per-project budget recommendation: "make at most N calls for this project (X files indexed)" — scaled by `getExploreBudget(fileCount)` which returns 1-5 based on file count tiers.
+- **`springgraph_explore` description** is augmented with a per-project budget recommendation: "make at most N calls for this project (X files indexed)" — scaled by `getExploreBudget(fileCount)` which returns 1-5 based on file count tiers.
 
 ### 4.7 Server Instructions (`src/mcp/server-instructions.ts`)
 
@@ -457,7 +457,7 @@ The Java extractor is defined in `src/extraction/languages/java.ts` and wired in
 
 The extractor declares which tree-sitter node types correspond to each `NodeKind`. The mapping is read by `TreeSitterExtractor.visitNode` and dispatched to the appropriate `extract*` private method.
 
-| tree-sitter node type | CodeGraph NodeKind | Notes |
+| tree-sitter node type | Springgraph NodeKind | Notes |
 |---|---|---|
 | `class_declaration` | `class` | Regular class definitions |
 | `method_declaration` | `method` | Instance and static methods inside classes |
@@ -832,9 +832,9 @@ Files without `<mapper namespace="...">` return only a file node. This includes 
 | macOS / Windows | Single recursive `fs.watch(root, {recursive:true})` | O(1) descriptors — one FSEvents stream / one RDCW handle regardless of repo size |
 | Linux | Per-directory `fs.watch()` — one inotify watch per directory | O(directories), not O(files) |
 
-The Linux per-directory strategy caps at `maxDirWatches` (default 50,000; tunable via `CODEGRAPH_MAX_DIR_WATCHES`). On inotify watch-count exhaustion (ENOSPC) it warns and stops adding watches rather than degrading — the already-installed watches keep working.
+The Linux per-directory strategy caps at `maxDirWatches` (default 50,000; tunable via `SPRINGGRAPH_MAX_DIR_WATCHES`). On inotify watch-count exhaustion (ENOSPC) it warns and stops adding watches rather than degrading — the already-installed watches keep working.
 
-**Ignored trees:** `node_modules/`, `dist/`, `.git/`, and all paths matched by the project's `.gitignore` are excluded. The same `buildScopeIgnore` used by the indexer is used by the watcher, so both agree on scope. `.codegraph/` is always ignored regardless of gitignore.
+**Ignored trees:** `node_modules/`, `dist/`, `.git/`, and all paths matched by the project's `.gitignore` are excluded. The same `buildScopeIgnore` used by the indexer is used by the watcher, so both agree on scope. `.springgraph/` is always ignored regardless of gitignore.
 
 ### 5.2 Watch Options
 
@@ -893,22 +893,22 @@ export interface PendingFile {
 }
 ```
 
-`CodeGraph.getPendingFiles()` (line 616) exposes this via the public API. The MCP tool handler uses it to render per-file staleness banners: if a response's text includes a pending file's path, a banner warns the agent to Read that file directly. The `indexing` flag distinguishes "still in the debounce window" (false) from "currently being indexed" (true).
+`Springgraph.getPendingFiles()` (line 616) exposes this via the public API. The MCP tool handler uses it to render per-file staleness banners: if a response's text includes a pending file's path, a banner warns the agent to Read that file directly. The `indexing` flag distinguishes "still in the debounce window" (false) from "currently being indexed" (true).
 
 ### 5.5 Watcher Lifecycle and Degradation
 
 - **Normal:** events are accumulated in `pendingFiles`, a debounce timer fires after `debounceMs` idle, `flush()` runs `syncFn()`.
 - **Lock contention:** `LockUnavailableError` is caught; the watcher retries with exponential backoff (`debounceMs * 2^(n-1)`). After 5 retries it degrades permanently.
-- **OS resource exhaustion (EMFILE/ENFILE):** the watcher degrades immediately with an actionable message. Run `codegraph sync` or install git sync hooks as backstop.
+- **OS resource exhaustion (EMFILE/ENFILE):** the watcher degrades immediately with an actionable message. Run `springgraph sync` or install git sync hooks as backstop.
 - **Linux inotify watch-count exhaustion (ENOSPC):** non-fatal warning; already-installed watches keep working. Raise `fs.inotify.max_user_watches`.
 - **WSL2 `/mnt/` detection:** `watchDisabledReason()` in `watch-policy.ts` returns a reason string on WSL2; the watcher refuses to start rather than blocking MCP startup. Fall back to manual sync or git hooks.
 
-### 5.6 CodeGraph.watch() and springkg Integration
+### 5.6 Springgraph.watch() and springkg Integration
 
-The public `CodeGraph.watch()` API (line 546) attaches a `FileWatcher` to a `CodeGraph` instance. The correct springkg integration pattern:
+The public `Springgraph.watch()` API (line 546) attaches a `FileWatcher` to a `Springgraph` instance. The correct springkg integration pattern:
 
 ```typescript
-const cg = await CodeGraph.open('/path/to/project');
+const cg = await Springgraph.open('/path/to/project');
 cg.watch({
   onSyncComplete: async ({ filesChanged, durationMs }) => {
     // WRONG: onSyncComplete only gives { filesChanged, durationMs } — no file paths
@@ -947,9 +947,9 @@ C:\Users\LONG\AppData\Local\Temp\opencode\cg-demo\
 ### 6.2 Init + Index
 
 ```bash
-$ node dist/bin/codegraph.js init "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo" --index
+$ node dist/bin/springgraph.js init "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo" --index
 
-  Initializing CodeGraph
+  Initializing Springgraph
   Initialized in C:\Users\LONG\AppData\Local\Temp\opencode\cg-demo
 
   Scanning files - 4 found
@@ -968,9 +968,9 @@ $ node dist/bin/codegraph.js init "C:/Users/LONG/AppData/Local/Temp/opencode/cg-
 ### 6.3 Index Statistics
 
 ```bash
-$ node dist/bin/codegraph.js status "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo"
+$ node dist/bin/springgraph.js status "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo"
 
-CodeGraph Status
+Springgraph Status
   Project: C:\Users\LONG\AppData\Local\Temp\opencode\cg-demo
 
 Index Statistics:
@@ -999,7 +999,7 @@ Files by Language:
 ### 6.4 Validation: Java Class/Method
 
 ```bash
-$ node dist/bin/codegraph.js query "listUsers" --path "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo"
+$ node dist/bin/springgraph.js query "listUsers" --path "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo"
 
 Search Results for "listUsers":
   method      listUsers  (8112%)
@@ -1012,7 +1012,7 @@ Search Results for "listUsers":
 ### 6.5 Validation: @GetMapping Route
 
 ```bash
-$ node dist/bin/codegraph.js query "users" --path "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo"
+$ node dist/bin/springgraph.js query "users" --path "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo"
 
 Search Results for "users":
   route       GET /users      (740%)
@@ -1026,7 +1026,7 @@ Search Results for "users":
 ### 6.6 Validation: MyBatis XML Statement
 
 ```bash
-$ node dist/bin/codegraph.js query "findAll" --path "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo"
+$ node dist/bin/springgraph.js query "findAll" --path "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo"
 
 Search Results for "findAll":
   method      findAll  (9485%)
@@ -1042,7 +1042,7 @@ Search Results for "findAll":
 ### 6.7 Validation: Full Flow with `explore`
 
 ```bash
-$ node dist/bin/codegraph.js explore "listUsers GET /users findAll" \
+$ node dist/bin/springgraph.js explore "listUsers GET /users findAll" \
     --path "C:/Users/LONG/AppData/Local/Temp/opencode/cg-demo"
 ```
 
@@ -1093,8 +1093,8 @@ public interface UserMapper {
 | `@GetMapping` route search | `query "users"` | ✅ Found `GET /users` and `GET /users/count` as kind=route |
 | MyBatis XML statement search | `query "findAll"` | ✅ Found in `UserMapper.xml` as kind=method |
 | End-to-end flow trace | `explore "listUsers GET /users findAll"` | ✅ Full flow: controller → mapper interface → XML SQL |
-| `init` + `index` | `codegraph init --index` | ✅ 4 files, 27 nodes, 35 edges in 304ms |
-| `status` | `codegraph status` | ✅ Backend `node:sqlite`, journal `wal` |
+| `init` + `index` | `springgraph init --index` | ✅ 4 files, 27 nodes, 35 edges in 304ms |
+| `status` | `springgraph status` | ✅ Backend `node:sqlite`, journal `wal` |
 
 All three validation targets (Java class/method, `@GetMapping` route, MyBatis XML statement) are correctly indexed and queryable. The `explore` tool successfully connects a Spring MVC route → controller method → MyBatis mapper interface → XML SQL statement across language boundaries, confirming that the extraction and resolution pipeline works end-to-end for a minimal Spring Boot + MyBatis project.
 

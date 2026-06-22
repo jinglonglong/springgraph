@@ -1,38 +1,38 @@
-# CodeGraph A/B benchmark — with vs without, every language × S/M/L
+# Springgraph A/B benchmark — with vs without, every language × S/M/L
 
-**Date:** 2026-05-24 · **Branch:** `main` · **codegraph 0.9.4**
+**Date:** 2026-05-24 · **Branch:** `main` · **springgraph 0.9.4**
 
 A headless agent (Claude Opus, `--permission-mode bypassPermissions`) answers one
-**canonical flow question** per repo — twice: **with** the codegraph MCP server, and
-**without** any MCP (built-in Read/Grep/Glob/Bash only). Same model, same prompt; codegraph
+**canonical flow question** per repo — twice: **with** the springgraph MCP server, and
+**without** any MCP (built-in Read/Grep/Glob/Bash only). Same model, same prompt; springgraph
 is the only variable. Each cell was **re-indexed fresh** first (against a `dist/` build of the
 current `main` HEAD), so the "with" arm reflects the shipped 0.9.4 resolvers.
 
 ## Headline
 
-**Across 37 cells, codegraph cut total file reads from 159 → 38 — 76% fewer.** It never
-*increased* reads in any cell (0 regressions). The mechanism: a few sub-millisecond codegraph
+**Across 37 cells, springgraph cut total file reads from 159 → 38 — 76% fewer.** It never
+*increased* reads in any cell (0 regressions). The mechanism: a few sub-millisecond springgraph
 calls replace a read-and-grep exploration.
 
 **Cost stays roughly flat — marginally higher on the with-arm here** (summed across the 37
 cells: with `$15.4` vs without `$13.8`). On these short single-flow questions the without-arm
-resolves in <10 calls and never balloons, so it doesn't reach the regime where codegraph's cost
+resolves in <10 calls and never balloons, so it doesn't reach the regime where springgraph's cost
 savings compound, while the with-arm pays fixed MCP overhead (tool definitions in context +
 tool-loading) that short tasks don't amortize. The win is **fewer tool calls (189 vs 321, −41%)
 + lower wall-clock** (mean **38s vs 48s**), which is the design target. On harder multi-turn
 investigations cost flips to a net saving as the without-arm's accumulated context balloons —
 see `docs/benchmarks/call-sequence-analysis.md`.
 
-The gap widens with repo size and flow complexity: on medium/large repos the without-codegraph
+The gap widens with repo size and flow complexity: on medium/large repos the without-springgraph
 arm often **thrashes** — many greps/globs, shell `find`/`grep` (Bash), and occasionally spawning
-a **sub-agent** — while the with-codegraph arm answers in 2–8 calls. On tiny repos (a handful of
-files) the two arms tie or codegraph is marginally slower (MCP/index overhead doesn't pay off
+a **sub-agent** — while the with-springgraph arm answers in 2–8 calls. On tiny repos (a handful of
+files) the two arms tie or springgraph is marginally slower (MCP/index overhead doesn't pay off
 when the whole flow fits in one or two files) — but reads still drop.
 
 ## How to read the table
 
 - **R / G / Gl / B / Ag** = Read / Grep / Glob / Bash / sub-agent (Task) tool calls.
-- **cg-calls** = codegraph MCP calls in the "with" arm (the trade for reads/greps).
+- **cg-calls** = springgraph MCP calls in the "with" arm (the trade for reads/greps).
 - **dur** = wall-clock seconds. **files** = indexed file count (the size proxy).
 - **reads saved** = without-reads − with-reads.
 - One run per arm (a **snapshot** — run-to-run variance is real; treat ±1–2 reads and ±10s as
@@ -81,8 +81,8 @@ when the whole flow fits in one or two files) — but reads still drop.
 | TypeScript/JS | M | `excalidraw` | 643 | 1R / 0G | 3 | 55s | 7R / 5G / 3Gl / 1B | 87s | 6 |
 | TypeScript/JS | L | `nest-immich` | 2759 | 1R / 0G | 7 | 50s | 3R / 0G / 1Gl | 44s | 2 |
 
-**Totals (37 cells):** with codegraph **38 reads / 22 greps**, without **159 reads / 72 greps** —
-**76% fewer reads, ~69% fewer greps.** Codegraph never increased reads in any cell, and the
+**Totals (37 cells):** with springgraph **38 reads / 22 greps**, without **159 reads / 72 greps** —
+**76% fewer reads, ~69% fewer greps.** Springgraph never increased reads in any cell, and the
 without-arm additionally ran **52 globs + 37 shell `find`/`grep` (Bash) + 1 sub-agent** that the
 with-arm (**0 Bash, 0 sub-agents**) never needed. (74 agent runs, $29.18 total.)
 
@@ -93,19 +93,19 @@ with-arm (**0 Bash, 0 sub-agents**) never needed. (74 agent runs, $29.18 total.)
   aspnet-eshop (0R vs 9R), django-realworld (2R vs 9R), spring-realworld (2R vs 8R + 5 Bash),
   django-wagtail (2R vs 8R), excalidraw (1R / 55s vs 7R / 87s), Luau Knit (0R vs 5R), aspnet-realworld
   (0R vs 5R), c-redis (0R vs 5R).
-- **Without codegraph, large repos make the agent thrash:** it falls back to shell `find`/`grep`
+- **Without springgraph, large repos make the agent thrash:** it falls back to shell `find`/`grep`
   (37 Bash calls across the matrix) and on jellyfin even spawned a sub-agent — exactly the behavior
-  codegraph is meant to prevent. The with-arm answers those in 2–8 codegraph calls and used **0 Bash
+  springgraph is meant to prevent. The with-arm answers those in 2–8 springgraph calls and used **0 Bash
   and 0 sub-agents** anywhere.
 - **Tie zone = tiny repos** (Kotlin Jetcaster 1R/1R, Rust cratesio 1R/1R, express 1R/2R, Swift template
-  0R/2R): the whole flow fits in 1–2 files, so reading is already cheap; codegraph ties on reads and is
+  0R/2R): the whole flow fits in 1–2 files, so reading is already cheap; springgraph ties on reads and is
   sometimes a few seconds slower (MCP + index overhead — Kotlin petclinic 37s vs 23s, cratesio 22s vs
-  18s). This matches the design note that codegraph's value scales with repo size.
+  18s). This matches the design note that springgraph's value scales with repo size.
 - **Duration tracks reads on the big repos** (jellyfin 51s vs 212s, excalidraw 55s vs 87s, aspnet-eshop
   39s vs 58s, django-wagtail 45s vs 66s) and is noise on small ones; mean wall-clock is 38s with vs 48s
   without.
 - Some "with" cells still read 2–4 files (jellyfin, gitness, forem, saleor, django) — the residual is
-  the documented frontier (anonymous handlers, deep service chains, dynamic finders); codegraph gets the
+  the documented frontier (anonymous handlers, deep service chains, dynamic finders); springgraph gets the
   agent to the right file, then it reads one to confirm a detail.
 
 ## Coverage note
@@ -117,9 +117,9 @@ than faked.
 
 ## Reproduce
 
-Canonical harness: `scripts/agent-eval/run-all.sh <repo> "<question>" headless` (with = codegraph-only
+Canonical harness: `scripts/agent-eval/run-all.sh <repo> "<question>" headless` (with = springgraph-only
 MCP, without = empty MCP), parsed from the stream-json logs. The throwaway matrix driver + parser used
 for this table live in `/tmp/ab-matrix/`: `run.sh` (the `lang|size|repo|question` matrix — each cell does
-`rm -rf .codegraph && codegraph init -i` then both arms), `parse-matrix.mjs` (cells → this table), and
+`rm -rf .springgraph && springgraph init -i` then both arms), `parse-matrix.mjs` (cells → this table), and
 `compare.mjs` (old-vs-new diff + aggregates). Build `dist/` from the target commit first so the MCP
-server loads the code under test (`codegraph` on PATH is `npm link`ed to the dev `dist/`).
+server loads the code under test (`springgraph` on PATH is `npm link`ed to the dev `dist/`).

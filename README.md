@@ -18,7 +18,7 @@
 > ⚠️ **Springgraph 不是又一个通用代码搜索工具。** 它是市面上第一个专为 Spring Cloud 微服务打造的图谱与 MCP 工具:深度解析 `@RestController` / `@FeignClient` / `@Autowired` / MyBatis XML,把端点 → 服务 → Mapper → SQL → 表 的整条调用链变成 Agent 可以直接查询的语义知识图谱。
 
 <p align="center">
-  <img src="assets/webui-preview.svg" alt="Springgraph Web UI 预览 — 6 层架构、Controller/Feign/Service/Mapper/SQL 关系" width="760">
+  <img src="assets/webui-overview-1.png" alt="Springgraph Web UI — 13,505 节点 / 30,996 边的 Spring Cloud 架构图谱" width="900">
 </p>
 
 ---
@@ -198,7 +198,15 @@ Agent 调用 `spring_method_impact`:
 Agent 通过 Web UI + 多次 `spring_*` 工具调用,5 分钟内给你完整的架构图、关键链路、依赖关系、技术栈清单。比 Read 几十个文件快 10 倍。
 
 <p align="center">
-  <img src="assets/mcp-terminal.svg" alt="MCP server 终端输出 + 调用链 trace 结果" width="760">
+  <img src="assets/webui-overview-2.png" alt="Web UI 节点详情 — 点击 Controller 节点,右侧直接显示源码、调用堆栈、调用链、影响范围" width="900">
+</p>
+
+### 场景 7:用 Web UI 直接验证 MCP 接口
+
+不需要写测试代码,Web UI 自带**接口验证器**(`接口验证` tab),可视化选择 MCP 工具、填入参数、一键调用、查看原始响应 — 调试 Agent 行为或为新工具编写 demo 极方便。
+
+<p align="center">
+  <img src="assets/webui-api-call.png" alt="MCP 接口验证器 — 填入 query=UserService 即可调用 springgraph_search,11ms 内返回 3 条匹配结果" width="900">
 </p>
 
 ---

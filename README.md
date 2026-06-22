@@ -192,36 +192,37 @@
 
 ## 快速开始
 
+你可以通过 npm 全局安装，或者直接使用 `npx` 免安装运行（建议 Node.js >= 20.0.0 且 < 25.0.0）：
+
 ```bash
-# 1. 克隆本仓库
-git clone https://github.com/jinglonglong/springgraph.git
-cd springgraph
+# 方式 1：全局安装（推荐）
+npm install -g @jinglonglong/springgraph
 
-# 2. 安装依赖
-npm install
-
-# 3. 构建
-npm run build
+# 方式 2：使用 npx 免安装运行
+npx @jinglonglong/springgraph <command>
 ```
 
-**对 Spring Cloud 项目建索引**:
+**对 Spring Cloud 项目建索引**（在你的 Spring Cloud 项目根目录下执行）：
 
 ```bash
 # 初始化并建索引
 springgraph init
 springgraph index
+# (如果是用 npx: npx @jinglonglong/springgraph init && npx @jinglonglong/springgraph index)
 ```
 
 **启动 MCP 服务器**(供 AI Agent 调用 4 个 `spring_*` 工具):
 
 ```bash
 springgraph serve --mcp --path /path/to/springcloud-project
+# (如果是用 npx: npx @jinglonglong/springgraph serve --mcp --path /path/to/springcloud-project)
 ```
 
 **启动 Web UI 可视化**:
 
 ```bash
 springgraph web
+# (如果是用 npx: npx @jinglonglong/springgraph web)
 ```
 
 启动后按终端输出的地址访问,即可在浏览器里浏览架构图。

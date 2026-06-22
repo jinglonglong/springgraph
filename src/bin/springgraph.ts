@@ -1,32 +1,32 @@
 #!/usr/bin/env node
 /**
- * CodeGraph CLI
+ * Springgraph CLI
  *
- * Command-line interface for CodeGraph code intelligence.
+ * Command-line interface for Springgraph code intelligence.
  *
  * Usage:
- *   codegraph                    Run interactive installer (when no args)
- *   codegraph install            Run interactive installer
- *   codegraph uninstall          Remove CodeGraph from your agents
- *   codegraph init [path]        Initialize CodeGraph in a project
- *   codegraph uninit [path]      Remove CodeGraph from a project
- *   codegraph index [path]       Index all files in the project
- *   codegraph sync [path]        Sync changes since last index
- *   codegraph status [path]      Show index status
- *   codegraph query <search>     Search for symbols
- *   codegraph files [options]    Show project file structure
- *   codegraph context <task>     Build context for a task
- *   codegraph callers <symbol>   Find what calls a function/method
- *   codegraph callees <symbol>   Find what a function/method calls
- *   codegraph impact <symbol>    Analyze what code is affected by changing a symbol
- *   codegraph affected [files]   Find test files affected by changes
- *   codegraph upgrade [version]  Update CodeGraph to the latest release
+ *   springgraph                    Run interactive installer (when no args)
+ *   springgraph install            Run interactive installer
+ *   springgraph uninstall          Remove Springgraph from your agents
+ *   springgraph init [path]        Initialize Springgraph in a project
+ *   springgraph uninit [path]      Remove Springgraph from a project
+ *   springgraph index [path]       Index all files in the project
+ *   springgraph sync [path]        Sync changes since last index
+ *   springgraph status [path]      Show index status
+ *   springgraph query <search>     Search for symbols
+ *   springgraph files [options]    Show project file structure
+ *   springgraph context <task>     Build context for a task
+ *   springgraph callers <symbol>   Find what calls a function/method
+ *   springgraph callees <symbol>   Find what a function/method calls
+ *   springgraph impact <symbol>    Analyze what code is affected by changing a symbol
+ *   springgraph affected [files]   Find test files affected by changes
+ *   springgraph upgrade [version]  Update Springgraph to the latest release
  */
 
 import { Command } from 'commander';
 import * as path from 'path';
 import * as fs from 'fs';
-import { getCodeGraphDir, isInitialized, unsafeIndexRootReason, findNearestCodeGraphRoot } from '../directory';
+import { getSpringgraphDir, isInitialized, unsafeIndexRootReason, findNearestSpringgraphRoot } from '../directory';
 import { detectWorktreeIndexMismatch, worktreeMismatchWarning } from '../sync/worktree';
 import { createShimmerProgress } from '../ui/shimmer-progress';
 import { getGlyphs } from '../ui/glyphs';
@@ -37,16 +37,16 @@ import { relaunchWithWasmRuntimeFlagsIfNeeded } from '../extraction/wasm-runtime
 import { EXTRACTION_VERSION } from '../extraction/extraction-version';
 import { getTelemetry, TELEMETRY_DOCS, recordIndexEvent } from '../telemetry';
 
-// Lazy-load heavy modules (CodeGraph, runInstaller) to keep CLI startup fast.
-async function loadCodeGraph(): Promise<typeof import('../index')> {
+// Lazy-load heavy modules (Springgraph, runInstaller) to keep CLI startup fast.
+async function loadSpringgraph(): Promise<typeof import('../index')> {
   try {
     return await import('../index');
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`\x1b[31m${getGlyphs().err}\x1b[0m Failed to load CodeGraph modules.`);
+    console.error(`\x1b[31m${getGlyphs().err}\x1b[0m Failed to load Springgraph modules.`);
     console.error(`\n  Node: ${process.version}  Platform: ${process.platform} ${process.arch}`);
     console.error(`\n  Error: ${msg}`);
-    console.error('\n  Try reinstalling with: npm install -g @colbymchenry/codegraph\n');
+    console.error('\n  Try reinstalling with: npm install -g @colbymchenry/springgraph\n');
     process.exit(1);
   }
 }
@@ -57,7 +57,7 @@ async function loadCodeGraph(): Promise<typeof import('../index')> {
 const importESM = new Function('specifier', 'return import(specifier)') as
   (specifier: string) => Promise<typeof import('@clack/prompts')>;
 
-// Block CodeGraph on Node.js 25.x — V8's turboshaft WASM JIT has a Zone
+// Block Springgraph on Node.js 25.x — V8's turboshaft WASM JIT has a Zone
 // allocator bug that reliably crashes when compiling tree-sitter
 // grammars (see #54, #81, #140). The previous behaviour was a soft
 // console.warn that scrolls off-screen before the OOM crash 30 seconds
@@ -68,7 +68,7 @@ const nodeVersion = process.versions.node;
 const nodeMajor = parseInt(nodeVersion.split('.')[0] ?? '0', 10);
 if (nodeMajor >= 25) {
   process.stderr.write(buildNode25BlockBanner(nodeVersion) + '\n');
-  if (!process.env.CODEGRAPH_ALLOW_UNSAFE_NODE) {
+  if (!process.env.SPRINGGRAPH_ALLOW_UNSAFE_NODE) {
     process.exit(1);
   }
   // Override active — banner shown for visibility, continuing.
@@ -78,7 +78,7 @@ if (nodeMajor >= 25) {
 // unsupported versions. Mirrors the 25+ block above. See package.json `engines`.
 if (nodeMajor < MIN_NODE_MAJOR) {
   process.stderr.write(buildNodeTooOldBanner(nodeVersion) + '\n');
-  if (!process.env.CODEGRAPH_ALLOW_UNSAFE_NODE) {
+  if (!process.env.SPRINGGRAPH_ALLOW_UNSAFE_NODE) {
     process.exit(1);
   }
   // Override active — banner shown for visibility, continuing.
@@ -124,8 +124,8 @@ const packageJson = JSON.parse(
 // `--version` and `-V`; intercept the spellings it can't — lowercase `-v` and
 // single-dash `-version` — before any parsing. (commander's version short flag
 // is the capital `-V`, and its parser rejects a multi-character single-dash
-// flag.) The bare `codegraph version` subcommand is registered further down so
-// the affordance also shows up in `codegraph --help`.
+// flag.) The bare `springgraph version` subcommand is registered further down so
+// the affordance also shows up in `springgraph --help`.
 const firstArg = process.argv[2];
 if (firstArg === '-v' || firstArg === '-version') {
   console.log(packageJson.version);
@@ -162,7 +162,7 @@ const chalk = {
 };
 
 program
-  .name('codegraph')
+  .name('springgraph')
   .description('Code intelligence and knowledge graph for any codebase')
   .version(packageJson.version);
 
@@ -177,7 +177,7 @@ const TELEMETRY_FLUSH_COMMANDS = new Set(['init', 'uninit', 'index', 'sync', 'up
 program.hook('preAction', (_thisCommand, actionCommand) => {
   try {
     // The detached daemon re-invokes `serve --mcp` internally — not a user action.
-    if (process.env.CODEGRAPH_DAEMON_INTERNAL) return;
+    if (process.env.SPRINGGRAPH_DAEMON_INTERNAL) return;
     const name = actionCommand.name();
     if (name === 'telemetry') return; // managing telemetry is not usage
     getTelemetry().recordUsage('cli_command', name, true);
@@ -193,19 +193,19 @@ program.hook('preAction', (_thisCommand, actionCommand) => {
 
 /**
  * Resolve project path from argument or current directory
- * Walks up parent directories to find nearest initialized CodeGraph project
- * (must have .codegraph/codegraph.db, not just .codegraph/lessons.db)
+ * Walks up parent directories to find nearest initialized Springgraph project
+ * (must have .springgraph/springgraph.db, not just .springgraph/lessons.db)
  */
 function resolveProjectPath(pathArg?: string): string {
   const absolutePath = path.resolve(pathArg || process.cwd());
 
-  // If exact path is initialized (has codegraph.db), use it
+  // If exact path is initialized (has springgraph.db), use it
   if (isInitialized(absolutePath)) {
     return absolutePath;
   }
 
-  // Walk up to find nearest parent with CodeGraph initialized
-  // Note: findNearestCodeGraphRoot finds any .codegraph folder, but we need one with codegraph.db
+  // Walk up to find nearest parent with Springgraph initialized
+  // Note: findNearestSpringgraphRoot finds any .springgraph folder, but we need one with springgraph.db
   let current = absolutePath;
   const root = path.parse(current).root;
 
@@ -383,14 +383,14 @@ function printIndexResult(clack: typeof import('@clack/prompts'), result: IndexR
 
     if (projectPath) {
       writeErrorLog(projectPath, result.errors);
-      clack.log.info('See .codegraph/errors.log for details');
+      clack.log.info('See .springgraph/errors.log for details');
     }
 
     if (result.filesIndexed > 0) {
       clack.log.info(`The index is fully usable ${getGlyphs().dash} only the failed files are missing.`);
     }
   } else if (projectPath) {
-    const logPath = path.join(getCodeGraphDir(projectPath), 'errors.log');
+    const logPath = path.join(getSpringgraphDir(projectPath), 'errors.log');
     if (fs.existsSync(logPath)) {
       fs.unlinkSync(logPath);
     }
@@ -398,10 +398,10 @@ function printIndexResult(clack: typeof import('@clack/prompts'), result: IndexR
 }
 
 /**
- * Write detailed error log to .codegraph/errors.log
+ * Write detailed error log to .springgraph/errors.log
  */
 function writeErrorLog(projectPath: string, errors: Array<{ message: string; filePath?: string; severity: string; code?: string }>): void {
-  const cgDir = getCodeGraphDir(projectPath);
+  const cgDir = getSpringgraphDir(projectPath);
   if (!fs.existsSync(cgDir)) return;
 
   const logPath = path.join(cgDir, 'errors.log');
@@ -425,7 +425,7 @@ function writeErrorLog(projectPath: string, errors: Array<{ message: string; fil
   }
 
   const lines: string[] = [
-    `CodeGraph Error Log - ${new Date().toISOString()}`,
+    `Springgraph Error Log - ${new Date().toISOString()}`,
     `${errorsByFile.size} files with errors`,
     '',
   ];
@@ -461,11 +461,11 @@ async function recordIndexTelemetry(
 // =============================================================================
 
 /**
- * codegraph init [path]
+ * springgraph init [path]
  */
 program
   .command('init [path]')
-  .description('Initialize CodeGraph in a project directory and build the initial index')
+  .description('Initialize Springgraph in a project directory and build the initial index')
   .option('-i, --index', 'Deprecated: indexing now runs by default; flag accepted for backward compatibility')
   .option('-f, --force', 'Initialize even if the path looks like your home directory or a filesystem root')
   .option('-v, --verbose', 'Show detailed worker lifecycle and memory info')
@@ -473,7 +473,7 @@ program
     const projectPath = path.resolve(pathArg || process.cwd());
     const clack = await importESM('@clack/prompts');
 
-    clack.intro('Initializing CodeGraph');
+    clack.intro('Initializing Springgraph');
 
     try {
       // Refuse to index your home directory / a filesystem root — it pulls in
@@ -490,7 +490,7 @@ program
 
       if (isInitialized(projectPath)) {
         clack.log.warn(`Already initialized in ${projectPath}`);
-        clack.log.info('Use "codegraph index" to re-index or "codegraph sync" to update');
+        clack.log.info('Use "springgraph index" to re-index or "springgraph sync" to update');
         try {
           const { offerWatchFallback } = await import('../installer');
           await offerWatchFallback(clack, projectPath);
@@ -499,8 +499,8 @@ program
         return;
       }
 
-      const { default: CodeGraph } = await loadCodeGraph();
-      const cg = await CodeGraph.init(projectPath, { index: false });
+      const { default: Springgraph } = await loadSpringgraph();
+      const cg = await Springgraph.init(projectPath, { index: false });
       clack.log.success(`Initialized in ${projectPath}`);
 
       // Indexing runs by default now. The legacy -i/--index flag is still
@@ -537,18 +537,18 @@ program
   });
 
 /**
- * codegraph uninit [path]
+ * springgraph uninit [path]
  */
 program
   .command('uninit [path]')
-  .description('Remove CodeGraph from a project (deletes .codegraph/ directory)')
+  .description('Remove Springgraph from a project (deletes .springgraph/ directory)')
   .option('-f, --force', 'Skip confirmation prompt')
   .action(async (pathArg: string | undefined, options: { force?: boolean }) => {
     const projectPath = resolveProjectPath(pathArg);
 
     try {
       if (!isInitialized(projectPath)) {
-        warn(`CodeGraph is not initialized in ${projectPath}`);
+        warn(`Springgraph is not initialized in ${projectPath}`);
         return;
       }
 
@@ -558,7 +558,7 @@ program
         const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
         const answer = await new Promise<string>((resolve) => {
           rl.question(
-            chalk.yellow(`${getGlyphs().warn} This will permanently delete all CodeGraph data. Continue? (y/N) `),
+            chalk.yellow(`${getGlyphs().warn} This will permanently delete all Springgraph data. Continue? (y/N) `),
             resolve
           );
         });
@@ -570,8 +570,8 @@ program
         }
       }
 
-      const { default: CodeGraph } = await loadCodeGraph();
-      const cg = CodeGraph.openSync(projectPath);
+      const { default: Springgraph } = await loadSpringgraph();
+      const cg = Springgraph.openSync(projectPath);
       cg.uninitialize();
 
       // Clean up any git sync hooks we installed (no-op if none / not a repo).
@@ -583,7 +583,7 @@ program
         }
       } catch { /* non-fatal */ }
 
-      success(`Removed CodeGraph from ${projectPath}`);
+      success(`Removed Springgraph from ${projectPath}`);
 
       // Churn signal — and flush now, since after an uninit there may be no
       // "next run" to deliver it.
@@ -598,7 +598,7 @@ program
   });
 
 /**
- * codegraph index [path]
+ * springgraph index [path]
  */
 program
   .command('index [path]')
@@ -619,13 +619,13 @@ program
       }
 
       if (!isInitialized(projectPath)) {
-        error(`CodeGraph not initialized in ${projectPath}`);
-        info('Run "codegraph init" first');
+        error(`Springgraph not initialized in ${projectPath}`);
+        info('Run "springgraph init" first');
         process.exit(1);
       }
 
-      const { default: CodeGraph } = await loadCodeGraph();
-      const cg = await CodeGraph.open(projectPath);
+      const { default: Springgraph } = await loadSpringgraph();
+      const cg = await Springgraph.open(projectPath);
 
       if (options.quiet) {
         // Quiet mode: no UI, just run. `index` is a full re-index, so clear the
@@ -679,7 +679,7 @@ program
   });
 
 /**
- * codegraph sync [path]
+ * springgraph sync [path]
  */
 program
   .command('sync [path]')
@@ -691,13 +691,13 @@ program
     try {
       if (!isInitialized(projectPath)) {
         if (!options.quiet) {
-          error(`CodeGraph not initialized in ${projectPath}`);
+          error(`Springgraph not initialized in ${projectPath}`);
         }
         process.exit(1);
       }
 
-      const { default: CodeGraph } = await loadCodeGraph();
-      const cg = await CodeGraph.open(projectPath);
+      const { default: Springgraph } = await loadSpringgraph();
+      const cg = await Springgraph.open(projectPath);
 
       if (options.quiet) {
         await cg.sync();
@@ -706,7 +706,7 @@ program
       }
 
       const clack = await importESM('@clack/prompts');
-      clack.intro('Syncing CodeGraph');
+      clack.intro('Syncing Springgraph');
 
       process.stdout.write(`${colors.dim}${getGlyphs().rail}${colors.reset}\n`);
       const progress = createShimmerProgress();
@@ -741,7 +741,7 @@ program
   });
 
 /**
- * codegraph status [path]
+ * springgraph status [path]
  */
 program
   .command('status [path]')
@@ -762,20 +762,20 @@ program
             initialized: false,
             version: packageJson.version,
             projectPath,
-            indexPath: getCodeGraphDir(projectPath),
+            indexPath: getSpringgraphDir(projectPath),
             lastIndexed: null,
           }));
           return;
         }
-        console.log(chalk.bold('\nCodeGraph Status\n'));
+        console.log(chalk.bold('\nSpringgraph Status\n'));
         info(`Project: ${projectPath}`);
         warn('Not initialized');
-        info('Run "codegraph init" to initialize');
+        info('Run "springgraph init" to initialize');
         return;
       }
 
-      const { default: CodeGraph } = await loadCodeGraph();
-      const cg = await CodeGraph.open(projectPath);
+      const { default: Springgraph } = await loadSpringgraph();
+      const cg = await Springgraph.open(projectPath);
       const stats = cg.getStats();
       const changes = cg.getChangedFiles();
       const backend = cg.getBackend();
@@ -791,7 +791,7 @@ program
           initialized: true,
           version: packageJson.version,
           projectPath,
-          indexPath: getCodeGraphDir(projectPath),
+          indexPath: getSpringgraphDir(projectPath),
           lastIndexed: lastIndexedMs != null ? new Date(lastIndexedMs).toISOString() : null,
           fileCount: stats.fileCount,
           nodeCount: stats.nodeCount,
@@ -820,7 +820,7 @@ program
         return;
       }
 
-      console.log(chalk.bold('\nCodeGraph Status\n'));
+      console.log(chalk.bold('\nSpringgraph Status\n'));
 
       // Project info
       console.log(chalk.cyan('Project:'), projectPath);
@@ -882,7 +882,7 @@ program
         if (changes.removed.length > 0) {
           console.log(`  Removed:   ${changes.removed.length} files`);
         }
-        info('Run "codegraph sync" to update the index');
+        info('Run "springgraph sync" to update the index');
       } else {
         success('Index is up to date');
       }
@@ -893,7 +893,7 @@ program
       if (reindexRecommended) {
         const builtWith = buildInfo.version ? `v${buildInfo.version.replace(/^v/, '')}` : 'an earlier version';
         warn(`Index was built by ${builtWith}; re-index to pick up this engine's improvements.`);
-        info('Run "codegraph index" (full rebuild) or "codegraph sync"');
+        info('Run "springgraph index" (full rebuild) or "springgraph sync"');
         console.log();
       }
 
@@ -905,7 +905,7 @@ program
   });
 
 /**
- * codegraph query <search>
+ * springgraph query <search>
  */
 program
   .command('query <search>')
@@ -919,12 +919,12 @@ program
 
     try {
       if (!isInitialized(projectPath)) {
-        error(`CodeGraph not initialized in ${projectPath}`);
+        error(`Springgraph not initialized in ${projectPath}`);
         process.exit(1);
       }
 
-      const { default: CodeGraph } = await loadCodeGraph();
-      const cg = await CodeGraph.open(projectPath);
+      const { default: Springgraph } = await loadSpringgraph();
+      const cg = await Springgraph.open(projectPath);
 
       const limit = parseInt(options.limit || '10', 10);
       const rawResults = cg.searchNodes(search, {
@@ -977,9 +977,9 @@ program
   });
 
 /**
- * codegraph explore <query...>
+ * springgraph explore <query...>
  *
- * The CLI face of the MCP codegraph_explore tool — same handler, same
+ * The CLI face of the MCP springgraph_explore tool — same handler, same
  * output (source of the relevant symbols grouped by file + the call path
  * among them). Exists so agents WITHOUT the MCP tools — Task-tool
  * subagents (which don't inherit MCP tools, #704) and non-MCP harnesses —
@@ -987,7 +987,7 @@ program
  */
 program
   .command('explore <query...>')
-  .description('Explore an area: relevant symbols\' source + call paths in one shot (same output as the codegraph_explore MCP tool)')
+  .description('Explore an area: relevant symbols\' source + call paths in one shot (same output as the springgraph_explore MCP tool)')
   .option('-p, --path <path>', 'Project path')
   .option('--max-files <number>', 'Maximum number of files to include source from')
   .action(async (queryParts: string[], options: { path?: string; maxFiles?: string }) => {
@@ -995,18 +995,18 @@ program
 
     try {
       if (!isInitialized(projectPath)) {
-        error(`CodeGraph isn't available here — no .codegraph/ index exists in ${projectPath}. If you are an AI agent: continue with your usual tools; indexing is the user's decision, do not run it yourself. (The project owner can enable CodeGraph with 'codegraph init'.)`);
+        error(`Springgraph isn't available here — no .springgraph/ index exists in ${projectPath}. If you are an AI agent: continue with your usual tools; indexing is the user's decision, do not run it yourself. (The project owner can enable Springgraph with 'springgraph init'.)`);
         process.exit(1);
       }
 
-      const { default: CodeGraph } = await loadCodeGraph();
-      const cg = await CodeGraph.open(projectPath);
+      const { default: Springgraph } = await loadSpringgraph();
+      const cg = await Springgraph.open(projectPath);
       const { ToolHandler } = await import('../mcp/tools');
       const handler = new ToolHandler(cg);
 
       const args: Record<string, unknown> = { query: queryParts.join(' ') };
       if (options.maxFiles) args.maxFiles = parseInt(options.maxFiles, 10);
-      const result = await handler.execute('codegraph_explore', args);
+      const result = await handler.execute('springgraph_explore', args);
 
       console.log(result.content[0]?.text ?? '');
       cg.destroy();
@@ -1018,15 +1018,15 @@ program
   });
 
 /**
- * codegraph node <name>
+ * springgraph node <name>
  *
- * The CLI face of the MCP codegraph_node tool: one symbol's source +
+ * The CLI face of the MCP springgraph_node tool: one symbol's source +
  * caller/callee trail, or a whole file with line numbers + dependents
  * (Read-parity). Same subagent/non-MCP rationale as `explore`.
  */
 program
   .command('node <name>')
-  .description('One symbol\'s source + caller/callee trail, or read a file with line numbers + dependents (same output as the codegraph_node MCP tool)')
+  .description('One symbol\'s source + caller/callee trail, or read a file with line numbers + dependents (same output as the springgraph_node MCP tool)')
   .option('-p, --path <path>', 'Project path')
   .option('-f, --file <file>', 'Treat as file mode (or disambiguate a symbol to this file)')
   .option('--offset <number>', 'File mode: 1-based start line')
@@ -1037,12 +1037,12 @@ program
 
     try {
       if (!isInitialized(projectPath)) {
-        error(`CodeGraph isn't available here — no .codegraph/ index exists in ${projectPath}. If you are an AI agent: continue with your usual tools; indexing is the user's decision, do not run it yourself. (The project owner can enable CodeGraph with 'codegraph init'.)`);
+        error(`Springgraph isn't available here — no .springgraph/ index exists in ${projectPath}. If you are an AI agent: continue with your usual tools; indexing is the user's decision, do not run it yourself. (The project owner can enable Springgraph with 'springgraph init'.)`);
         process.exit(1);
       }
 
-      const { default: CodeGraph } = await loadCodeGraph();
-      const cg = await CodeGraph.open(projectPath);
+      const { default: Springgraph } = await loadSpringgraph();
+      const cg = await Springgraph.open(projectPath);
       const { ToolHandler } = await import('../mcp/tools');
       const handler = new ToolHandler(cg);
 
@@ -1065,7 +1065,7 @@ program
       if (options.limit) args.limit = parseInt(options.limit, 10);
       if (options.symbolsOnly) args.symbolsOnly = true;
 
-      const result = await handler.execute('codegraph_node', args);
+      const result = await handler.execute('springgraph_node', args);
 
       console.log(result.content[0]?.text ?? '');
       cg.destroy();
@@ -1077,7 +1077,7 @@ program
   });
 
 /**
- * codegraph files [path]
+ * springgraph files [path]
  */
 program
   .command('files')
@@ -1102,16 +1102,16 @@ program
 
     try {
       if (!isInitialized(projectPath)) {
-        error(`CodeGraph not initialized in ${projectPath}`);
+        error(`Springgraph not initialized in ${projectPath}`);
         process.exit(1);
       }
 
-      const { default: CodeGraph } = await loadCodeGraph();
-      const cg = await CodeGraph.open(projectPath);
+      const { default: Springgraph } = await loadSpringgraph();
+      const cg = await Springgraph.open(projectPath);
       let files = cg.getFiles();
 
       if (files.length === 0) {
-        info('No files indexed. Run "codegraph index" first.');
+        info('No files indexed. Run "springgraph index" first.');
         cg.destroy();
         return;
       }
@@ -1203,9 +1203,9 @@ program
 
 /**
  * Normalize a user-supplied file path to the project-relative, forward-slash
- * form CodeGraph stores in the index. Accepts an absolute path, a `./`-prefixed
+ * form Springgraph stores in the index. Accepts an absolute path, a `./`-prefixed
  * path, or Windows back-slashes; an empty string when the input is blank. Used
- * by `codegraph affected` so `./src/x.ts`, `/abs/repo/src/x.ts`, and
+ * by `springgraph affected` so `./src/x.ts`, `/abs/repo/src/x.ts`, and
  * `src/x.ts` all match the same indexed file. (#825)
  */
 function normalizeIndexPath(filePath: string, projectPath: string): string {
@@ -1301,21 +1301,21 @@ function printFileTree(
 }
 
 /**
- * codegraph daemon — interactive manager for the background daemons. Arrow keys
+ * springgraph daemon — interactive manager for the background daemons. Arrow keys
  * to pick one (the current project's daemon floats to the top, auto-selected),
  * enter to stop it. Falls back to a plain list when output isn't a TTY.
  */
 program
   .command('daemon')
   .aliases(['daemons'])
-  .description('Manage running CodeGraph background daemons — pick one and press enter to stop it')
+  .description('Manage running Springgraph background daemons — pick one and press enter to stop it')
   .action(async () => {
     const { listDaemons, stopDaemonAt, stopAllDaemons } = await import('../mcp/daemon-registry');
     const { runDaemonPicker } = await import('../mcp/daemon-manager');
 
     const daemons = listDaemons();
     if (daemons.length === 0) {
-      info('No CodeGraph daemons running.');
+      info('No Springgraph daemons running.');
       return;
     }
 
@@ -1330,11 +1330,11 @@ program
 
     // The current project's daemon floats to the top and is pre-selected.
     let cwdRoot: string | null = null;
-    const found = findNearestCodeGraphRoot(process.cwd());
+    const found = findNearestSpringgraphRoot(process.cwd());
     if (found) { try { cwdRoot = fs.realpathSync(found); } catch { cwdRoot = found; } }
 
     const clack = await importESM('@clack/prompts');
-    clack.intro('CodeGraph daemons');
+    clack.intro('Springgraph daemons');
     await runDaemonPicker({
       list: listDaemons,
       stop: stopDaemonAt,
@@ -1349,7 +1349,7 @@ program
   });
 
 /**
- * codegraph serve
+ * springgraph serve
  */
 program
   // Hidden from `--help`: this is the stdio entry point an AI agent launches
@@ -1358,7 +1358,7 @@ program
   // invoked — hiding only removes it from the listing. See the interactive-TTY
   // guard below, which explains this to anyone who runs it by hand.
   .command('serve', { hidden: true })
-  .description('Start CodeGraph as an MCP server for AI assistants')
+  .description('Start Springgraph as an MCP server for AI assistants')
   .option('-p, --path <path>', 'Project path (optional for MCP mode, uses rootUri from client)')
   .option('--mcp', 'Run as MCP server (stdio transport)')
   .option('--no-watch', 'Disable the file watcher (no auto-sync; useful on slow filesystems like WSL2 /mnt drives)')
@@ -1368,7 +1368,7 @@ program
     // Commander sets watch=false when --no-watch is passed. Route it through
     // the same env-var chokepoint the watcher and MCP server already honor.
     if (options.watch === false) {
-      process.env.CODEGRAPH_NO_WATCH = '1';
+      process.env.SPRINGGRAPH_NO_WATCH = '1';
     }
 
     try {
@@ -1379,13 +1379,13 @@ program
         // stdin is an interactive TTY, explain instead of hanging. The agent's
         // pipe and the detached daemon both have a non-TTY stdin, so this only
         // ever fires for a person who typed it.
-        if (process.stdin.isTTY && !process.env.CODEGRAPH_DAEMON_INTERNAL) {
-          console.error(chalk.bold('\nCodeGraph MCP server\n'));
+        if (process.stdin.isTTY && !process.env.SPRINGGRAPH_DAEMON_INTERNAL) {
+          console.error(chalk.bold('\nSpringgraph MCP server\n'));
           console.error("This is the MCP server your AI agent (Claude Code, Cursor, Codex, opencode, …)");
           console.error("starts automatically — you don't run it yourself.");
-          console.error(`\nIt's already wired up by ${chalk.cyan('codegraph install')}. To check on things:`);
-          console.error(`  ${chalk.cyan('codegraph status')}   ${chalk.dim('— is this project indexed and healthy?')}`);
-          console.error(`  ${chalk.cyan('codegraph daemon')}   ${chalk.dim('— list or stop background MCP servers')}`);
+          console.error(`\nIt's already wired up by ${chalk.cyan('springgraph install')}. To check on things:`);
+          console.error(`  ${chalk.cyan('springgraph status')}   ${chalk.dim('— is this project indexed and healthy?')}`);
+          console.error(`  ${chalk.cyan('springgraph daemon')}   ${chalk.dim('— list or stop background MCP servers')}`);
           console.error(chalk.dim('\n(Running it directly only does something when an MCP client drives it over stdin.)'));
           return;
         }
@@ -1397,28 +1397,28 @@ program
       } else {
         // Default: show info about MCP mode.
         // Use stderr so stdout stays clean for any piped/stdio usage.
-        console.error(chalk.bold('\nCodeGraph MCP Server\n'));
+        console.error(chalk.bold('\nSpringgraph MCP Server\n'));
         console.error(chalk.blue(getGlyphs().info) + ' Use --mcp flag to start the MCP server');
         console.error('\nTo use with Claude Code, add to your MCP configuration:');
         console.error(chalk.dim(`
 {
   "mcpServers": {
-    "codegraph": {
-      "command": "codegraph",
+    "springgraph": {
+      "command": "springgraph",
       "args": ["serve", "--mcp"]
     }
   }
 }
 `));
         console.error('Available tools:');
-        console.error(chalk.cyan('  codegraph_explore') + '   - Primary: source of the relevant symbols for any question');
-        console.error(chalk.cyan('  codegraph_search') + '    - Search for code symbols');
-        console.error(chalk.cyan('  codegraph_callers') + '   - Find callers of a symbol');
-        console.error(chalk.cyan('  codegraph_callees') + '   - Find what a symbol calls');
-        console.error(chalk.cyan('  codegraph_impact') + '    - Analyze impact of changes');
-        console.error(chalk.cyan('  codegraph_node') + '      - Get symbol details');
-        console.error(chalk.cyan('  codegraph_files') + '     - Get project file structure');
-        console.error(chalk.cyan('  codegraph_status') + '    - Get index status');
+        console.error(chalk.cyan('  springgraph_explore') + '   - Primary: source of the relevant symbols for any question');
+        console.error(chalk.cyan('  springgraph_search') + '    - Search for code symbols');
+        console.error(chalk.cyan('  springgraph_callers') + '   - Find callers of a symbol');
+        console.error(chalk.cyan('  springgraph_callees') + '   - Find what a symbol calls');
+        console.error(chalk.cyan('  springgraph_impact') + '    - Analyze impact of changes');
+        console.error(chalk.cyan('  springgraph_node') + '      - Get symbol details');
+        console.error(chalk.cyan('  springgraph_files') + '     - Get project file structure');
+        console.error(chalk.cyan('  springgraph_status') + '    - Get index status');
       }
     } catch (err) {
       error(`Failed to start server: ${err instanceof Error ? err.message : String(err)}`);
@@ -1427,7 +1427,7 @@ program
   });
 
 /**
- * codegraph unlock [path]
+ * springgraph unlock [path]
  */
 program
   .command('unlock [path]')
@@ -1437,11 +1437,11 @@ program
 
     try {
       if (!isInitialized(projectPath)) {
-        error(`CodeGraph not initialized in ${projectPath}`);
+        error(`Springgraph not initialized in ${projectPath}`);
         return;
       }
 
-      const lockPath = path.join(getCodeGraphDir(projectPath), 'codegraph.lock');
+      const lockPath = path.join(getSpringgraphDir(projectPath), 'springgraph.lock');
 
       if (!fs.existsSync(lockPath)) {
         info(`No lock file found ${getGlyphs().dash} nothing to do`);
@@ -1457,9 +1457,9 @@ program
   });
 
 /**
- * codegraph callers <symbol>
+ * springgraph callers <symbol>
  *
- * CLI parity with the MCP graph tools (codegraph_callers/callees/impact) so the
+ * CLI parity with the MCP graph tools (springgraph_callers/callees/impact) so the
  * traversal queries work in scripts, CI, and git hooks without a running MCP
  * server.
  */
@@ -1474,12 +1474,12 @@ program
 
     try {
       if (!isInitialized(projectPath)) {
-        error(`CodeGraph not initialized in ${projectPath}`);
+        error(`Springgraph not initialized in ${projectPath}`);
         process.exit(1);
       }
 
-      const { default: CodeGraph } = await loadCodeGraph();
-      const cg = await CodeGraph.open(projectPath);
+      const { default: Springgraph } = await loadSpringgraph();
+      const cg = await Springgraph.open(projectPath);
       const limit = parseInt(options.limit || '20', 10);
 
       const matches = cg.searchNodes(symbol, { limit: 50 });
@@ -1540,7 +1540,7 @@ program
   });
 
 /**
- * codegraph callees <symbol>
+ * springgraph callees <symbol>
  */
 program
   .command('callees <symbol>')
@@ -1553,12 +1553,12 @@ program
 
     try {
       if (!isInitialized(projectPath)) {
-        error(`CodeGraph not initialized in ${projectPath}`);
+        error(`Springgraph not initialized in ${projectPath}`);
         process.exit(1);
       }
 
-      const { default: CodeGraph } = await loadCodeGraph();
-      const cg = await CodeGraph.open(projectPath);
+      const { default: Springgraph } = await loadSpringgraph();
+      const cg = await Springgraph.open(projectPath);
       const limit = parseInt(options.limit || '20', 10);
 
       const matches = cg.searchNodes(symbol, { limit: 50 });
@@ -1618,7 +1618,7 @@ program
   });
 
 /**
- * codegraph impact <symbol>
+ * springgraph impact <symbol>
  */
 program
   .command('impact <symbol>')
@@ -1631,12 +1631,12 @@ program
 
     try {
       if (!isInitialized(projectPath)) {
-        error(`CodeGraph not initialized in ${projectPath}`);
+        error(`Springgraph not initialized in ${projectPath}`);
         process.exit(1);
       }
 
-      const { default: CodeGraph } = await loadCodeGraph();
-      const cg = await CodeGraph.open(projectPath);
+      const { default: Springgraph } = await loadSpringgraph();
+      const cg = await Springgraph.open(projectPath);
       const depth = Math.min(Math.max(parseInt(options.depth || '2', 10), 1), 10);
 
       const matches = cg.searchNodes(symbol, { limit: 50 });
@@ -1715,14 +1715,14 @@ program
   });
 
 /**
- * codegraph affected [files...]
+ * springgraph affected [files...]
  *
  * Find test files affected by the given source files.
  * Traces dependency edges transitively to find test files that depend on changed code.
  *
  * Usage:
- *   git diff --name-only | codegraph affected --stdin
- *   codegraph affected src/lib/components/Editor.svelte src/routes/+page.svelte
+ *   git diff --name-only | springgraph affected --stdin
+ *   springgraph affected src/lib/components/Editor.svelte src/routes/+page.svelte
  */
 program
   .command('affected [files...]')
@@ -1738,7 +1738,7 @@ program
 
     try {
       if (!isInitialized(projectPath)) {
-        error(`CodeGraph not initialized in ${projectPath}`);
+        error(`Springgraph not initialized in ${projectPath}`);
         process.exit(1);
       }
 
@@ -1764,8 +1764,8 @@ program
         process.exit(0);
       }
 
-      const { default: CodeGraph } = await loadCodeGraph();
-      const cg = await CodeGraph.open(projectPath);
+      const { default: Springgraph } = await loadSpringgraph();
+      const cg = await Springgraph.open(projectPath);
       const maxDepth = parseInt(options.depth || '5', 10);
 
       // Common test file patterns
@@ -1861,11 +1861,11 @@ program
   });
 
 /**
- * codegraph install
+ * springgraph install
  */
 program
   .command('install')
-  .description('Install codegraph MCP server into one or more agents (Claude Code, Cursor, Codex CLI, opencode, Hermes Agent)')
+  .description('Install springgraph MCP server into one or more agents (Claude Code, Cursor, Codex CLI, opencode, Hermes Agent)')
   .option('-t, --target <ids>', 'Target agent(s): comma-separated ids, or "auto"|"all"|"none". Default: prompt')
   .option('-l, --location <where>', 'Install location: "global" or "local". Default: prompt')
   .option('-y, --yes', 'Non-interactive: defaults to --location=global --target=auto, auto-allow on')
@@ -1923,16 +1923,16 @@ program
   });
 
 /**
- * codegraph uninstall
+ * springgraph uninstall
  *
- * Inverse of `install`. Removes the codegraph MCP server entry,
+ * Inverse of `install`. Removes the springgraph MCP server entry,
  * instructions block, and permissions from every agent (or a
  * `--target` subset). Prompts global-vs-local when not given. Does NOT
- * delete the `.codegraph/` index — that's `codegraph uninit`.
+ * delete the `.springgraph/` index — that's `springgraph uninit`.
  */
 program
   .command('uninstall')
-  .description('Remove codegraph from your agents (Claude Code, Cursor, Codex CLI, opencode, Hermes Agent)')
+  .description('Remove springgraph from your agents (Claude Code, Cursor, Codex CLI, opencode, Hermes Agent)')
   .option('-t, --target <ids>', 'Target agent(s): comma-separated ids, or "all". Default: all')
   .option('-l, --location <where>', 'Uninstall location: "global" or "local". Default: prompt')
   .option('-y, --yes', 'Non-interactive: defaults to --location=global --target=all')
@@ -1959,7 +1959,7 @@ program
   });
 
 /**
- * codegraph telemetry [on|off|status]
+ * springgraph telemetry [on|off|status]
  */
 program
   .command('telemetry [action]')
@@ -1975,7 +1975,7 @@ program
         success('Telemetry disabled. Buffered, unsent data was deleted.');
       }
       const effective = t.getStatus();
-      if (effective.decidedBy === 'DO_NOT_TRACK' || effective.decidedBy === 'CODEGRAPH_TELEMETRY') {
+      if (effective.decidedBy === 'DO_NOT_TRACK' || effective.decidedBy === 'SPRINGGRAPH_TELEMETRY') {
         warn(
           `The ${effective.decidedBy} environment variable overrides this choice — ` +
           `effective state right now: ${effective.enabled ? 'enabled' : 'disabled'}.`
@@ -1992,7 +1992,7 @@ program
     const s = t.getStatus();
     const decidedBy: Record<typeof s.decidedBy, string> = {
       DO_NOT_TRACK: 'DO_NOT_TRACK environment variable',
-      CODEGRAPH_TELEMETRY: 'CODEGRAPH_TELEMETRY environment variable',
+      SPRINGGRAPH_TELEMETRY: 'SPRINGGRAPH_TELEMETRY environment variable',
       config: 'your saved choice',
       default: 'default',
     };
@@ -2003,15 +2003,15 @@ program
   });
 
 /**
- * codegraph upgrade [version]
+ * springgraph upgrade [version]
  *
- * Self-update, however CodeGraph was installed (bundle via install.sh/.ps1,
+ * Self-update, however Springgraph was installed (bundle via install.sh/.ps1,
  * npm-global, npx, or a source checkout). See ../upgrade for the detection and
  * per-method upgrade logic.
  */
 program
   .command('upgrade [version]')
-  .description('Update CodeGraph to the latest release (or a specific version)')
+  .description('Update Springgraph to the latest release (or a specific version)')
   .option('--check', 'Check whether an update is available without installing')
   .option('-f, --force', 'Reinstall even if already on the target version')
   .action(async (versionArg: string | undefined, options: { check?: boolean; force?: boolean }) => {
@@ -2021,7 +2021,7 @@ program
       platform: process.platform,
       cwd: process.cwd(),
     });
-    const pin = versionArg || process.env.CODEGRAPH_VERSION || undefined;
+    const pin = versionArg || process.env.SPRINGGRAPH_VERSION || undefined;
     const code = await up.runUpgrade(
       { version: pin, check: options.check, force: options.force },
       {
@@ -2040,16 +2040,16 @@ program
   });
 
 /**
- * codegraph version
+ * springgraph version
  *
  * The bare-noun form of `--version`. commander already provides `--version`
  * and `-V`, and the `-v` / `-version` spellings are intercepted before parse
- * (see top of main). This subcommand makes `codegraph version` work and lists
- * the version affordance in `codegraph --help`.
+ * (see top of main). This subcommand makes `springgraph version` work and lists
+ * the version affordance in `springgraph --help`.
  */
 program
   .command('version')
-  .description('Print the installed CodeGraph version (also: -v, --version)')
+  .description('Print the installed Springgraph version (also: -v, --version)')
   .action(() => {
     console.log(packageJson.version);
   });

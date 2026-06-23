@@ -299,7 +299,11 @@ describe('Best-Candidate Resolution', () => {
 describe('Schema v2 Migration', () => {
   it.skipIf(!HAS_SQLITE)('should have correct current schema version', async () => {
     const { CURRENT_SCHEMA_VERSION } = await import('../src/db/migrations');
-    expect(CURRENT_SCHEMA_VERSION).toBe(6);
+    // Bumped to 7 by the init-performance change, phase 1, task 1.3
+    // (openspec/changes/optimize-initialization-performance). v7 adds
+    // files.cheap_hash and files.blob_oid for the incremental-skip
+    // path; see src/db/migrations.ts.
+    expect(CURRENT_SCHEMA_VERSION).toBe(7);
   });
 
   it.skipIf(!HAS_SQLITE)('should have migration for version 2', async () => {

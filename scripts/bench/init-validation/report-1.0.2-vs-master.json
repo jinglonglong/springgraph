@@ -1,0 +1,37 @@
+{
+  "fixture": "C:\\Users\\LONG\\AppData\\Local\\Temp\\springgraph-fixture",
+  "fixtureFileCount": 102,
+  "runsPerBinary": 3,
+  "master": {
+    "label": "master",
+    "binary": "D:\\code\\springgraph-master-baseline\\dist\\bin\\springgraph.js",
+    "commit": "ba2205f",
+    "runs": [
+      { "wallMs": 4167, "filesIndexed": 102, "nodes": 1317, "edges": 2560, "refs": 0 },
+      { "wallMs": 3025, "filesIndexed": 102, "nodes": 1317, "edges": 2560, "refs": 0 },
+      { "wallMs": 3171, "filesIndexed": 102, "nodes": 1317, "edges": 2560, "refs": 0 }
+    ],
+    "medianMs": 3171,
+    "minMs": 3025,
+    "maxMs": 4167
+  },
+  "current": {
+    "label": "current",
+    "binary": "D:\\code\\codegraph-springcloud\\dist\\bin\\springgraph.js",
+    "branch": "feature/v1.0.2",
+    "phase": "1.1-1.3 (tunables infrastructure, no parallelization yet)",
+    "runs": [
+      { "wallMs": 3073, "filesIndexed": 102, "nodes": 1317, "edges": 2560, "refs": 0 },
+      { "wallMs": 3187, "filesIndexed": 102, "nodes": 1317, "edges": 2560, "refs": 0 },
+      { "wallMs": 3067, "filesIndexed": 102, "nodes": 1317, "edges": 2560, "refs": 0 }
+    ],
+    "medianMs": 3073,
+    "minMs": 3067,
+    "maxMs": 3187
+  },
+  "medianSpeedupX": 1.032,
+  "medianDeltaPct": -3.1,
+  "outputConsistent": true,
+  "conclusion": "Phase 1 (tunables infrastructure) delivers ZERO performance change as designed. Output is byte-for-byte identical (same 1317 nodes, 2560 edges, 102 files). The 3% 'speedup' is well within run-to-run noise. The 4-8x speedup requires phase 1.4 (ParseWorkerPool) + phase 2 (BatchStore) + phase 3 (git-native enumeration + content-hash skip).",
+  "nextBaseline": "Use this report as the anchor for measuring the actual speedup when phase 1.4 lands. Expected: master-vs-feature median should drop from ~3170ms to ~500-800ms with worker pool + batch writes (4-8x faster)."
+}

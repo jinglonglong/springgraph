@@ -9,7 +9,7 @@ import { SqliteDatabase } from './sqlite-adapter';
 /**
  * Current schema version
  */
-export const CURRENT_SCHEMA_VERSION = 6;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 /**
  * Migration definition
@@ -82,6 +82,39 @@ const migrations: Migration[] = [
     up: (db) => {
       db.exec(`
         ALTER TABLE nodes ADD COLUMN metadata TEXT;
+      `);
+    },
+  },
+  {
+    // init-performance change, phase 1, task 1.3
+    // (openspec/changes/optimize-initialization-performance/specs/incremental-content-hash).
+    // The cheap_hash column is the first-tier skip key for `springgraph
+    // init` on a tree whose files are byte-identical to the previous
+    // index — the resolver compares the new file's xxhash/blake3/SHA-1
+    // to files.cheap_hash and skips the SHA-256 + parse path on a match.
+    // blob_oid is populated by the git-native-enumeration capability
+    // and used as a free strong content key in git mode.
+    version: 7,
+    description:
+      'Add files.cheap_hash + files.blob_oid for the init incremental-skip path; backfill cheap_hash from content_hash',
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE files ADD COLUMN cheap_hash TEXT;
+        ALTER TABLE files ADD COLUMN blob_oid TEXT;
+        -- Backfill cheap_hash from content_hash so the column is
+        -- populated immediately after the migration. Note: on the next
+        -- init the cheap-hash check will (almost always) fail because
+        -- the stored value is a SHA-256 hex string, not an xxhash of
+        -- the file content — so the resolver escalates to the strong
+        -- hash, which DOES match, and skips. cheap_hash gets rewritten
+        -- with the real xxhash for the next run. The first init after
+        -- migration is therefore not skipped (expected) but every init
+        -- from then on is.
+        UPDATE files SET cheap_hash = content_hash WHERE cheap_hash IS NULL;
+        -- Cover the first-tier skip path. The query planner will use
+        -- this when cheap_hash is the only filter (the common case
+        -- during a re-init on an unchanged tree).
+        CREATE INDEX IF NOT EXISTS idx_files_cheap_hash ON files(cheap_hash);
       `);
     },
   },

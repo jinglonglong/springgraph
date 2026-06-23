@@ -321,6 +321,15 @@ type IndexResult = {
   edgesCreated: number;
   errors: Array<{ message: string; filePath?: string; severity: string; code?: string }>;
   durationMs: number;
+  /**
+   * init-performance change, phase 5: optional path info for
+   * the one-line init summary. Present when the call went
+   * through ExtractionOrchestrator.indexAll; absent for the
+   * per-file indexFiles path.
+   */
+  mode?: 'parallel+git' | 'parallel+fs' | 'legacy+git' | 'legacy+fs';
+  workers?: number;
+  peakRssBytes?: number;
 };
 
 /**
@@ -473,6 +482,51 @@ function printIndexResult(clack: typeof import('@clack/prompts'), result: IndexR
 }
 
 /**
+ * Print a one-line summary of an init/index result. init-performance
+ * change, phase 5 — gives the user a single grep-able line that
+ * captures the path taken (pool vs legacy, git vs fs), the
+ * worker count, the wall time, and the peak RSS. Output goes to
+ * stdout (not the clack log stream) so it's easy to grep and
+ * parse.
+ *
+ * `command` is the leading word — "init" for `springgraph init`,
+ * "index" for `springgraph index`. The other fields are only
+ * present when the orchestrator populated them (i.e. when
+ * indexAll ran; indexFiles does not).
+ */
+function printInitSummary(
+  command: 'init' | 'index',
+  result: IndexResult
+): void {
+  const parts: string[] = [];
+  parts.push(`status=${result.success ? 'ok' : 'error'}`);
+  parts.push(`duration=${formatDuration(result.durationMs)}`);
+  const total =
+    result.filesIndexed + result.filesSkipped + result.filesErrored;
+  parts.push(
+    `files=${formatNumber(result.filesIndexed)}/${formatNumber(total)}`
+  );
+  if (result.peakRssBytes !== undefined) {
+    parts.push(`peakRss=${formatBytes(result.peakRssBytes)}`);
+  }
+  if (result.workers !== undefined) {
+    parts.push(`workers=${result.workers}`);
+  }
+  if (result.mode !== undefined) {
+    parts.push(`mode=${result.mode}`);
+  }
+  process.stdout.write(`springgraph ${command}: ${parts.join(' ')}\n`);
+}
+
+/** Human-readable byte size (KB/MB/GB). */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}GB`;
+}
+
+/**
  * Write detailed error log to .springgraph/errors.log
  */
 function writeErrorLog(projectPath: string, errors: Array<{ message: string; filePath?: string; severity: string; code?: string }>): void {
@@ -606,6 +660,7 @@ applyInitTunablesOptions(
         await progress.stop();
       }
       printIndexResult(clack, result, projectPath);
+      printInitSummary('init', result);
       await recordIndexTelemetry(cg, result);
 
       try {
@@ -759,6 +814,7 @@ applyInitTunablesOptions(
       }
 
       printIndexResult(clack, result, projectPath);
+      printInitSummary('index', result);
       await recordIndexTelemetry(cg, result);
 
       if (!result.success) {

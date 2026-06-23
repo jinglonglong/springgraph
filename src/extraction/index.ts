@@ -76,6 +76,14 @@ export interface IndexResult {
   edgesCreated: number;
   errors: ExtractionError[];
   durationMs: number;
+  /**
+   * init-performance change, phase 5: optional path info for
+   * the one-line init summary. Undefined for paths that don't
+   * go through the full indexAll() (e.g. indexFiles()).
+   */
+  mode?: 'parallel+git' | 'parallel+fs' | 'legacy+git' | 'legacy+fs';
+  workers?: number;
+  peakRssBytes?: number;
 }
 
 /**
@@ -1000,6 +1008,7 @@ export class ExtractionOrchestrator {
     // walk has to filter out.
     const gitMode = this.tunables?.gitMode ?? 'auto';
     let files: string[];
+    let usedGit = false;
     if (gitMode === 'no') {
       // --no-git: always use the filesystem walk.
       files = await scanDirectoryAsync(this.rootDir, (current, file) => {
@@ -1020,6 +1029,7 @@ export class ExtractionOrchestrator {
         try {
           const listed = await gitNativeEnumerate(this.rootDir);
           files = listed.map((f) => f.path);
+          usedGit = true;
           log(
             `git-native enumeration: ${files.length} files (${this.rootDir})`
           );
@@ -1667,6 +1677,21 @@ export class ExtractionOrchestrator {
       }
     }
 
+    // init-performance change, phase 5: build the path-mode string
+    // for the one-line init summary. `legacy+git` is technically
+    // possible if the user forces --use-git on a non-work-tree
+    // root that auto-fell-back (the orchestrator logs the fall-
+    // back as a warning). We still report "fs" because that's
+    // what the file walk actually used.
+    const mode: IndexResult['mode'] = parsePool
+      ? usedGit
+        ? 'parallel+git'
+        : 'parallel+fs'
+      : usedGit
+      ? 'legacy+git'
+      : 'legacy+fs';
+    const workers = parsePool ? parsePool.threadCount : 1;
+
     return {
       success: filesIndexed > 0 || errors.filter((e) => e.severity === 'error').length === 0,
       filesIndexed,
@@ -1676,6 +1701,9 @@ export class ExtractionOrchestrator {
       edgesCreated: totalEdges,
       errors,
       durationMs: Date.now() - startTime,
+      mode,
+      workers,
+      peakRssBytes: process.memoryUsage().rss,
     };
   }
 

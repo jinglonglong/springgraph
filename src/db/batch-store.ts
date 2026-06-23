@@ -28,17 +28,9 @@
  * be discarded on process exit.
  */
 import * as fs from 'fs';
-import * as crypto from 'crypto';
 import type { Language, Node, Edge, FileRecord, ExtractionResult, UnresolvedReference } from '../types';
 import type { QueryBuilder } from './queries';
-
-/** SHA-256 content hash, inlined here to avoid the db → extraction
- *  import cycle. The extraction module's `hashContent` is the
- *  single source of truth at runtime — this duplicates the body
- *  to keep the import graph acyclic. */
-function hashContent(content: string): string {
-  return crypto.createHash('sha256').update(content).digest('hex');
-}
+import { cheapHash, strongHash } from '../util/hash';
 
 /** Conservative ceiling on SQL placeholder count per INSERT. */
 const MAX_PLACEHOLDERS = 30000;
@@ -92,6 +84,17 @@ export class BatchStore {
    * matches). Does NOT call the DB write path yet — the actual
    * INSERTs happen in flush().
    *
+   * init-performance change, phase 3: two-tier skip. First we
+   * compare the cheap (non-cryptographic, ~5 GB/s) hash. If it
+   * matches the stored `cheap_hash` we skip without computing
+   * SHA-256. If the cheap hash differs but the strong hash
+   * matches, we also skip (rare: a non-cryptographic collision).
+   * Otherwise we buffer the new rows.
+   *
+   * The second init on an unchanged tree short-circuits on the
+   * first tier for every file - that's the "re-init is instant"
+   * property the change promises.
+   *
    * May trigger a flush mid-call if any trigger threshold is
    * crossed.
    */
@@ -105,13 +108,19 @@ export class BatchStore {
     if (this.closed) {
       throw new Error('BatchStore: append() after close()');
     }
-    const contentHash = hashContent(content);
+    const strong = strongHash(content);
+    const cheap = cheapHash(content);
 
-    // Skip if the file is already in the DB with the same content.
-    // The pre-existing per-file path did this check; we keep it.
+    // Skip on cheap-hash match. The first init on a fresh DB has
+    // no existing row, so this branch is only hit on re-init.
     const existing = this.queries.getFileByPath(filePath);
-    if (existing && existing.contentHash === contentHash) {
-      return;
+    if (existing) {
+      if (existing.cheapHash && existing.cheapHash === cheap) {
+        return;
+      }
+      if (existing.contentHash === strong) {
+        return;
+      }
     }
 
     // If this file was already buffered (same path, second append in
@@ -140,7 +149,8 @@ export class BatchStore {
 
     const fileRecord: FileRecord = {
       path: filePath,
-      contentHash,
+      contentHash: strong,
+      cheapHash: cheap,
       language,
       size: stats.size,
       modifiedAt: stats.mtimeMs,

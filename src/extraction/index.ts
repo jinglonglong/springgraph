@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import * as os from 'os';
 import { execFileSync } from 'child_process';
 import {
   Language,
@@ -21,6 +22,7 @@ import { extractFromSource } from './tree-sitter';
 import { detectLanguage, isSourceFile, isLanguageSupported, isFileLevelOnlyLanguage, initGrammars, loadGrammarsForLanguages } from './grammars';
 import { isSpringgraphDataDir } from '../directory';
 import { logDebug, logWarn } from '../errors';
+import { ParseWorkerPool } from './parse-pool';
 import { validatePathWithinRoot, normalizePath } from '../utils';
 import ignore, { Ignore } from 'ignore';
 import { detectFrameworks } from '../resolution/frameworks';
@@ -1128,6 +1130,34 @@ export class ExtractionOrchestrator {
       await ensureWorker();
     }
 
+    // init-performance change, phase 1.5: build a multi-worker pool
+    // for the parsing phase. The pool is opt-in via the absence of
+    // SPRINGGRAPH_NO_PARALLEL_INIT; the legacy single-worker path
+    // stays live so constrained environments and tests can fall
+    // back without code changes. Thread count comes from
+    // tunables.threads (0 = auto, computed from cpus-1 capped at 8).
+    let parsePool: ParseWorkerPool | null = null;
+    const usePool =
+      WorkerClass !== null &&
+      !process.env.SPRINGGRAPH_NO_PARALLEL_INIT;
+    if (usePool) {
+      const tunablesThreads = this.tunables?.threads ?? 0;
+      const poolThreads =
+        tunablesThreads > 0
+          ? tunablesThreads
+          : Math.max(1, Math.min(8, os.cpus().length - 1));
+      parsePool = new ParseWorkerPool(
+        poolThreads,
+        parseWorkerPath,
+        neededLanguages,
+        frameworkNames
+      );
+      await parsePool.ready();
+      log(
+        `Parse worker pool ready: ${poolThreads} workers (legacy single-worker path: SPRINGGRAPH_NO_PARALLEL_INIT=1)`
+      );
+    }
+
     /**
      * Recycle the worker thread to reclaim WASM memory.
      * Terminates the current worker and clears the reference so
@@ -1185,22 +1215,72 @@ export class ExtractionOrchestrator {
       });
     }
 
-    for (let i = 0; i < files.length; i += FILE_IO_BATCH_SIZE) {
-      if (signal?.aborted) {
-        if (parseWorker) (parseWorker as import('worker_threads').Worker).terminate().catch(() => {});
-        return {
-          success: false,
-          filesIndexed,
-          filesSkipped,
-          filesErrored,
-          nodesCreated: totalNodes,
-          edgesCreated: totalEdges,
-          errors: [{ message: 'Aborted', severity: 'error' }, ...errors],
-          durationMs: Date.now() - startTime,
-        };
+    // init-performance change, phase 1.5: split the parse phase into
+    // two paths. The pool path submits every file in a batch to N
+    // workers in parallel and drains the result stream. The legacy
+    // path keeps the original per-file `await requestParse` so
+    // constrained environments and tests can fall back via
+    // SPRINGGRAPH_NO_PARALLEL_INIT=1. Bookkeeping (counts, errors,
+    // storeExtractionResult) is shared via processParseResult so the
+    // two paths report identical stats.
+    const processParseResult = (
+      filePath: string,
+      content: string,
+      stats: fs.Stats,
+      result: ExtractionResult
+    ): void => {
+      processed++;
+      if (result.nodes.length > 0 || result.errors.length === 0) {
+        const language = detectLanguage(filePath, content);
+        this.storeExtractionResult(filePath, content, language, stats, result);
       }
+      if (result.errors.length > 0) {
+        for (const err of result.errors) {
+          if (!err.filePath) err.filePath = filePath;
+        }
+        errors.push(...result.errors);
+      }
+      if (result.nodes.length > 0) {
+        filesIndexed++;
+        totalNodes += result.nodes.length;
+        totalEdges += result.edges.length;
+      } else if (result.errors.some((e) => e.severity === 'error')) {
+        filesErrored++;
+      } else {
+        // Files with no symbols but no errors (yaml, twig, properties) are
+        // tracked at the file level — count them as indexed so the CLI
+        // doesn't misleadingly report "No files found to index".
+        const lang = detectLanguage(filePath, content);
+        if (isFileLevelOnlyLanguage(lang)) {
+          filesIndexed++;
+        } else {
+          filesSkipped++;
+        }
+      }
+    };
 
-      const batch = files.slice(i, i + FILE_IO_BATCH_SIZE);
+    const abortAndReturn = (): IndexResult => {
+      if (parsePool) {
+        parsePool.abort().catch(() => {});
+      } else if (parseWorker) {
+        parseWorker.terminate().catch(() => {});
+      }
+      return {
+        success: false,
+        filesIndexed,
+        filesSkipped,
+        filesErrored,
+        nodesCreated: totalNodes,
+        edgesCreated: totalEdges,
+        errors: [{ message: 'Aborted', severity: 'error' }, ...errors],
+        durationMs: Date.now() - startTime,
+      };
+    };
+
+    for (let i = 0; i < files.length; i += (parsePool ? Math.min(FILE_IO_BATCH_SIZE, parsePool.threadCount) : FILE_IO_BATCH_SIZE)) {
+      if (signal?.aborted) return abortAndReturn();
+
+      const batch = files.slice(i, i + (parsePool ? Math.min(FILE_IO_BATCH_SIZE, parsePool.threadCount) : FILE_IO_BATCH_SIZE));
 
       // Read files in parallel (with path validation before any I/O)
       const fileContents = await Promise.all(
@@ -1220,108 +1300,148 @@ export class ExtractionOrchestrator {
         })
       );
 
-      // Send to worker for parsing, store results on main thread
-      for (const { filePath, content, stats, error } of fileContents) {
-        if (signal?.aborted) {
-          if (parseWorker) (parseWorker as import('worker_threads').Worker).terminate().catch(() => {});
-          return {
-            success: false,
-            filesIndexed,
-            filesSkipped,
-            filesErrored,
-            nodesCreated: totalNodes,
-            edgesCreated: totalEdges,
-            errors: [{ message: 'Aborted', severity: 'error' }, ...errors],
-            durationMs: Date.now() - startTime,
-          };
-        }
+      if (parsePool) {
+        // POOL PATH: submit every file in this batch, then drain
+        // results. Round-robin dispatch + multi-worker WASM means
+        // up to N files parse concurrently. fileMeta remembers the
+        // per-file content and stats so the out-of-order drain
+        // results can be correlated back to their file.
+        const fileMeta = new Map<
+          string,
+          { content: string; stats: fs.Stats }
+        >();
 
-        // Report progress before parsing (show current file being worked on)
-        onProgress?.({
-          phase: 'parsing',
-          current: processed,
-          total,
-          currentFile: filePath,
-        });
+        for (const { filePath, content, stats, error } of fileContents) {
+          if (signal?.aborted) return abortAndReturn();
 
-        if (error || content === null || stats === null) {
-          processed++;
-          filesErrored++;
-          errors.push({
-            message: `Failed to read file: ${error instanceof Error ? error.message : String(error)}`,
-            filePath,
-            severity: 'error',
-            code: 'read_error',
+          // Report progress before parsing (show current file being
+          // submitted). The drain reports completion progress below.
+          onProgress?.({
+            phase: 'parsing',
+            current: processed,
+            total,
+            currentFile: filePath,
           });
-          continue;
-        }
 
-        // Honour MAX_FILE_SIZE. Without this check, vendored generated
-        // headers, minified bundles, and other multi-MB files get indexed,
-        // wasting WASM heap and the worker recycle budget on inputs with no
-        // useful symbols. The single-file extractFile path already enforces
-        // this; the bulk path used to silently skip the check.
-        if (stats.size > MAX_FILE_SIZE) {
-          processed++;
-          filesSkipped++;
-          errors.push({
-            message: `File exceeds max size (${stats.size} > ${MAX_FILE_SIZE})`,
-            filePath,
-            severity: 'warning',
-            code: 'size_exceeded',
-          });
-          onProgress?.({ phase: 'parsing', current: processed, total });
-          continue;
-        }
-
-        // Parse in worker thread (main thread stays unblocked).
-        // Wrapped in try/catch to handle worker timeouts and crashes gracefully.
-        let result: ExtractionResult;
-        try {
-          result = await requestParse(filePath, content);
-        } catch (parseErr) {
-          processed++;
-          filesErrored++;
-          errors.push({
-            message: parseErr instanceof Error ? parseErr.message : String(parseErr),
-            filePath,
-            severity: 'error',
-            code: 'parse_error',
-          });
-          continue;
-        }
-
-        processed++;
-
-        // Store in database on main thread (SQLite is not thread-safe)
-        if (result.nodes.length > 0 || result.errors.length === 0) {
-          const language = detectLanguage(filePath, content);
-          this.storeExtractionResult(filePath, content, language, stats, result);
-        }
-
-        if (result.errors.length > 0) {
-          for (const err of result.errors) {
-            if (!err.filePath) err.filePath = filePath;
+          if (error || content === null || stats === null) {
+            processed++;
+            filesErrored++;
+            errors.push({
+              message: `Failed to read file: ${error instanceof Error ? error.message : String(error)}`,
+              filePath,
+              severity: 'error',
+              code: 'read_error',
+            });
+            continue;
           }
-          errors.push(...result.errors);
-        }
 
-        if (result.nodes.length > 0) {
-          filesIndexed++;
-          totalNodes += result.nodes.length;
-          totalEdges += result.edges.length;
-        } else if (result.errors.some((e) => e.severity === 'error')) {
-          filesErrored++;
-        } else {
-          // Files with no symbols but no errors (yaml, twig, properties) are
-          // tracked at the file level — count them as indexed so the CLI
-          // doesn't misleadingly report "No files found to index".
-          const lang = detectLanguage(filePath, content);
-          if (isFileLevelOnlyLanguage(lang)) {
-            filesIndexed++;
-          } else {
+          if (stats.size > MAX_FILE_SIZE) {
+            processed++;
             filesSkipped++;
+            errors.push({
+              message: `File exceeds max size (${stats.size} > ${MAX_FILE_SIZE})`,
+              filePath,
+              severity: 'warning',
+              code: 'size_exceeded',
+            });
+            onProgress?.({ phase: 'parsing', current: processed, total });
+            continue;
           }
+
+          fileMeta.set(filePath, { content, stats });
+          parsePool.submit({ filePath, content });
+        }
+
+        // Drain. We loop until we've received a result/error for
+        // every file submitted in this batch. The pool only yields
+        // `done` on close/abort, which happens at the very end of
+        // indexAll — we don't wait for it here because we know
+        // exactly how many files we just submitted.
+        const expectedCount = fileMeta.size;
+        let received = 0;
+        for await (const item of parsePool.drain()) {
+          if (item.kind === 'done') break;
+          if (signal?.aborted) {
+            await parsePool.abort();
+            return abortAndReturn();
+          }
+          if (item.kind === 'error') {
+            processed++;
+            filesErrored++;
+            errors.push({
+              message: item.error.message,
+              filePath: item.filePath,
+              severity: 'error',
+              code: 'parse_error',
+            });
+          } else {
+            const meta = fileMeta.get(item.filePath);
+            if (meta) {
+              processParseResult(item.filePath, meta.content, meta.stats, item.result);
+            }
+          }
+          received++;
+          if (received >= expectedCount) break;
+        }
+      } else {
+        // LEGACY PATH: per-file sequential `await requestParse`.
+        // Preserved verbatim (modulo the shared processParseResult +
+        // abortAndReturn helpers) for SPRINGGRAPH_NO_PARALLEL_INIT=1
+        // and for environments where the parse-worker.js is missing.
+        for (const { filePath, content, stats, error } of fileContents) {
+          if (signal?.aborted) return abortAndReturn();
+
+          // Report progress before parsing (show current file being worked on)
+          onProgress?.({
+            phase: 'parsing',
+            current: processed,
+            total,
+            currentFile: filePath,
+          });
+
+          if (error || content === null || stats === null) {
+            processed++;
+            filesErrored++;
+            errors.push({
+              message: `Failed to read file: ${error instanceof Error ? error.message : String(error)}`,
+              filePath,
+              severity: 'error',
+              code: 'read_error',
+            });
+            continue;
+          }
+
+          if (stats.size > MAX_FILE_SIZE) {
+            processed++;
+            filesSkipped++;
+            errors.push({
+              message: `File exceeds max size (${stats.size} > ${MAX_FILE_SIZE})`,
+              filePath,
+              severity: 'warning',
+              code: 'size_exceeded',
+            });
+            onProgress?.({ phase: 'parsing', current: processed, total });
+            continue;
+          }
+
+          // Parse in worker thread (main thread stays unblocked).
+          // Wrapped in try/catch to handle worker timeouts and crashes gracefully.
+          let result: ExtractionResult;
+          try {
+            result = await requestParse(filePath, content);
+          } catch (parseErr) {
+            processed++;
+            filesErrored++;
+            errors.push({
+              message: parseErr instanceof Error ? parseErr.message : String(parseErr),
+              filePath,
+              severity: 'error',
+              code: 'parse_error',
+            });
+            continue;
+          }
+
+          processParseResult(filePath, content, stats, result);
         }
       }
     }
@@ -1447,6 +1567,20 @@ export class ExtractionOrchestrator {
     rejectAllPending('Indexing complete');
     if (parseWorker) {
       (parseWorker as import('worker_threads').Worker).terminate().catch(() => {});
+    }
+
+    // init-performance change, phase 1.5: drain the parse pool now
+    // that the main loop and the retry pass are both done. close()
+    // sends `shutdown` to every worker and terminates them — the
+    // pool only yields `done` from drain() after close(), so
+    // skipping this would leak the workers and the open grammars
+    // until the process exits.
+    if (parsePool) {
+      try {
+        await parsePool.close();
+      } catch (err) {
+        logWarn('Parse worker pool close failed', { error: (err as Error).message });
+      }
     }
 
     return {

@@ -24,6 +24,7 @@ import { isSpringgraphDataDir } from '../directory';
 import { logDebug, logWarn } from '../errors';
 import { ParseWorkerPool } from './parse-pool';
 import { BatchStore } from '../db/batch-store';
+import { isGitWorkTree, gitNativeEnumerate } from './git-ls';
 import { validatePathWithinRoot, normalizePath } from '../utils';
 import ignore, { Ignore } from 'ignore';
 import { detectFrameworks } from '../resolution/frameworks';
@@ -991,14 +992,62 @@ export class ExtractionOrchestrator {
       total: 0,
     });
 
-    const files = await scanDirectoryAsync(this.rootDir, (current, file) => {
-      onProgress?.({
-        phase: 'scanning',
-        current,
-        total: 0,
-        currentFile: file,
+    // init-performance change, phase 3b: prefer git-native file
+    // enumeration when the user opts in (--use-git) or the auto-
+    // detect finds a work tree. The git path respects .gitignore
+    // automatically and avoids walking dependency directories
+    // (node_modules, target/, .git/objects) that the filesystem
+    // walk has to filter out.
+    const gitMode = this.tunables?.gitMode ?? 'auto';
+    let files: string[];
+    if (gitMode === 'no') {
+      // --no-git: always use the filesystem walk.
+      files = await scanDirectoryAsync(this.rootDir, (current, file) => {
+        onProgress?.({
+          phase: 'scanning',
+          current,
+          total: 0,
+          currentFile: file,
+        });
       });
-    });
+    } else {
+      // 'use' or 'auto': try git first, fall back to fs on
+      // non-work-tree roots. Auto-detect is cached inside
+      // isGitWorkTree so the second call is free.
+      const useGit =
+        gitMode === 'use' || (await isGitWorkTree(this.rootDir));
+      if (useGit) {
+        try {
+          const listed = await gitNativeEnumerate(this.rootDir);
+          files = listed.map((f) => f.path);
+          log(
+            `git-native enumeration: ${files.length} files (${this.rootDir})`
+          );
+        } catch (err) {
+          logWarn(
+            'gitNativeEnumerate failed, falling back to filesystem walk',
+            { error: (err as Error).message }
+          );
+          files = await scanDirectoryAsync(this.rootDir, (current, file) => {
+            onProgress?.({
+              phase: 'scanning',
+              current,
+              total: 0,
+              currentFile: file,
+            });
+          });
+        }
+      } else {
+        files = await scanDirectoryAsync(this.rootDir, (current, file) => {
+          onProgress?.({
+            phase: 'scanning',
+            current,
+            total: 0,
+            currentFile: file,
+          });
+        });
+      }
+    }
 
     // Detect frameworks once per indexAll run using the scanned file list.
     // Names are passed to each parse call so framework-specific extractors

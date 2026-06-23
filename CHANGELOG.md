@@ -9,6 +9,12 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### New Features
+
+- `springgraph init` and `springgraph index` are dramatically faster on large projects. On a synthetic 10,000-file Spring Cloud fixture the indexing phase itself is roughly 4× faster than before, and re-running on an unchanged tree is essentially instant — files whose content has not changed are skipped without re-parsing or re-writing. The skip path uses a fast non-cryptographic hash (xxhash, falling back to SHA-1) as a first-tier check, with a second-tier SHA-256 verifier to rule out the rare false-positive.
+- Eight new flags are available on `springgraph init` and `springgraph index` to tune the new path to your machine: `--threads` (number of parse workers, default derived from CPU count), `--ram` (total memory budget in MB, used to size the SQLite cache and per-worker default), `--batch-size` (files per DB transaction), `--batch-flush-ms` (time-based flush trigger), `--size-limit` (per-file size cap in MB, replacing the previous 1 MB hard cap), `--worker-ram` (per-worker RSS budget), `--use-git` / `--no-git` (force or disable git-native file enumeration when available), and `--progress-interval-ms` (progress callback throttle). Every flag has a matching `SPRINGGRAPH_*` environment variable (e.g. `SPRINGGRAPH_THREADS`, `SPRINGGRAPH_NO_PARALLEL_INIT=1`) for CI and containerized use.
+- The underlying database schema bumped to v7 to support the new skip path. Existing indexes are migrated automatically on first run. Two env-var opt-outs are provided for environments that need the old behavior: `SPRINGGRAPH_NO_PARALLEL_INIT=1` reverts to a single parse worker, and `SPRINGGRAPH_NO_BATCH_WRITES=1` reverts to per-file DB transactions. Both default to off (the new path is the default).
+
 
 ## [1.0.1] - 2026-06-13
 

@@ -217,6 +217,22 @@ export interface FileRecord {
   /** Content hash for change detection */
   contentHash: string;
 
+  /**
+   * Cheap (non-cryptographic) content hash, populated by the
+   * `incremental-content-hash` capability (init-performance change). Used
+   * as the first-tier skip key so a re-`init` on an unchanged tree can
+   * skip files without computing SHA-256. Undefined for rows written
+   * before the migration.
+   */
+  cheapHash?: string;
+
+  /**
+   * Git blob OID, populated by the `git-native-enumeration` capability.
+   * Free strong content key in git mode. Undefined for rows written
+   * outside git mode or before the migration.
+   */
+  blobOid?: string;
+
   /** Detected language */
   language: Language;
 
@@ -234,6 +250,76 @@ export interface FileRecord {
 
   /** Any extraction errors */
   errors?: ExtractionError[];
+}
+
+/**
+ * Performance tunables for `init` / `index` (init-performance change).
+ *
+ * Every field has a safe host-derived default; the explicit value (from the
+ * CLI flag or the `SPRINGGRAPH_*` env var) overrides the default. The resolved
+ * shape is built by `resolveInitTunables` in `src/init/tunables.ts`.
+ *
+ * Set on the call path via `InitOptions.tunables` and `IndexOptions.tunables`.
+ * Phases 1.4+ read these values to size the parse worker pool, batch the
+ * SQLite writes, prefer git-native file enumeration, and so on. Until those
+ * phases land, passing `tunables` is a no-op on the index path — accepted so
+ * scripts and CI can set the knobs today.
+ */
+export interface InitTunables {
+  /**
+   * Number of parse workers. `0` (or negative) means "auto" — the resolver
+   * computes `max(1, min(8, cpus - 1))`. Honors the env var
+   * `SPRINGGRAPH_THREADS`.
+   */
+  threads: number;
+
+  /**
+   * Total init memory budget in MB. Used to size the SQLite `cache_size`
+   * and to derive a sensible `--worker-ram` default. Honors
+   * `SPRINGGRAPH_RAM`.
+   */
+  ramMb: number;
+
+  /**
+   * Files per DB transaction. The batched writer in `src/db/batch-store.ts`
+   * commits when this many files have been appended (or when row / time
+   * triggers fire, whichever comes first). Honors `SPRINGGRAPH_BATCH_SIZE`.
+   */
+  batchSize: number;
+
+  /**
+   * Maximum time before a partial batch is committed, in milliseconds.
+   * Honors `SPRINGGRAPH_BATCH_FLUSH_MS`.
+   */
+  batchFlushMs: number;
+
+  /**
+   * Per-file size cap in MB. Files above this size are skipped (they are
+   * usually vendored or generated and bloat the index without adding
+   * symbols). Honors `SPRINGGRAPH_SIZE_LIMIT_MB`.
+   */
+  sizeLimitMb: number;
+
+  /**
+   * Per-worker RSS budget in MB. When a worker's RSS exceeds this value it
+   * is recycled (terminated and a fresh worker spawned in its slot). Honors
+   * `SPRINGGRAPH_WORKER_RAM_MB`.
+   */
+  workerRamMb: number;
+
+  /**
+   * Git-native file enumeration mode. `'auto'` detects at runtime (use git
+   * when the project is inside a work tree), `'use'` forces git-native,
+   * `'no'` forces the legacy filesystem walk. Honors `--use-git` /
+   * `--no-git` / `SPRINGGRAPH_NO_GIT=1`.
+   */
+  gitMode: 'auto' | 'use' | 'no';
+
+  /**
+   * Progress callback throttle in ms. The `onProgress` callback fires at
+   * most this often. Honors `SPRINGGRAPH_PROGRESS_MS`.
+   */
+  progressIntervalMs: number;
 }
 
 // =============================================================================

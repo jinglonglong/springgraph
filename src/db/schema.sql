@@ -60,6 +60,20 @@ CREATE TABLE IF NOT EXISTS edges (
 CREATE TABLE IF NOT EXISTS files (
     path TEXT PRIMARY KEY,
     content_hash TEXT NOT NULL,
+    -- Cheap (non-cryptographic) hash of the file content. First-tier
+    -- skip key for the incremental-content-hash capability
+    -- (init-performance change): a re-init on an unchanged tree
+    -- compares the new file's cheap hash to this column and skips the
+    -- expensive SHA-256 + parse path on a match. Nullable for rows
+    -- written before the migration.
+    cheap_hash TEXT,
+    -- Git blob OID, populated by the git-native-enumeration capability
+    -- when the file's content matches a blob in the project's object
+    -- store. Free strong content key in git mode — used as the
+    -- second-tier skip key without computing SHA-256 ourselves.
+    -- Nullable outside git mode and for rows written before the
+    -- migration.
+    blob_oid TEXT,
     language TEXT NOT NULL,
     size INTEGER NOT NULL,
     modified_at INTEGER NOT NULL,
@@ -137,6 +151,12 @@ CREATE INDEX IF NOT EXISTS idx_edges_target_kind ON edges(target, kind);
 -- File indexes
 CREATE INDEX IF NOT EXISTS idx_files_language ON files(language);
 CREATE INDEX IF NOT EXISTS idx_files_modified_at ON files(modified_at);
+-- init-performance change, phase 1, task 1.3: covers the first-tier
+-- skip path in the incremental-content-hash capability. The v7
+-- migration also creates this index (with the same IF NOT EXISTS
+-- guard) so a v6 → v7 upgrade on an existing DB lands the index
+-- even when schema.sql hasn't been re-run.
+CREATE INDEX IF NOT EXISTS idx_files_cheap_hash ON files(cheap_hash);
 
 -- Unresolved refs indexes
 CREATE INDEX IF NOT EXISTS idx_unresolved_from_node ON unresolved_refs(from_node_id);

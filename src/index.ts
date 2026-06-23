@@ -12,6 +12,7 @@ import {
   EdgeKind,
   FileRecord,
   ExtractionResult,
+  InitTunables,
   Subgraph,
   TraversalOptions,
   SearchOptions,
@@ -110,6 +111,14 @@ export interface InitOptions {
 
   /** Progress callback for indexing */
   onProgress?: (progress: IndexProgress) => void;
+
+  /**
+   * Performance tunables for the init pass. Phase 1 (this change) accepts
+   * the value and propagates it; subsequent phases (worker pool, batched
+   * DB writes, git-native enumeration) read it. Defaults are computed by
+   * `resolveInitTunables`.
+   */
+  tunables?: InitTunables;
 }
 
 /**
@@ -135,6 +144,14 @@ export interface IndexOptions {
 
   /** Enable verbose logging (worker lifecycle, memory, timeouts) */
   verbose?: boolean;
+
+  /**
+   * Performance tunables. Same shape and resolution rules as
+   * `InitOptions.tunables`. Phase 1 (this change) accepts the value and
+   * stores it on the orchestrator; later phases read it to size the
+   * worker pool and the batched writer.
+   */
+  tunables?: InitTunables;
 }
 
 /**
@@ -227,7 +244,10 @@ export class Springgraph {
 
     // Run initial indexing if requested
     if (options.index) {
-      await instance.indexAll({ onProgress: options.onProgress });
+      await instance.indexAll({
+        onProgress: options.onProgress,
+        tunables: options.tunables,
+      });
     }
 
     return instance;
@@ -359,6 +379,11 @@ export class Springgraph {
       }
       try {
         const before = this.queries.getNodeAndEdgeCount();
+        // Forward performance tunables (init-performance change, phase 1).
+        // The orchestrator stores them; later phases (parallel-parse-pipeline,
+        // bulk-db-writes, git-native-enumeration) read them. Passing
+        // `undefined` is a no-op and keeps today's behavior intact.
+        this.orchestrator.setTunables(options.tunables);
         const result = await this.orchestrator.indexAll(options.onProgress, options.signal, options.verbose);
 
         // Re-detect frameworks now that the index is populated. The resolver

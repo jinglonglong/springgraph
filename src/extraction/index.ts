@@ -14,6 +14,7 @@ import {
   FileRecord,
   ExtractionResult,
   ExtractionError,
+  InitTunables,
 } from '../types';
 import { QueryBuilder } from '../db/queries';
 import { extractFromSource } from './tree-sitter';
@@ -850,9 +851,29 @@ export class ExtractionOrchestrator {
    */
   private detectedFrameworkNames: string[] | null = null;
 
+  /**
+   * Performance tunables for the next indexAll() call. Set by the public
+   * facade (`Springgraph.indexAll`) before the orchestrator runs; later
+   * phases of the init-performance change (parallel-parse-pipeline,
+   * bulk-db-writes, git-native-enumeration, worker-pool-persistence) read
+   * this field to size the worker pool, batch the SQLite writes, and
+   * prefer git-native file enumeration. Undefined means "use today's
+   * behavior" — so a missing value is a safe fallback.
+   */
+  private tunables: InitTunables | undefined = undefined;
+
   constructor(rootDir: string, queries: QueryBuilder) {
     this.rootDir = rootDir;
     this.queries = queries;
+  }
+
+  /**
+   * Set the performance tunables for the next indexAll() call. Called by
+   * `Springgraph.indexAll` when `options.tunables` is provided. Subsequent
+   * phases (parse worker pool, batched DB writes) read this value.
+   */
+  setTunables(tunables: InitTunables | undefined): void {
+    this.tunables = tunables;
   }
 
   /**
@@ -944,6 +965,21 @@ export class ExtractionOrchestrator {
     const log = verbose
       ? (msg: string) => { console.log(`[worker] ${msg}`); }
       : (_msg: string) => {};
+
+    // init-performance change, phase 1: surface the resolved tunables
+    // (if any) on the verbose log so the user can verify the resolver's
+    // output. Later phases (parallel-parse-pipeline, bulk-db-writes,
+    // git-native-enumeration, worker-pool-persistence) read `this.tunables`
+    // to size the worker pool, batch the SQLite writes, and prefer
+    // git-native enumeration. For phase 1 the value is only used here,
+    // so we read it once to keep the field live and avoid the TS6133.
+    if (verbose && this.tunables) {
+      const t = this.tunables;
+      log(
+        `tunables: threads=${t.threads} ram=${t.ramMb}MB batch=${t.batchSize}/${t.batchFlushMs}ms ` +
+          `sizeLimit=${t.sizeLimitMb}MB workerRam=${t.workerRamMb}MB git=${t.gitMode} progress=${t.progressIntervalMs}ms`
+      );
+    }
 
     // Phase 1: Scan for files
     onProgress?.({

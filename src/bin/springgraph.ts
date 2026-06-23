@@ -30,6 +30,7 @@ import { getSpringgraphDir, isInitialized, unsafeIndexRootReason, findNearestSpr
 import { detectWorktreeIndexMismatch, worktreeMismatchWarning } from '../sync/worktree';
 import { createShimmerProgress } from '../ui/shimmer-progress';
 import { getGlyphs } from '../ui/glyphs';
+import { resolveInitTunables } from '../init/tunables';
 
 import { buildNode25BlockBanner, buildNodeTooOldBanner, MIN_NODE_MAJOR } from './node-version-check';
 import { installFatalHandlers } from './fatal-handler';
@@ -323,6 +324,80 @@ type IndexResult = {
 };
 
 /**
+ * Subset of the commander `options` object that `init` and `index`
+ * collect from the new init-performance tunables flags
+ * (openspec/changes/optimize-initialization-performance, phase 1, task 1.1).
+ * Each field is the raw string from commander (or `undefined`); the
+ * resolver parses and validates them. The shape matches the
+ * `RawInitTunables` interface exported by `src/init/tunables.ts`.
+ */
+interface InitTunablesCliOptions {
+  threads?: string;
+  ram?: string;
+  batchSize?: string;
+  batchFlushMs?: string;
+  sizeLimitMb?: string;
+  workerRamMb?: string;
+  useGit?: boolean;
+  noGit?: boolean;
+  progressIntervalMs?: string;
+}
+
+/**
+ * Add the 8 init-performance CLI flags to a commander command and
+ * return the typed options shape. Shared by `init` and `index` so the
+ * two commands accept the exact same set of tunables. The flag list
+ * is the single source of truth — `src/init/tunables.ts` is the
+ * matching resolver and `src/types.ts` (`InitTunables`) is the
+ * resolved shape.
+ *
+ * Each option's `env` is the matching `SPRINGGRAPH_*` variable (the
+ * commander `--env` form is a recent addition; the resolver reads
+ * the same name from `process.env` so passing `process.env` is
+ * equivalent). Description is user-facing per the CHANGELOG house
+ * rules: lead with the capability, name the env var.
+ */
+function applyInitTunablesOptions(command: Command): Command {
+  return command
+    .option(
+      '--threads <n>',
+      'Number of parse workers (0 = auto; or set SPRINGGRAPH_THREADS). Defaults to cpus-1, capped at 8'
+    )
+    .option(
+      '--ram <mb>',
+      'Total init memory budget in MB (or set SPRINGGRAPH_RAM). Used for SQLite cache_size and per-worker default'
+    )
+    .option(
+      '--batch-size <n>',
+      'Files per DB transaction (or set SPRINGGRAPH_BATCH_SIZE). Larger = fewer commits, more memory'
+    )
+    .option(
+      '--batch-flush-ms <ms>',
+      'Max ms before a partial batch commits (or set SPRINGGRAPH_BATCH_FLUSH_MS). 0 = disable time trigger'
+    )
+    .option(
+      '--size-limit <mb>',
+      'Per-file size cap in MB (or set SPRINGGRAPH_SIZE_LIMIT_MB). Files above this are skipped'
+    )
+    .option(
+      '--worker-ram <mb>',
+      'Per-worker RSS budget in MB (or set SPRINGGRAPH_WORKER_RAM_MB). Triggers worker recycle when exceeded'
+    )
+    .option(
+      '--use-git',
+      'Force git-native file enumeration (git ls-files + cat-file --batch). Auto-detected by default'
+    )
+    .option(
+      '--no-git',
+      'Disable git-native file enumeration; always use the filesystem walk'
+    )
+    .option(
+      '--progress-interval-ms <ms>',
+      'Throttle for the onProgress callback (or set SPRINGGRAPH_PROGRESS_MS). 0 = fire every event'
+    );
+}
+
+/**
  * Print indexing results using clack log methods
  */
 function printIndexResult(clack: typeof import('@clack/prompts'), result: IndexResult, projectPath?: string): void {
@@ -463,15 +538,23 @@ async function recordIndexTelemetry(
 /**
  * springgraph init [path]
  */
-program
-  .command('init [path]')
-  .description('Initialize Springgraph in a project directory and build the initial index')
-  .option('-i, --index', 'Deprecated: indexing now runs by default; flag accepted for backward compatibility')
-  .option('-f, --force', 'Initialize even if the path looks like your home directory or a filesystem root')
-  .option('-v, --verbose', 'Show detailed worker lifecycle and memory info')
-  .action(async (pathArg: string | undefined, options: { index?: boolean; force?: boolean; verbose?: boolean }) => {
+applyInitTunablesOptions(
+  program
+    .command('init [path]')
+    .description('Initialize Springgraph in a project directory and build the initial index')
+    .option('-i, --index', 'Deprecated: indexing now runs by default; flag accepted for backward compatibility')
+    .option('-f, --force', 'Initialize even if the path looks like your home directory or a filesystem root')
+    .option('-v, --verbose', 'Show detailed worker lifecycle and memory info')
+)
+  .action(async (pathArg: string | undefined, options: { index?: boolean; force?: boolean; verbose?: boolean } & InitTunablesCliOptions) => {
     const projectPath = path.resolve(pathArg || process.cwd());
     const clack = await importESM('@clack/prompts');
+
+    // init-performance change, phase 1, task 1.1: resolve the 8 tunables
+    // flags + env vars + host defaults. resolveInitTunables throws on
+    // malformed values (e.g. `SPRINGGRAPH_THREADS=banana`) so a typo
+    // fails loud here instead of silently falling back.
+    const tunables = resolveInitTunables(options);
 
     clack.intro('Initializing Springgraph');
 
@@ -511,12 +594,14 @@ program
         result = await cg.indexAll({
           onProgress: createVerboseProgress(),
           verbose: true,
+          tunables,
         });
       } else {
         process.stdout.write(`${colors.dim}${getGlyphs().rail}${colors.reset}\n`);
         const progress = createShimmerProgress();
         result = await cg.indexAll({
           onProgress: progress.onProgress,
+          tunables,
         });
         await progress.stop();
       }
@@ -600,14 +685,22 @@ program
 /**
  * springgraph index [path]
  */
-program
-  .command('index [path]')
-  .description('Rebuild the full index from scratch (same result as a fresh init)')
-  .option('-f, --force', 'Index even if the path looks like your home directory or a filesystem root')
-  .option('-q, --quiet', 'Suppress progress output')
-  .option('-v, --verbose', 'Show detailed worker lifecycle and memory info')
-  .action(async (pathArg: string | undefined, options: { force?: boolean; quiet?: boolean; verbose?: boolean }) => {
+applyInitTunablesOptions(
+  program
+    .command('index [path]')
+    .description('Rebuild the full index from scratch (same result as a fresh init)')
+    .option('-f, --force', 'Index even if the path looks like your home directory or a filesystem root')
+    .option('-q, --quiet', 'Suppress progress output')
+    .option('-v, --verbose', 'Show detailed worker lifecycle and memory info')
+)
+  .action(async (pathArg: string | undefined, options: { force?: boolean; quiet?: boolean; verbose?: boolean } & InitTunablesCliOptions) => {
     const projectPath = resolveProjectPath(pathArg);
+
+    // init-performance change, phase 1, task 1.1: same 8 tunables flags
+    // as `init`. `index` and `init` share the underlying indexAll path,
+    // so a user who fine-tunes `init` gets the same tuning on
+    // `index` without having to repeat themselves.
+    const tunables = resolveInitTunables(options);
 
     try {
       // Don't (re)index your home directory / a filesystem root (#845). --force
@@ -631,7 +724,7 @@ program
         // Quiet mode: no UI, just run. `index` is a full re-index, so clear the
         // existing graph and rebuild from scratch (see the note below — #874).
         cg.clear();
-        const result = await cg.indexAll();
+        const result = await cg.indexAll({ tunables });
         if (!result.success) process.exit(1);
         cg.destroy();
         return;
@@ -653,12 +746,14 @@ program
         result = await cg.indexAll({
           onProgress: createVerboseProgress(),
           verbose: true,
+          tunables,
         });
       } else {
         process.stdout.write(`${colors.dim}${getGlyphs().rail}${colors.reset}\n`);
         const progress = createShimmerProgress();
         result = await cg.indexAll({
           onProgress: progress.onProgress,
+          tunables,
         });
         await progress.stop();
       }

@@ -412,7 +412,8 @@ function applyInitTunablesOptions(command: Command): Command {
 /**
  * Print indexing results using clack log methods
  */
-function printIndexResult(clack: typeof import('@clack/prompts'), result: IndexResult, projectPath?: string): void {
+function printIndexResult(result: IndexResult, projectPath?: string): void {
+  const glyphs = getGlyphs();
   const hasErrors = result.filesErrored > 0;
 
   // Surface non-file-level failures (e.g. lock-acquisition failure
@@ -428,21 +429,21 @@ function printIndexResult(clack: typeof import('@clack/prompts'), result: IndexR
   // continuing to the misleading "No files found" branch or throwing.
   if (!result.success && !hasErrors && result.filesIndexed === 0) {
     const generic = result.errors.find((e) => e.severity === 'error');
-    clack.log.error(generic?.message ?? `Indexing failed ${getGlyphs().dash} no further details available`);
+    process.stdout.write(`${glyphs.err} ${generic?.message ?? `Indexing failed ${glyphs.dash} no further details available`}\n`);
     return;
   }
 
   if (result.filesIndexed > 0) {
     if (hasErrors) {
-      clack.log.success(`Indexed ${formatNumber(result.filesIndexed)} files (${formatNumber(result.filesErrored)} could not be parsed)`);
+      process.stdout.write(`${glyphs.ok} Indexed ${formatNumber(result.filesIndexed)} files (${formatNumber(result.filesErrored)} could not be parsed)\n`);
     } else {
-      clack.log.success(`Indexed ${formatNumber(result.filesIndexed)} files`);
+      process.stdout.write(`${glyphs.ok} Indexed ${formatNumber(result.filesIndexed)} files\n`);
     }
-    clack.log.info(`${formatNumber(result.nodesCreated)} nodes, ${formatNumber(result.edgesCreated)} edges in ${formatDuration(result.durationMs)}`);
+    process.stdout.write(`${glyphs.info} ${formatNumber(result.nodesCreated)} nodes, ${formatNumber(result.edgesCreated)} edges in ${formatDuration(result.durationMs)}\n`);
   } else if (hasErrors) {
-    clack.log.error(`Indexing failed ${getGlyphs().dash} all ${formatNumber(result.filesErrored)} files had errors`);
+    process.stdout.write(`${glyphs.err} Indexing failed ${glyphs.dash} all ${formatNumber(result.filesErrored)} files had errors\n`);
   } else {
-    clack.log.warn('No files found to index');
+    process.stdout.write(`${glyphs.warn} No files found to index\n`);
   }
 
   if (hasErrors) {
@@ -466,15 +467,18 @@ function printIndexResult(clack: typeof import('@clack/prompts'), result: IndexR
     const breakdown = Array.from(errorsByCode)
       .map(([code, count]) => `${formatNumber(count)} ${codeLabels[code] || code}`)
       .join('\n');
-    clack.note(breakdown, 'Error breakdown');
+    process.stdout.write(`${glyphs.info} Error breakdown ${glyphs.dash}\n`);
+    for (const line of breakdown.split('\n')) {
+      process.stdout.write(`  ${line}\n`);
+    }
 
     if (projectPath) {
       writeErrorLog(projectPath, result.errors);
-      clack.log.info('See .springgraph/errors.log for details');
+      process.stdout.write(`${glyphs.info} See .springgraph/errors.log for details\n`);
     }
 
     if (result.filesIndexed > 0) {
-      clack.log.info(`The index is fully usable ${getGlyphs().dash} only the failed files are missing.`);
+      process.stdout.write(`${glyphs.info} The index is fully usable ${glyphs.dash} only the failed files are missing.\n`);
     }
   } else if (projectPath) {
     const logPath = path.join(getSpringgraphDir(projectPath), 'errors.log');
@@ -482,6 +486,32 @@ function printIndexResult(clack: typeof import('@clack/prompts'), result: IndexR
       fs.unlinkSync(logPath);
     }
   }
+}
+
+/** Glyph-aware replacements for clack intro/outro/log helpers.
+ *
+ * clack uses Unicode icons and box-drawing that render as mojibake on
+ * Windows OEM codepages and in some non-TTY environments. We use the
+ * same ASCII/Unicode glyph selection as the shimmer so output stays
+ * readable everywhere.
+ */
+function printIntro(title: string): void {
+  process.stdout.write(`\n${getGlyphs().rail} ${title}\n`);
+}
+
+function printOutro(message: string): void {
+  if (message) {
+    process.stdout.write(`${getGlyphs().ok} ${message}\n`);
+  }
+}
+
+function printLog(level: 'success' | 'info' | 'warn' | 'error', message: string): void {
+  const glyphs = getGlyphs();
+  const icon = level === 'success' ? glyphs.ok
+    : level === 'info' ? glyphs.info
+      : level === 'warn' ? glyphs.warn
+        : glyphs.err;
+  process.stdout.write(`${icon} ${message}\n`);
 }
 
 /**
@@ -613,7 +643,7 @@ applyInitTunablesOptions(
     // fails loud here instead of silently falling back.
     const tunables = resolveInitTunables(options);
 
-    clack.intro('Initializing Springgraph');
+    printIntro('Initializing Springgraph');
 
     try {
       // Refuse to index your home directory / a filesystem root — it pulls in
@@ -621,27 +651,27 @@ applyInitTunablesOptions(
       // churn, and on pre-1.0 macOS a machine-crashing fd blowup, #845).
       const unsafe = unsafeIndexRootReason(projectPath);
       if (unsafe && !options.force) {
-        clack.log.error(`Refusing to initialize in ${projectPath} — it looks like ${unsafe}.`);
-        clack.log.info('Run this inside a specific project directory, or pass --force if you really mean to index everything under it.');
-        clack.outro('');
+        printLog('error', `Refusing to initialize in ${projectPath} — it looks like ${unsafe}.`);
+        printLog('info', 'Run this inside a specific project directory, or pass --force if you really mean to index everything under it.');
+        printOutro('');
         process.exitCode = 1;
         return;
       }
 
       if (isInitialized(projectPath)) {
-        clack.log.warn(`Already initialized in ${projectPath}`);
-        clack.log.info('Use "springgraph index" to re-index or "springgraph sync" to update');
+        printLog('warn', `Already initialized in ${projectPath}`);
+        printLog('info', 'Use "springgraph index" to re-index or "springgraph sync" to update');
         try {
           const { offerWatchFallback } = await import('../installer');
           await offerWatchFallback(clack, projectPath);
         } catch { /* non-fatal */ }
-        clack.outro('');
+        printOutro('');
         return;
       }
 
       const { default: Springgraph } = await loadSpringgraph();
       const cg = await Springgraph.init(projectPath, { index: false });
-      clack.log.success(`Initialized in ${projectPath}`);
+      printLog('success', `Initialized in ${projectPath}`);
 
       // Indexing runs by default now. The legacy -i/--index flag is still
       // accepted (so existing muscle memory and scripts don't break) but is a
@@ -662,7 +692,7 @@ applyInitTunablesOptions(
         });
         await progress.stop();
       }
-      printIndexResult(clack, result, projectPath);
+      printIndexResult(result, projectPath);
       printInitSummary('init', result);
       await recordIndexTelemetry(cg, result);
 
@@ -671,10 +701,10 @@ applyInitTunablesOptions(
         await offerWatchFallback(clack, projectPath);
       } catch { /* non-fatal */ }
 
-      clack.outro('Done');
+      printOutro('Done');
       cg.destroy();
     } catch (err) {
-      clack.log.error(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+      printLog('error', `Failed: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);
     }
   });
@@ -788,8 +818,7 @@ applyInitTunablesOptions(
         return;
       }
 
-      const clack = await importESM('@clack/prompts');
-      clack.intro('Indexing project');
+      printIntro('Indexing project');
 
       // `index` is a FULL re-index: clear the existing graph and rebuild it from
       // scratch so the result is identical to a fresh `init`. Without the clear,
@@ -816,7 +845,7 @@ applyInitTunablesOptions(
         await progress.stop();
       }
 
-      printIndexResult(clack, result, projectPath);
+      printIndexResult(result, projectPath);
       printInitSummary('index', result);
       await recordIndexTelemetry(cg, result);
 
@@ -824,7 +853,7 @@ applyInitTunablesOptions(
         process.exit(1);
       }
 
-      clack.outro('Done');
+      printOutro('Done');
       cg.destroy();
     } catch (err) {
       error(`Failed to index: ${err instanceof Error ? err.message : String(err)}`);
@@ -859,8 +888,7 @@ program
         return;
       }
 
-      const clack = await importESM('@clack/prompts');
-      clack.intro('Syncing Springgraph');
+      printIntro('Syncing Springgraph');
 
       process.stdout.write(`${colors.dim}${getGlyphs().rail}${colors.reset}\n`);
       const progress = createShimmerProgress();
@@ -874,17 +902,17 @@ program
       const totalChanges = result.filesAdded + result.filesModified + result.filesRemoved;
 
       if (totalChanges === 0) {
-        clack.log.info('Already up to date');
+        printLog('info', 'Already up to date');
       } else {
-        clack.log.success(`Synced ${formatNumber(totalChanges)} changed files`);
+        printLog('success', `Synced ${formatNumber(totalChanges)} changed files`);
         const details: string[] = [];
         if (result.filesAdded > 0) details.push(`Added: ${result.filesAdded}`);
         if (result.filesModified > 0) details.push(`Modified: ${result.filesModified}`);
         if (result.filesRemoved > 0) details.push(`Removed: ${result.filesRemoved}`);
-        clack.log.info(`${details.join(', ')} ${getGlyphs().dash} ${formatNumber(result.nodesUpdated)} nodes in ${formatDuration(result.durationMs)}`);
+        printLog('info', `${details.join(', ')} ${getGlyphs().dash} ${formatNumber(result.nodesUpdated)} nodes in ${formatDuration(result.durationMs)}`);
       }
 
-      clack.outro('Done');
+      printOutro('Done');
       cg.destroy();
     } catch (err) {
       if (!options.quiet) {
@@ -1488,7 +1516,7 @@ program
     if (found) { try { cwdRoot = fs.realpathSync(found); } catch { cwdRoot = found; } }
 
     const clack = await importESM('@clack/prompts');
-    clack.intro('Springgraph daemons');
+    printIntro('Springgraph daemons');
     await runDaemonPicker({
       list: listDaemons,
       stop: stopDaemonAt,
@@ -1497,8 +1525,8 @@ program
       now: () => Date.now(),
       select: (opts) => clack.select(opts),
       isCancel: (v) => clack.isCancel(v),
-      note: (m) => clack.log.success(m),
-      done: (m) => clack.outro(m),
+      note: (m) => printLog('success', m),
+      done: (m) => printOutro(m),
     });
   });
 

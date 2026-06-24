@@ -8,6 +8,9 @@ Springgraph 基于 [colbymchenry/codegraph](https://github.com/colbymchenry/code
 
 ## [Unreleased]
 
+
+## [1.0.3] - 2026-06-24
+
 ### 修复
 
 - `springgraph init`、`springgraph index` 和 `springgraph sync` 在 Node 22+ 上不再重复打印 `(node:…) ExperimentalWarning: SQLite is an experimental feature` 警告。
@@ -140,3 +143,4 @@ Springgraph 基于 [colbymchenry/codegraph](https://github.com/colbymchenry/code
 [1.0.0]: https://github.com/jinglonglong/springgraph/releases/tag/v1.0.0
 [1.0.1]: https://github.com/jinglonglong/springgraph/releases/tag/v1.0.1
 [1.0.2]: https://github.com/jinglonglong/springgraph/releases/tag/v1.0.2
+[1.0.3]: https://github.com/jinglonglong/springgraph/releases/tag/v1.0.3

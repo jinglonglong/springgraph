@@ -1,5 +1,3 @@
-import { parentPort, workerData } from 'worker_threads';
-import * as fs from 'fs';
 import { getGlyphs } from './glyphs';
 import type { ShimmerWorkerMessage, WorkerProgressMsg } from './types';
 
@@ -26,10 +24,13 @@ import type { ShimmerWorkerMessage, WorkerProgressMsg } from './types';
  *   worker's bar needs to advance). Done and idle phases are no-ops after
  *   the first render.
  *
- * Output uses `process.stdout.write` (not `fs.writeSync(1, ...)`) so
- * Node's TTY-aware encoding conversion runs — on Windows the active
- * console codepage (often CP936/CP949 for CJK) is honored, which keeps
- * Chinese / Japanese / Korean glyphs readable.
+ * Output uses `process.stdout.write` so Node's TTY-aware encoding conversion
+ * runs — on Windows the active console codepage (often CP936/CP949 for CJK)
+ * is honored, which keeps Chinese / Japanese / Korean glyphs readable.
+ * The renderer is spawned as a child_process (not a worker_thread) so this
+ * stdout is its own file descriptor and does not proxy through the busy main
+ * thread; animation stays smooth even when the main thread is blocked in
+ * SQLite writes or synthesizers.
  */
 
 type WorkerState = {
@@ -63,7 +64,13 @@ const GRN = '\x1b[32m';
 const BOLD = '\x1b[1m';
 const DIM_FG = '\x1b[90m';
 
-const startTime: number = (workerData?.startTime as number | undefined) ?? Date.now();
+let startTime: number = Date.now();
+if (typeof process.env.SPRINGGRAPH_SHIMMER_START_TIME === 'string' && process.env.SPRINGGRAPH_SHIMMER_START_TIME !== '') {
+  const parsed = Number.parseInt(process.env.SPRINGGRAPH_SHIMMER_START_TIME, 10);
+  if (Number.isFinite(parsed)) {
+    startTime = parsed;
+  }
+}
 
 const phases = new Map<string, PhaseState>();
 const order: string[] = [];
@@ -228,24 +235,6 @@ function buildLines(frame: number): string[] {
  * redraws the whole block, and ends with another newline. Done phases still
  * redraw, but since their content is static the visual result is stable.
  */
-/**
- * Raw stdout write via fd 1. We intentionally do NOT use
- * `process.stdout.write` because in a worker_thread it proxies through the
- * main thread's stdout; when the main thread is blocked in SQLite writes or
- * synthesizers, the proxy stalls and the animation freezes. `fs.writeSync(1,
- * ...)` writes directly to the file descriptor and stays smooth even when the
- * main thread is busy. The bytes are UTF-8; modern Windows terminals (Windows
- * Terminal, modern conhost with VT enabled) render UTF-8 correctly, and the
- * legacy CP936/CP949 mojibake issue is acceptable trade-off for a responsive
- * progress bar.
- */
-function stdoutWrite(data: string): void {
-  try {
-    fs.writeSync(1, Buffer.from(data, 'utf-8'));
-  } catch {
-    // Ignore write errors (e.g. stdout closed) to avoid crashing the worker.
-  }
-}
 
 function render(): void {
   if (order.length === 0) return;
@@ -254,20 +243,20 @@ function render(): void {
 
   // Move cursor from "below the block" back to the top of the block.
   if (blockHeight > 0) {
-    stdoutWrite(`\x1b[${blockHeight}A`);
+    process.stdout.write(`\x1b[${blockHeight}A`);
   }
 
   for (let i = 0; i < newLines.length; i++) {
-    stdoutWrite('\r\x1b[K');
-    stdoutWrite(newLines[i] as string);
+    process.stdout.write('\r\x1b[K');
+    process.stdout.write(newLines[i] as string);
     if (i < newLines.length - 1) {
-      stdoutWrite('\n');
+      process.stdout.write('\n');
     }
   }
 
   // Leave cursor on a fresh row below the block. This is the anchor point
   // the next render will move up from.
-  stdoutWrite('\n');
+  process.stdout.write('\n');
   blockHeight = newLines.length;
 }
 
@@ -302,7 +291,7 @@ function ensurePhase(id: string, label: string, description: string): PhaseState
   return phase;
 }
 
-parentPort?.on('message', (msg: ShimmerWorkerMessage) => {
+function handleMessage(msg: ShimmerWorkerMessage): void {
   switch (msg.type) {
     case 'add-phase': {
       ensurePhase(msg.id, msg.label, msg.description ?? '');
@@ -398,8 +387,12 @@ parentPort?.on('message', (msg: ShimmerWorkerMessage) => {
       // Render() already left the cursor on a fresh row below the block,
       // so we just reset the tracked height.
       blockHeight = 0;
-      parentPort?.postMessage({ type: 'stopped' });
+      if (process.send) {
+        process.send({ type: 'stopped' });
+      }
       break;
     }
   }
-});
+}
+
+process.on('message', handleMessage);

@@ -931,24 +931,6 @@ export class Springgraph {
         onProgress?.(aggregateStats.resolved, total);
       }
 
-      // Additive synthesizers (run on main thread so they can write edges).
-      const synthStats = this.resolver.runSynthesizers();
-      for (const [method, count] of Object.entries(synthStats)) {
-        aggregateStats.byMethod[method] = (aggregateStats.byMethod[method] || 0) + count;
-      }
-
-      // Deferred second pass for chain/this/super refs collected by workers.
-      const deferredResult = this.resolver.resolveDeferredRefs({
-        chainRefs: deferredChainRefs,
-        thisMemberRefs: deferredThisMemberRefs,
-        superMemberRefs: deferredSuperMemberRefs,
-      });
-      aggregateStats.total += deferredResult.stats.total;
-      aggregateStats.resolved += deferredResult.stats.resolved;
-      aggregateStats.unresolved += deferredResult.stats.unresolved;
-      for (const [method, count] of Object.entries(deferredResult.stats.byMethod)) {
-        aggregateStats.byMethod[method] = (aggregateStats.byMethod[method] || 0) + count;
-      }
     } finally {
       await pool.close();
     }

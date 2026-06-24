@@ -10,7 +10,7 @@
  * auto-registers phases with default labels — that keeps existing call
  * sites compiling while the CLI migrates to the explicit API.
  */
-import { Worker } from 'worker_threads';
+import { fork } from 'child_process';
 import * as path from 'path';
 
 export interface IndexProgress {
@@ -61,31 +61,36 @@ export interface ShimmerProgress {
 
 export function createShimmerProgress(): ShimmerProgress {
   const workerPath = path.join(__dirname, 'shimmer-worker.js');
-  const worker = new Worker(workerPath, {
-    workerData: { startTime: Date.now() },
+  const startTime = Date.now();
+  const worker = fork(workerPath, [], {
+    stdio: ['pipe', 'inherit', 'inherit', 'ipc'],
+    env: {
+      ...process.env,
+      SPRINGGRAPH_SHIMMER_START_TIME: String(startTime),
+    },
   });
 
   const api: ShimmerProgress = {
     addPhase(id, label, description = '') {
-      worker.postMessage({ type: 'add-phase', id, label, description });
+      worker.send({ type: 'add-phase', id, label, description });
     },
     startPhase(id) {
-      worker.postMessage({ type: 'start-phase', id });
+      worker.send({ type: 'start-phase', id });
     },
     updatePhase(id, current, total, detail) {
-      worker.postMessage({ type: 'update-phase', id, current, total, detail });
+      worker.send({ type: 'update-phase', id, current, total, detail });
     },
     completePhase(id) {
-      worker.postMessage({ type: 'complete-phase', id });
+      worker.send({ type: 'complete-phase', id });
     },
     updateWorkers(phaseId, workers) {
-      worker.postMessage({ type: 'update-workers', phaseId, workers });
+      worker.send({ type: 'update-workers', phaseId, workers });
     },
     onProgress(progress) {
       const def =
         LEGACY_PHASE_DEFAULTS[progress.phase] ??
         { label: progress.phase, description: '' };
-      worker.postMessage({
+      worker.send({
         type: 'legacy-update',
         phase: progress.phase,
         label: def.label,
@@ -97,16 +102,18 @@ export function createShimmerProgress(): ShimmerProgress {
     stop() {
       return new Promise<void>((resolve) => {
         const timeout = setTimeout(() => {
-          worker.terminate().then(() => resolve());
+          worker.kill('SIGTERM');
+          resolve();
         }, 2000);
         worker.on('message', (msg: { type: string }) => {
           if (msg.type === 'stopped') {
             clearTimeout(timeout);
-            worker.terminate().then(() => resolve());
+            worker.kill('SIGTERM');
             setCurrentShimmerProgress(null);
+            resolve();
           }
         });
-        worker.postMessage({ type: 'stop' });
+        worker.send({ type: 'stop' });
       });
     },
   };

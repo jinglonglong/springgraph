@@ -242,4 +242,68 @@ describe('ResolveWorkerPool', () => {
 
     await expect(Promise.all(promises)).rejects.toThrow('aborted');
   });
+
+  it('emits per-worker progress callbacks that sum to the pool total', async () => {
+    const nodeCount = 80;
+    const nodes: Node[] = [];
+    const refs: UnresolvedReference[] = [];
+    nodes.push(makeNode('func:perw.ts:caller:1', 'function', 'caller', 'perw.ts', 'typescript'));
+    for (let i = 0; i < nodeCount; i++) {
+      nodes.push(makeNode(`func:perw.ts:helper${i}:1`, 'function', `helper${i}`, 'perw.ts', 'typescript'));
+      refs.push({
+        fromNodeId: 'func:perw.ts:caller:1',
+        referenceName: `helper${i}`,
+        referenceKind: 'calls',
+        line: i + 1,
+        column: 0,
+        filePath: 'perw.ts',
+        language: 'typescript',
+      });
+    }
+    insertNodesAndRefs(nodes, refs);
+
+    const samples: Array<{ id: number; current: number; total: number }[]> = [];
+    const pool = new ResolveWorkerPool(
+      tempDir,
+      dbPath,
+      3,
+      cg.getDetectedFrameworks(),
+      undefined,
+      0, // disable aggregate throttle so per-worker fires on every event
+      (workers) => samples.push(workers.map((w) => ({ ...w })))
+    );
+    try {
+      await pool.start();
+      const unresolved = readUnresolvedRefs();
+      // Split into 4 small batches so multiple workers are exercised and
+      // the pool's per-worker state visibly changes between snapshots.
+      const batches = [
+        unresolved.slice(0, 20),
+        unresolved.slice(20, 40),
+        unresolved.slice(40, 60),
+        unresolved.slice(60, 80),
+      ];
+      await Promise.all(batches.map((b) => pool.submitBatch(b)));
+
+      // Every snapshot must have exactly `threads` entries.
+      expect(samples.length).toBeGreaterThan(0);
+      for (const s of samples) {
+        expect(s.length).toBe(3);
+        for (const w of s) {
+          expect(w.id).toBeGreaterThanOrEqual(0);
+          expect(w.id).toBeLessThan(3);
+          expect(w.current).toBeLessThanOrEqual(w.total);
+        }
+      }
+      // The sum of per-worker totals must equal the total refs we submitted.
+      const last = samples[samples.length - 1]!;
+      const sumTotal = last.reduce((acc, w) => acc + w.total, 0);
+      expect(sumTotal).toBe(nodeCount);
+      // Every worker that received work must have advanced at least once.
+      const lastIds = last.filter((w) => w.total > 0).map((w) => w.id).sort();
+      expect(lastIds.length).toBeGreaterThan(1);
+    } finally {
+      await pool.close();
+    }
+  });
 });

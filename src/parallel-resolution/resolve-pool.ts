@@ -26,6 +26,18 @@ export interface ResolveBatchResult {
   deferredSuperMemberRefs: UnresolvedRef[];
 }
 
+/**
+ * Per-worker progress snapshot. `current` is the count of refs the worker
+ * has resolved so far (completed batches + last in-flight batch progress).
+ * `total` is the cumulative number of refs the pool has assigned to this
+ * worker across every batch it has handled.
+ */
+export interface WorkerProgressSnapshot {
+  id: number;
+  current: number;
+  total: number;
+}
+
 interface WorkerSlot {
   worker: Worker;
   ready: Promise<void>;
@@ -49,6 +61,17 @@ interface InFlightBatch {
   workerIdx: number;
 }
 
+interface WorkerStats {
+  /** Cumulative refs assigned to this worker across every dispatched batch. */
+  totalAssigned: number;
+  /** Resolved refs from completed batches. */
+  resolvedFromCompleted: number;
+  /** Size of the in-flight batch, if any. */
+  inflightSize: number;
+  /** Last progress reported within the in-flight batch (refs processed). */
+  inflightProgress: number;
+}
+
 export class ResolveWorkerPool {
   private slots: WorkerSlot[] = [];
   private queue: QueuedBatch[] = [];
@@ -64,10 +87,14 @@ export class ResolveWorkerPool {
 
   // Progress aggregation state
   private onProgress?: (current: number, total: number) => void;
+  private onWorkerProgress?: (workers: WorkerProgressSnapshot[]) => void;
   private totalSubmitted = 0;
   private resolvedCompleted = 0;
   private lastProgressAt = 0;
   private progressThrottleMs: number;
+
+  // Per-worker state — keyed by slotIdx.
+  private workerStats = new Map<number, WorkerStats>();
 
   /**
    * @param projectRoot - Absolute project root (passed to each worker)
@@ -76,6 +103,9 @@ export class ResolveWorkerPool {
    * @param frameworkNames - Framework names detected for the project
    * @param onProgress - Optional aggregate progress callback
    * @param progressThrottleMs - Minimum ms between progress callbacks (default 100)
+   * @param onWorkerProgress - Optional per-worker progress callback. Fired
+   *   whenever a worker's resolved/total counts change, throttled by
+   *   `progressThrottleMs` to avoid stuttering the UI.
    */
   constructor(
     projectRoot: string,
@@ -83,7 +113,8 @@ export class ResolveWorkerPool {
     threads: number,
     frameworkNames: string[] = [],
     onProgress?: (current: number, total: number) => void,
-    progressThrottleMs = 100
+    progressThrottleMs = 100,
+    onWorkerProgress?: (workers: WorkerProgressSnapshot[]) => void
   ) {
     if (threads < 1) {
       throw new Error(`ResolveWorkerPool: threads must be >= 1 (got ${threads})`);
@@ -93,11 +124,18 @@ export class ResolveWorkerPool {
     this.threads = threads;
     this.frameworkNames = frameworkNames;
     this.onProgress = onProgress;
+    this.onWorkerProgress = onWorkerProgress;
     this.progressThrottleMs = progressThrottleMs;
     this.workerPath = this.resolveWorkerPath();
 
     for (let i = 0; i < threads; i++) {
       this.slots.push(this.spawnWorker(i));
+      this.workerStats.set(i, {
+        totalAssigned: 0,
+        resolvedFromCompleted: 0,
+        inflightSize: 0,
+        inflightProgress: 0,
+      });
     }
     logDebug(`ResolveWorkerPool: spawned ${threads} worker(s)`);
   }
@@ -266,6 +304,13 @@ export class ResolveWorkerPool {
       retries: batch.retries,
       workerIdx,
     });
+    // Track per-worker assignment so the UI can show "worker N: X/Y".
+    const stats = this.workerStats.get(workerIdx);
+    if (stats) {
+      stats.totalAssigned += batch.refs.length;
+      stats.inflightSize = batch.refs.length;
+      stats.inflightProgress = 0;
+    }
     slot.worker.postMessage({
       type: 'resolve-batch',
       batchId: batch.batchId,
@@ -329,6 +374,11 @@ export class ResolveWorkerPool {
     if (msg.type === 'init-done') return;
 
     if (msg.type === 'progress' && msg.current !== undefined && msg.total !== undefined) {
+      const stats = this.workerStats.get(slotIdx);
+      if (stats) {
+        // msg.current is refs processed within this in-flight batch.
+        stats.inflightProgress = msg.current;
+      }
       this.emitProgress();
       return;
     }
@@ -338,7 +388,15 @@ export class ResolveWorkerPool {
       if (!inflight) return; // late result after crash/close
       this.inFlight.delete(msg.batchId);
       slot.inFlightBatchId = null;
-      this.resolvedCompleted += msg.result?.stats.resolved ?? 0;
+      const resolvedInBatch = msg.result?.stats.resolved ?? 0;
+      this.resolvedCompleted += resolvedInBatch;
+      // Roll the in-flight progress into the completed bucket and clear it.
+      const stats = this.workerStats.get(slotIdx);
+      if (stats) {
+        stats.resolvedFromCompleted += resolvedInBatch;
+        stats.inflightSize = 0;
+        stats.inflightProgress = 0;
+      }
       this.emitProgress();
       inflight.resolve(msg.result!);
       this.pumpQueue();
@@ -417,20 +475,52 @@ export class ResolveWorkerPool {
   // ---------------------------------------------------------------------------
 
   private emitProgress(): void {
-    if (!this.onProgress) return;
+    // Single shared throttle window for both aggregate and per-worker
+    // callbacks — they always fire together (or both skip) so the UI
+    // doesn't get half a frame.
     const now = Date.now();
     if (now - this.lastProgressAt < this.progressThrottleMs) return;
     this.lastProgressAt = now;
 
-    let currentInFlight = 0;
-    for (const inflight of this.inFlight.values()) {
-      // We don't track per-batch current precisely; count in-flight batches
-      // as completed for progress so the bar moves steadily as batches land.
-      currentInFlight += inflight.refs.length;
+    if (this.onProgress) {
+      let currentInFlight = 0;
+      for (const inflight of this.inFlight.values()) {
+        // We don't track per-batch current precisely; count in-flight batches
+        // as completed for progress so the bar moves steadily as batches land.
+        currentInFlight += inflight.refs.length;
+      }
+      const current = this.resolvedCompleted + currentInFlight;
+      const safeCurrent = Math.min(current, this.totalSubmitted);
+      this.onProgress(safeCurrent, this.totalSubmitted);
     }
-    const current = this.resolvedCompleted + currentInFlight;
-    const safeCurrent = Math.min(current, this.totalSubmitted);
-    this.onProgress(safeCurrent, this.totalSubmitted);
+
+    if (this.onWorkerProgress) {
+      this.onWorkerProgress(this.snapshotWorkerProgress());
+    }
+  }
+
+  /**
+   * Build a per-worker progress snapshot suitable for the UI. Includes every
+   * worker slot, even idle ones (current=0, total=0) so the UI can show a
+   * consistent N lines for the lifetime of the resolve phase.
+   */
+  private snapshotWorkerProgress(): WorkerProgressSnapshot[] {
+    const out: WorkerProgressSnapshot[] = [];
+    for (let i = 0; i < this.slots.length; i++) {
+      const stats = this.workerStats.get(i);
+      if (!stats) continue;
+      const current = stats.resolvedFromCompleted + stats.inflightProgress;
+      out.push({ id: i, current, total: stats.totalAssigned });
+    }
+    return out;
+  }
+
+  /**
+   * Public read-only snapshot. Useful for one-shot displays (e.g. on phase
+   * completion) and tests. Returns a defensive copy.
+   */
+  getWorkerProgress(): WorkerProgressSnapshot[] {
+    return this.snapshotWorkerProgress();
   }
 
 }

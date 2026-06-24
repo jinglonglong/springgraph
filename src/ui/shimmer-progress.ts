@@ -27,6 +27,12 @@ const LEGACY_PHASE_DEFAULTS: Record<string, { label: string; description: string
   resolving: { label: '解析引用', description: '并行解析未解引用' },
 };
 
+export interface WorkerProgressEntry {
+  id: number;
+  current: number;
+  total: number;
+}
+
 export interface ShimmerProgress {
   /**
    * Register a phase up front so the worker can show it as pending until it
@@ -39,6 +45,12 @@ export interface ShimmerProgress {
   updatePhase(id: string, current: number, total: number, detail?: string): void;
   /** Mark a phase as done. Total is finalised to current if it was 0. */
   completePhase(id: string): void;
+  /**
+   * Attach N per-worker sub-bars under a phase header. Used by the parallel
+   * resolve stage so the user can see each worker's progress independently
+   * instead of one aggregate bar. Pass an empty list to remove sub-bars.
+   */
+  updateWorkers(phaseId: string, workers: WorkerProgressEntry[]): void;
   /**
    * Legacy API: single-bar mode. New phase ids implicitly mark any previous
    * running phase as done. Kept so old call sites keep working unchanged.
@@ -65,6 +77,9 @@ export function createShimmerProgress(): ShimmerProgress {
     },
     completePhase(id) {
       worker.postMessage({ type: 'complete-phase', id });
+    },
+    updateWorkers(phaseId, workers) {
+      worker.postMessage({ type: 'update-workers', phaseId, workers });
     },
     onProgress(progress) {
       const def =

@@ -65,8 +65,6 @@ const RST = '\x1b[0m';
 const DM = '\x1b[2m';
 const GRN = '\x1b[32m';
 const BOLD = '\x1b[1m';
-const DIM_FG = '\x1b[90m';
-
 // Use ANSI cursor movement only when the parent process tells us it's safe.
 // The parent decides based on its own stdout.isTTY plus NO_COLOR/CI env vars;
 // child_process inherited file descriptors are not a reliable signal on
@@ -118,30 +116,19 @@ function formatDuration(ms: number): string {
   return `${m}m${(s - m * 60).toFixed(0)}s`;
 }
 
-function renderBar(frame: number, percent: number): string {
+function renderBar(_frame: number, percent: number): string {
   if (percent <= 0) return `${DM}${G.barEmpty.repeat(BAR_WIDTH)}${RST}`;
   if (percent >= 100) return `${GRN}${G.barFilled.repeat(BAR_WIDTH)}${RST}`;
   const filled = Math.round((BAR_WIDTH * percent) / 100);
   const empty = BAR_WIDTH - filled;
-  const cycleFrames = 24;
-  const shimmerPos = ((frame % cycleFrames) / cycleFrames) * (filled + 6) - 3;
-  const shimmerWidth = 3;
-  let bar = '';
-  for (let i = 0; i < filled; i++) {
-    const dist = Math.abs(i - shimmerPos);
-    const t = Math.max(0, 1 - dist / shimmerWidth);
-    const r = lerp(160, 251, t);
-    const g = lerp(100, 191, t);
-    const b = lerp(9, 36, t);
-    bar += `\x1b[38;2;${r};${g};${b}m${BOLD}${G.barFilled}`;
-  }
-  bar += `${RST}${DM}${G.barEmpty.repeat(empty)}${RST}`;
-  return bar;
+  // Static fill: no shimmer sweep so the bar reads as solid progress rather
+  // than a scanning/polling animation.
+  return `${BOLD}\x1b[38;2;200;150;60m${G.barFilled.repeat(filled)}${RST}${DM}${G.barEmpty.repeat(empty)}${RST}`;
 }
 
 function formatProgress(percent: number, current: number, total: number): string {
   if (total > 0) {
-    return `${renderBar(animFrame(), percent)}  ${formatNumber(current)}/${formatNumber(total)} (${percent}%)`;
+    return `${renderBar(0, percent)}  ${formatNumber(current)}/${formatNumber(total)} (${percent}%)`;
   }
   if (current > 0) {
     return `${formatNumber(current)} 个`;
@@ -158,9 +145,9 @@ function renderHeaderLine(frame: number, phase: PhaseState): string {
   if (phase.status === 'done') {
     statusIcon = G.phaseDone;
     iconColor = GRN;
-  } else if (phase.status === 'running') {
+  } else   if (phase.status === 'running') {
     statusIcon = glyph;
-    iconColor = color;
+    iconColor = GRN;
   } else {
     statusIcon = G.rail;
     iconColor = DM;
@@ -223,22 +210,6 @@ function renderPlainHeaderLine(phase: PhaseState): string {
   return `${statusIcon} ${padded}${progress}${desc}${detail}${timing}`;
 }
 
-function renderWorkerLine(_frame: number, phase: PhaseState, worker: WorkerState): string {
-  // Worker bars use the same shimmer as the header bar so the visual
-  // language is consistent. Status comes from the bar fill (>=100% is
-  // implicitly "done"); the parent phase controls whether workers animate
-  // (running parent -> animate; done parent -> frozen).
-  const percent = worker.total > 0 ? Math.min(100, Math.round((worker.current / worker.total) * 100)) : 0;
-  const bar = phase.status === 'running' ? renderBar(animFrame(), percent) : renderBar(0, percent);
-  const cur = formatNumber(worker.current);
-  const tot = formatNumber(worker.total);
-  // Two-space indent + tree-rail glyph + "worker-N" + bar + numbers. The
-  // tree glyph (├── / └──) implies the worker is a child of the phase.
-  const tree = G.treeBranch;
-  const label = `worker-${worker.id}`;
-  return `${DIM_FG}${tree}${RST} ${label.padEnd(10, ' ')}  ${bar}  ${cur}/${tot} (${percent}%)`;
-}
-
 /**
  * Build the current set of renderable lines from the phases map. Rebuilds
  * the lineLayout array so the diff algorithm below can map absolute line
@@ -250,17 +221,6 @@ function buildLines(frame: number): string[] {
     const phase = phases.get(id);
     if (!phase) continue;
     out.push(renderHeaderLine(frame, phase));
-    // Worker sub-bars are only meaningful while the phase is running.
-    // Hide idle workers (total=0) and collapse sub-bars once the phase
-    // is done so the final frame is clean.
-    if (phase.status !== 'done') {
-      for (let w = 0; w < phase.workers.length; w++) {
-        const worker = phase.workers[w]!;
-        if (worker.total > 0) {
-          out.push(renderWorkerLine(frame, phase, worker));
-        }
-      }
-    }
   }
   return out;
 }

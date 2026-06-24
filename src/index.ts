@@ -837,19 +837,7 @@ export class Springgraph {
       threads,
       this.resolver.getDetectedFrameworks(),
       onProgress,
-      100,
-      (workers) => {
-        // Forward per-worker progress to the shimmer UI so the user sees
-        // one bar per worker instead of one aggregate bar. Imported
-        // dynamically so the worker entry points (which don't need UI)
-        // don't pull the UI module.
-        try {
-          const { getCurrentShimmerProgress } = require('./ui/shimmer-progress') as typeof import('./ui/shimmer-progress');
-          getCurrentShimmerProgress()?.updateWorkers('resolving', workers);
-        } catch {
-          /* progress UI not active — ignore */
-        }
-      }
+      100
     );
 
     try {
@@ -930,10 +918,7 @@ export class Springgraph {
             aggregateStats.byMethod[method] = (aggregateStats.byMethod[method] || 0) + count;
           }
         }
-
-        onProgress?.(aggregateStats.resolved, total);
       }
-
     } finally {
       await pool.close();
     }

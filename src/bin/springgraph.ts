@@ -26,6 +26,9 @@
 import { Command } from 'commander';
 import * as path from 'path';
 import * as fs from 'fs';
+// Install the SQLite ExperimentalWarning filter as early as possible, before
+// any module loads `node:sqlite`.
+import '../errors';
 import { getSpringgraphDir, isInitialized, unsafeIndexRootReason, findNearestSpringgraphRoot } from '../directory';
 import { detectWorktreeIndexMismatch, worktreeMismatchWarning } from '../sync/worktree';
 import { createShimmerProgress } from '../ui/shimmer-progress';

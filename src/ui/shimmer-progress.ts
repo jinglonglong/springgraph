@@ -62,11 +62,20 @@ export interface ShimmerProgress {
 export function createShimmerProgress(): ShimmerProgress {
   const workerPath = path.join(__dirname, 'shimmer-worker.js');
   const startTime = Date.now();
+  // Determine ANSI support in the parent process where stdout.isTTY is
+  // reliable, then pass the decision to the child so it doesn't have to
+  // guess based on inherited file descriptors.
+  const useAnsi = process.stdout.isTTY === true
+    && process.env.TERM !== 'dumb'
+    && process.env.NO_COLOR !== '1'
+    && process.env.CI !== 'true'
+    && process.env.CI !== '1';
   const worker = fork(workerPath, [], {
     stdio: ['pipe', 'inherit', 'inherit', 'ipc'],
     env: {
       ...process.env,
       SPRINGGRAPH_SHIMMER_START_TIME: String(startTime),
+      SPRINGGRAPH_SHIMMER_USE_ANSI: useAnsi ? '1' : '0',
     },
   });
 

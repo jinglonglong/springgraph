@@ -7,6 +7,9 @@
 
 import * as path from 'path';
 import * as os from 'os';
+// Install the SQLite ExperimentalWarning filter before any DB code loads
+// `node:sqlite`.
+import './errors';
 import {
   Node,
   Edge,

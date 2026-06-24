@@ -1,4 +1,7 @@
 import { getGlyphs } from './glyphs';
+// Install the SQLite warning filter in the shimmer child even though it does
+// not use SQLite — it inherits stderr and should not let stray warnings leak.
+import '../errors';
 import type { ShimmerWorkerMessage, WorkerProgressMsg } from './types';
 
 /**
@@ -55,7 +58,7 @@ type PhaseState = {
 const G = getGlyphs();
 const ANIM_INTERVAL = 150;
 const FRAMES_PER_GLYPH = 3;
-const RENDER_INTERVAL_MS = 80;
+const RENDER_INTERVAL_MS = 200;
 const BAR_WIDTH = 20;
 
 const RST = '\x1b[0m';
@@ -63,6 +66,12 @@ const DM = '\x1b[2m';
 const GRN = '\x1b[32m';
 const BOLD = '\x1b[1m';
 const DIM_FG = '\x1b[90m';
+
+// Use ANSI cursor movement only when the parent process tells us it's safe.
+// The parent decides based on its own stdout.isTTY plus NO_COLOR/CI env vars;
+// child_process inherited file descriptors are not a reliable signal on
+// Windows, so we don't check isTTY here.
+const useAnsi = process.env.SPRINGGRAPH_SHIMMER_USE_ANSI === '1';
 
 let startTime: number = Date.now();
 if (typeof process.env.SPRINGGRAPH_SHIMMER_START_TIME === 'string' && process.env.SPRINGGRAPH_SHIMMER_START_TIME !== '') {
@@ -77,7 +86,7 @@ const order: string[] = [];
 
 // Height of the rendered block, in logical lines (not terminal rows). Used
 // to move the cursor from "below the block" back to the top on each redraw.
-let blockHeight = 0;
+let maxBlockHeight = 0;
 
 let renderInterval: NodeJS.Timeout | null = null;
 
@@ -182,6 +191,38 @@ function renderHeaderLine(frame: number, phase: PhaseState): string {
   return `${iconColor}${statusIcon}${RST} ${padded}${progress}${desc}${detail}${timing}`;
 }
 
+function renderPlainBar(percent: number): string {
+  if (percent <= 0) return '-'.repeat(BAR_WIDTH);
+  if (percent >= 100) return '#'.repeat(BAR_WIDTH);
+  const filled = Math.round((BAR_WIDTH * percent) / 100);
+  const empty = BAR_WIDTH - filled;
+  return '#'.repeat(filled) + '-'.repeat(empty);
+}
+
+function renderPlainHeaderLine(phase: PhaseState): string {
+  const statusIcon = phase.status === 'done' ? '*' : phase.status === 'running' ? '>' : '|';
+  const padded = phase.label.length >= 14 ? phase.label : phase.label + '　'.repeat(14 - phase.label.length);
+
+  let progress = '';
+  if (!(phase.status === 'pending' && phase.total === 0)) {
+    const percent = phase.total > 0 ? Math.round((phase.current / phase.total) * 100) : 0;
+    if (phase.total > 0) {
+      progress = `  ${renderPlainBar(percent)}  ${formatNumber(phase.current)}/${formatNumber(phase.total)} (${percent}%)`;
+    } else if (phase.current > 0) {
+      progress = `  ${formatNumber(phase.current)}`;
+    }
+  }
+  const desc = phase.description ? `  ${phase.description}` : '';
+  const detail = phase.detail ? `  ${phase.detail}` : '';
+
+  let timing = '';
+  if (phase.status === 'done' && phase.endTime !== null) {
+    timing = `  - ${formatDuration(phase.endTime - phase.startTime)}`;
+  }
+
+  return `${statusIcon} ${padded}${progress}${desc}${detail}${timing}`;
+}
+
 function renderWorkerLine(_frame: number, phase: PhaseState, worker: WorkerState): string {
   // Worker bars use the same shimmer as the header bar so the visual
   // language is consistent. Status comes from the bar fill (>=100% is
@@ -224,6 +265,51 @@ function buildLines(frame: number): string[] {
   return out;
 }
 
+// Plain-text progress mode for non-TTY output (pipes, CI, dumb terminals).
+// Prints one line per completed phase and overwrites a single running-phase
+// line with \r so logs stay readable without ANSI cursor gymnastics.
+const plainCompletedPhases = new Set<string>();
+let plainRunningLine = '';
+let plainNeedFinalNewline = false;
+
+function renderPlain(): void {
+  if (order.length === 0) return;
+
+  // Print any phases that just finished.
+  for (const id of order) {
+    const phase = phases.get(id);
+    if (!phase) continue;
+    if (phase.status === 'done' && !plainCompletedPhases.has(id)) {
+      if (plainNeedFinalNewline) {
+        process.stdout.write('\n');
+        plainNeedFinalNewline = false;
+      }
+      process.stdout.write(renderPlainHeaderLine(phase));
+      process.stdout.write('\n');
+      plainCompletedPhases.add(id);
+      plainRunningLine = '';
+    }
+  }
+
+  // Find the most advanced running phase and overwrite the running line.
+  let runningPhase: PhaseState | null = null;
+  for (const id of order) {
+    const phase = phases.get(id);
+    if (phase?.status === 'running') {
+      runningPhase = phase;
+    }
+  }
+  if (runningPhase) {
+    const line = renderPlainHeaderLine(runningPhase);
+    if (line !== plainRunningLine) {
+      process.stdout.write('\r');
+      process.stdout.write(line);
+      plainRunningLine = line;
+      plainNeedFinalNewline = true;
+    }
+  }
+}
+
 /**
  * Full-block redraw.
  *
@@ -231,19 +317,27 @@ function buildLines(frame: number): string[] {
  * and partial-redraw cursor math is fragile once lines wrap or the block
  * grows (worker sub-bars appearing under a phase). Instead, after every
  * render we emit a trailing newline so the cursor is at column 0 of the row
- * directly below the block. The next render moves up by `blockHeight` rows,
- * redraws the whole block, and ends with another newline. Done phases still
- * redraw, but since their content is static the visual result is stable.
+ * directly below the block. The next render moves up by `maxBlockHeight` rows,
+ * clears everything below the cursor, redraws the whole block, and ends with
+ * another newline. Done phases still redraw, but since their content is static
+ * the visual result is stable.
  */
 
 function render(): void {
+  if (!useAnsi) {
+    renderPlain();
+    return;
+  }
   if (order.length === 0) return;
   const frame = animFrame();
   const newLines = buildLines(frame);
 
-  // Move cursor from "below the block" back to the top of the block.
-  if (blockHeight > 0) {
-    process.stdout.write(`\x1b[${blockHeight}A`);
+  // Move cursor from "below the block" back to the top of the block. Use
+  // the maximum block height ever seen so a growing block (e.g. worker
+  // sub-bars appearing) still reaches the original top row. Clear each
+  // redrawn line and then clear everything below the new block.
+  if (maxBlockHeight > 0) {
+    process.stdout.write(`\x1b[${maxBlockHeight}A`);
   }
 
   for (let i = 0; i < newLines.length; i++) {
@@ -253,11 +347,14 @@ function render(): void {
       process.stdout.write('\n');
     }
   }
+  process.stdout.write('\x1b[J');
 
   // Leave cursor on a fresh row below the block. This is the anchor point
   // the next render will move up from.
   process.stdout.write('\n');
-  blockHeight = newLines.length;
+  if (newLines.length > maxBlockHeight) {
+    maxBlockHeight = newLines.length;
+  }
 }
 
 function ensureRenderLoop(): void {
@@ -386,7 +483,7 @@ function handleMessage(msg: ShimmerWorkerMessage): void {
       render();
       // Render() already left the cursor on a fresh row below the block,
       // so we just reset the tracked height.
-      blockHeight = 0;
+      maxBlockHeight = 0;
       if (process.send) {
         process.send({ type: 'stopped' });
       }

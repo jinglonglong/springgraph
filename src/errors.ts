@@ -247,9 +247,9 @@ export function logWarn(message: string, context?: Record<string, unknown>): voi
  * Other warnings are re-emitted via the standard mechanism so the user still
  * sees deprecations, unhandled rejections, etc.
  *
- * Installed lazily on first import of this module — covers both the main
- * process (CLI, MCP) and every spawned worker (parse-worker, resolve-worker
- * each import logWarn below and thus trigger this side effect).
+ * Installed on module load so it is active before `node:sqlite` is first
+ * required. Every process that imports this module (main CLI, MCP, resolve
+ * workers, shimmer child) gets the filter installed exactly once.
  */
 function installNodeWarningFilter(): void {
   if ((process as unknown as { __springgraphWarnFilterInstalled?: boolean })
@@ -258,16 +258,41 @@ function installNodeWarningFilter(): void {
   }
   (process as unknown as { __springgraphWarnFilterInstalled?: boolean })
     .__springgraphWarnFilterInstalled = true;
-  process.on('warning', (warning) => {
-    if (warning.name === 'ExperimentalWarning' && /SQLite/.test(warning.message)) {
-      return;
-    }
-    // Re-emit other warnings using Node's standard format.
-    const code = (warning as { code?: string }).code;
-    const prefix = code ? `(${warning.name} ${code})` : `(${warning.name})`;
-    process.stderr.write(`${prefix} ${warning.message}\n`);
-  });
+
+  // `process.on('warning', ...)` does not suppress warnings emitted by
+  // Node's internal `emitExperimentalWarning` (used by `node:sqlite`).
+  // Override `process.emitWarning` at the source so SQLite warnings never
+  // reach stderr while every other warning is forwarded unchanged.
+  try {
+    const original = process.emitWarning;
+    process.emitWarning = function (
+      this: typeof process,
+      warning: string | Error,
+      ...args: any[]
+    ): void {
+      const message = typeof warning === 'string'
+        ? warning
+        : (warning?.message ?? String(warning));
+      if (/SQLite/.test(message)) {
+        return;
+      }
+      return original.apply(this, [warning, ...args] as any);
+    };
+  } catch {
+    // If the runtime prevents overriding emitWarning, fall back to the
+    // listener (which at least lets us reformat / log selectively).
+    process.on('warning', (warning) => {
+      if (warning.name === 'ExperimentalWarning' && /SQLite/.test(warning.message)) {
+        return;
+      }
+      const code = (warning as { code?: string }).code;
+      const prefix = code ? `(${warning.name} ${code})` : `(${warning.name})`;
+      process.stderr.write(`${prefix} ${warning.message}\n`);
+    });
+  }
 }
+
+installNodeWarningFilter();
 
 /**
  * Log an error message

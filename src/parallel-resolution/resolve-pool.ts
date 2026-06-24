@@ -474,6 +474,12 @@ export class ResolveWorkerPool {
   // Internal: progress
   // ---------------------------------------------------------------------------
 
+  // Aggregate progress uses the maximum of (resolved + actual in-flight
+  // progress) ever observed. This keeps the bar smooth (it advances as work
+  // is done) while staying monotonic: when a batch completes with some
+  // unresolved refs, the drop in in-flight progress is absorbed by the max.
+  private maxAggregateCurrent = 0;
+
   private emitProgress(): void {
     // Single shared throttle window for both aggregate and per-worker
     // callbacks — they always fire together (or both skip) so the UI
@@ -483,11 +489,13 @@ export class ResolveWorkerPool {
     this.lastProgressAt = now;
 
     if (this.onProgress) {
-      // Aggregate progress must be monotonic: only count refs that have
-      // actually been resolved. Counting in-flight batches as done makes the
-      // bar leap forward when batches are dispatched and then fall back when
-      // they finish with unresolved refs, which looks like a bug.
-      const safeCurrent = Math.min(this.resolvedCompleted, this.totalSubmitted);
+      let inflightProgress = 0;
+      for (const stats of this.workerStats.values()) {
+        inflightProgress += stats.inflightProgress;
+      }
+      const current = this.resolvedCompleted + inflightProgress;
+      this.maxAggregateCurrent = Math.max(this.maxAggregateCurrent, current);
+      const safeCurrent = Math.min(this.maxAggregateCurrent, this.totalSubmitted);
       this.onProgress(safeCurrent, this.totalSubmitted);
     }
 

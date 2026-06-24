@@ -953,13 +953,17 @@ export class Springgraph {
       await pool.close();
     }
 
-    // Mark the resolve phase complete in the UI and collapse worker bars.
-    // This happens *before* synthesizers/deferred refs so the user sees the
-    // parallel resolve stage finish cleanly instead of freezing near 100%.
+    // Mark the parallel resolve phase complete in the UI and collapse worker
+    // bars. Then show a short "finalizing" phase for the serial synthesizer
+    // and deferred-ref passes so the screen doesn't sit silent while the main
+    // thread finishes the remaining work.
     try {
       const { getCurrentShimmerProgress } = require('./ui/shimmer-progress') as typeof import('./ui/shimmer-progress');
-      getCurrentShimmerProgress()?.updateWorkers('resolving', []);
-      getCurrentShimmerProgress()?.completePhase('resolving');
+      const progress = getCurrentShimmerProgress();
+      progress?.updateWorkers('resolving', []);
+      progress?.completePhase('resolving');
+      progress?.addPhase('finalizing', '收尾处理', 'synthesizers + deferred refs');
+      progress?.startPhase('finalizing');
     } catch {
       /* progress UI not active — ignore */
     }
@@ -981,6 +985,13 @@ export class Springgraph {
     aggregateStats.unresolved += deferredResult.stats.unresolved;
     for (const [method, count] of Object.entries(deferredResult.stats.byMethod)) {
       aggregateStats.byMethod[method] = (aggregateStats.byMethod[method] || 0) + count;
+    }
+
+    try {
+      const { getCurrentShimmerProgress } = require('./ui/shimmer-progress') as typeof import('./ui/shimmer-progress');
+      getCurrentShimmerProgress()?.completePhase('finalizing');
+    } catch {
+      /* progress UI not active — ignore */
     }
 
     return {

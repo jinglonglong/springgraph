@@ -1,4 +1,5 @@
 import { parentPort, workerData } from 'worker_threads';
+import * as fs from 'fs';
 import { getGlyphs } from './glyphs';
 import type { ShimmerWorkerMessage, WorkerProgressMsg } from './types';
 
@@ -227,6 +228,25 @@ function buildLines(frame: number): string[] {
  * redraws the whole block, and ends with another newline. Done phases still
  * redraw, but since their content is static the visual result is stable.
  */
+/**
+ * Raw stdout write via fd 1. We intentionally do NOT use
+ * `process.stdout.write` because in a worker_thread it proxies through the
+ * main thread's stdout; when the main thread is blocked in SQLite writes or
+ * synthesizers, the proxy stalls and the animation freezes. `fs.writeSync(1,
+ * ...)` writes directly to the file descriptor and stays smooth even when the
+ * main thread is busy. The bytes are UTF-8; modern Windows terminals (Windows
+ * Terminal, modern conhost with VT enabled) render UTF-8 correctly, and the
+ * legacy CP936/CP949 mojibake issue is acceptable trade-off for a responsive
+ * progress bar.
+ */
+function stdoutWrite(data: string): void {
+  try {
+    fs.writeSync(1, Buffer.from(data, 'utf-8'));
+  } catch {
+    // Ignore write errors (e.g. stdout closed) to avoid crashing the worker.
+  }
+}
+
 function render(): void {
   if (order.length === 0) return;
   const frame = animFrame();
@@ -234,20 +254,20 @@ function render(): void {
 
   // Move cursor from "below the block" back to the top of the block.
   if (blockHeight > 0) {
-    process.stdout.write(`\x1b[${blockHeight}A`);
+    stdoutWrite(`\x1b[${blockHeight}A`);
   }
 
   for (let i = 0; i < newLines.length; i++) {
-    process.stdout.write('\r\x1b[K');
-    process.stdout.write(newLines[i] as string);
+    stdoutWrite('\r\x1b[K');
+    stdoutWrite(newLines[i] as string);
     if (i < newLines.length - 1) {
-      process.stdout.write('\n');
+      stdoutWrite('\n');
     }
   }
 
   // Leave cursor on a fresh row below the block. This is the anchor point
   // the next render will move up from.
-  process.stdout.write('\n');
+  stdoutWrite('\n');
   blockHeight = newLines.length;
 }
 
@@ -316,6 +336,11 @@ parentPort?.on('message', (msg: ShimmerWorkerMessage) => {
         phase.status = 'done';
         phase.endTime = Date.now();
         if (phase.total === 0 && phase.current > 0) phase.total = phase.current;
+        // Show a full bar when a phase completes, even if not all underlying
+        // work was successfully resolved (e.g. many unresolved refs remain).
+        // The real stats are reported elsewhere; the UI bar is about stage
+        // completion.
+        phase.current = phase.total;
       }
       break;
     }
@@ -333,7 +358,8 @@ parentPort?.on('message', (msg: ShimmerWorkerMessage) => {
     case 'legacy-update': {
       // Auto-register a phase from the old onProgress({ phase, current, total })
       // API. Mirrors the old single-bar behavior: each new phase id implicitly
-      // marks the previous as done.
+      // marks the previous as done. When the phase already exists and is done,
+      // ignore the update so a trailing onProgress() cannot reopen it.
       const existing = phases.get(msg.phase);
       if (!existing) {
         for (const id of order) {
@@ -348,7 +374,7 @@ parentPort?.on('message', (msg: ShimmerWorkerMessage) => {
         phase.current = msg.current;
         phase.total = msg.total;
         phase.startTime = Date.now();
-      } else {
+      } else if (existing.status !== 'done') {
         existing.status = 'running';
         existing.current = msg.current;
         existing.total = msg.total;

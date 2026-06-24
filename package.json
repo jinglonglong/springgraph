@@ -1,6 +1,6 @@
 {
   "name": "@jinglonglong/springgraph",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "为 Spring Cloud 微服务架构量身打造的语义知识图谱与 MCP 服务器",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

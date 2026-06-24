@@ -8,6 +8,11 @@ Springgraph 基于 [colbymchenry/codegraph](https://github.com/colbymchenry/code
 
 ## [Unreleased]
 
+### 修复
+
+- `springgraph init`、`springgraph index` 和 `springgraph sync` 在 Node 22+ 上不再重复打印 `(node:…) ExperimentalWarning: SQLite is an experimental feature` 警告。
+- 进度输出在 Windows 终端、cmd、PowerShell 以及不支持 Unicode 的环境（包括 OEM 代码页）中不再显示为乱码或方块；如果默认输出仍有渲染问题，可设置 `NO_COLOR=1` 或 `SPRINGGRAPH_ASCII=1` 强制使用纯 ASCII 进度条。
+- 大型 Spring Cloud 项目并行解析引用时，进度渲染不再阻塞主线程，减少了界面假死和行重复的概率。
 
 ## [1.0.2] - 2026-06-24
 

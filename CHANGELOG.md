@@ -8,6 +8,9 @@ Springgraph 基于 [colbymchenry/codegraph](https://github.com/colbymchenry/code
 
 ## [Unreleased]
 
+
+## [1.0.2] - 2026-06-24
+
 ### 新功能
 
 - Spring Cloud 项目现在拥有真正的 Maven 模块树：每个模块都会从 `pom.xml` 解析出来，文件会被映射到所属模块，服务模块也会与库模块、父 POM 模块区分开。`springgraph_explore`、架构快照和 Web UI 都会展示模块路径与服务边界，只需一次调用就能回答“这个类属于哪个微服务”。
@@ -131,3 +134,4 @@ Springgraph 基于 [colbymchenry/codegraph](https://github.com/colbymchenry/code
 
 [1.0.0]: https://github.com/jinglonglong/springgraph/releases/tag/v1.0.0
 [1.0.1]: https://github.com/jinglonglong/springgraph/releases/tag/v1.0.1
+[1.0.2]: https://github.com/jinglonglong/springgraph/releases/tag/v1.0.2

@@ -1,7 +1,7 @@
 {
   "name": "@jinglonglong/springgraph",
   "version": "1.0.4",
-  "description": "为 Spring Cloud 微服务架构量身打造的语义知识图谱与 MCP 服务器",
+  "description": "Spring Cloud code knowledge graph and MCP server for AI coding agents",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -14,7 +14,7 @@
   "bugs": {
     "url": "https://github.com/jinglonglong/springgraph/issues"
   },
-  "homepage": "https://github.com/jinglonglong/springgraph#readme",
+  "homepage": "https://jinglonglong.github.io/springgraph/",
   "files": [
     "dist",
     "scripts",
@@ -41,11 +41,30 @@
     "access": "public"
   },
   "keywords": [
+    "spring-cloud",
+    "spring-boot",
+    "java",
+    "mybatis",
+    "mcp",
+    "mcp-server",
+    "ai-agent",
+    "claude-code",
+    "cursor",
+    "opencode",
     "code-intelligence",
+    "code-graph",
     "knowledge-graph",
-    "static-analysis"
+    "static-analysis",
+    "developer-tools",
+    "microservices",
+    "architecture",
+    "call-graph"
   ],
-  "author": "",
+  "author": {
+    "name": "JL359662817",
+    "email": "xyjinglong@163.com",
+    "url": "https://github.com/jinglonglong/springgraph"
+  },
   "license": "MIT",
   "dependencies": {
     "@clack/prompts": "^1.3.0",
@@ -55,6 +74,7 @@
     "fast-wrap-ansi": "^0.2.0",
     "ignore": "^7.0.5",
     "jsonc-parser": "^3.3.1",
+    "openspec": "^0.0.0",
     "picomatch": "^4.0.3",
     "sisteransi": "^1.0.5",
     "tree-sitter-wasms": "^0.1.11",
